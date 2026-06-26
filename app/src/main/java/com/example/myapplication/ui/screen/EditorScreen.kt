@@ -99,7 +99,7 @@ private fun WebView.setEditorLanguage(lang: String) =
     evalJs("setLanguage('$lang')")
 
 private fun WebView.setEditorTheme(dark: Boolean) =
-    evalJs("setTheme('${if (dark) "scripthub-dark" else "scripthub-light"}')")
+    evalJs("setTheme('${if (dark) "vs-dark" else "vs"}')")
 
 private fun WebView.getEditorContent(callback: (String) -> Unit) {
     evaluateJavascript("getContentBase64()") { result ->
