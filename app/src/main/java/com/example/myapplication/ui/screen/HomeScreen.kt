@@ -40,6 +40,7 @@ fun HomeScreen(
     onNewLocalProject: () -> Unit = {},
     onCloneGithub: () -> Unit = {},
     onImportFile: () -> Unit = {},
+    onFromTemplate: () -> Unit = {},
     onSettingsClick: () -> Unit = {}
 ) {
     var sortMenuExpanded by remember { mutableStateOf(false) }
@@ -143,6 +144,7 @@ fun HomeScreen(
                     AddProjectAction.NEW_LOCAL    -> onNewLocalProject()
                     AddProjectAction.CLONE_GITHUB -> onCloneGithub()
                     AddProjectAction.IMPORT_FILE  -> onImportFile()
+                    AddProjectAction.FROM_TEMPLATE -> onFromTemplate()
                 }
             },
             onDismiss = { showAddSheet = false }
@@ -276,16 +278,11 @@ fun ProjectCard(
                 )
             }
 
-            // 右侧状态区域：Active 徽章 > LOCAL 徽章 > 修改时间
+            // 右侧徽章：仅按项目来源类型区分
             Spacer(modifier = Modifier.width(8.dp))
-            when {
-                project.isActive              -> ActiveBadge()
-                project.type == ProjectType.LOCAL -> LocalBadge()
-                else -> Text(
-                    text = project.lastModified,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+            when (project.type) {
+                ProjectType.LOCAL  -> LocalBadge()
+                ProjectType.GITHUB -> GithubBadge()
             }
         }
     }
@@ -318,24 +315,7 @@ fun ProjectIcon(
     }
 }
 
-// ---------- Active Badge ----------
-@Composable
-fun ActiveBadge() {
-    Surface(
-        shape = RoundedCornerShape(6.dp),
-        color = MaterialTheme.colorScheme.secondaryContainer
-    ) {
-        Text(
-            text = "Active",
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSecondaryContainer,
-            fontWeight = FontWeight.Medium
-        )
-    }
-}
-
-// ---------- Local Badge ----------
+// ---------- LOCAL 徽章 ----------
 @Composable
 fun LocalBadge() {
     Surface(
@@ -347,6 +327,23 @@ fun LocalBadge() {
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onPrimaryContainer,
+            fontWeight = FontWeight.Medium
+        )
+    }
+}
+
+// ---------- GITHUB 徽章 ----------
+@Composable
+fun GithubBadge() {
+    Surface(
+        shape = RoundedCornerShape(6.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh
+    ) {
+        Text(
+            text = "GITHUB",
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             fontWeight = FontWeight.Medium
         )
     }

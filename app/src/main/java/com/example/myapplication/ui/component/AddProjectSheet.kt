@@ -9,6 +9,7 @@ import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.FolderOpen
 import androidx.compose.material.icons.outlined.Hub
@@ -30,7 +31,8 @@ import androidx.compose.ui.unit.sp
 enum class AddProjectAction {
     NEW_LOCAL,
     CLONE_GITHUB,
-    IMPORT_FILE
+    IMPORT_FILE,
+    FROM_TEMPLATE
 }
 
 // ─────────────────────────────────────────────
@@ -127,6 +129,17 @@ private fun SheetContent(
             title = "导入本地文件",
             subtitle = "从设备存储中选择已有的项目文件夹",
             onClick = { onAction(AddProjectAction.IMPORT_FILE) }
+        )
+
+        OptionDivider()
+
+        AddProjectOption(
+            icon = Icons.Outlined.AutoAwesome,
+            iconBackgroundColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            iconTint = MaterialTheme.colorScheme.onSurfaceVariant,
+            title = "从模板开始",
+            subtitle = "从预置模板快速创建项目，稍后完善",
+            onClick = { onAction(AddProjectAction.FROM_TEMPLATE) }
         )
     }
 }

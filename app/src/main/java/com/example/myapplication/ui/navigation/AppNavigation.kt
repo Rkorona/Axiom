@@ -6,6 +6,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.graphics.Color
+import com.example.myapplication.ui.component.NewLocalProjectDialog
 import com.example.myapplication.ui.model.Project
 import com.example.myapplication.ui.model.ProjectType
 import com.example.myapplication.ui.screen.EditorFile
@@ -48,38 +49,45 @@ fun AppNavigation() {
     // 项目列表：动态管理，无硬编码
     val projects = remember { mutableStateListOf<Project>() }
 
-    // ── 文件夹选择器（导入本地项目）──────────────────
+    // 弹窗状态
+    var showNewLocalDialog by remember { mutableStateOf(false) }
+
+    // ── 工具函数：计算下一个本地项目图标颜色 ────────────
+    fun nextLocalColor(): Color {
+        val localCount = projects.count { it.type == ProjectType.LOCAL }
+        return localProjectIconColors[localCount % localProjectIconColors.size]
+    }
+
+    // ── 文件夹选择器（导入已有本地项目）──────────────────
     val importFolderLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocumentTree()
     ) { uri: Uri? ->
         if (uri == null) return@rememberLauncherForActivityResult
 
-        // 解析文件夹名称：取 URI 末段，去掉 "primary:" 前缀
         val rawSegment = uri.lastPathSegment ?: uri.toString()
         val folderName = rawSegment
-            .substringAfterLast(':')   // 去掉 "primary:" 等存储卷前缀
-            .substringAfterLast('/')   // 取最后一段路径
-            .ifBlank { rawSegment }    // 若解析为空则回退原始值
+            .substringAfterLast(':')
+            .substringAfterLast('/')
+            .ifBlank { rawSegment }
 
-        // 友好显示路径（用于 description 副标题）
         val displayPath = rawSegment
             .substringAfterLast(':')
             .ifBlank { "本地存储" }
 
-        val colorIndex = projects.count { it.type == ProjectType.LOCAL } % localProjectIconColors.size
         val newProject = Project(
             id = System.currentTimeMillis().toString(),
             name = folderName,
             description = displayPath,
             type = ProjectType.LOCAL,
             lastModified = "刚刚",
-            iconColor = localProjectIconColors[colorIndex],
+            iconColor = nextLocalColor(),
             isActive = false,
             localPath = uri.toString()
         )
-        projects.add(0, newProject) // 插入到列表头部，最新的在最上面
+        projects.add(0, newProject)
     }
 
+    // ── 页面渲染 ─────────────────────────────────────────
     when (val screen = currentScreen) {
         is Screen.Home -> {
             HomeScreen(
@@ -92,21 +100,16 @@ fun AppNavigation() {
                     )
                 },
                 onNewLocalProject = {
-                    // 新建本地项目：打开空白编辑器
-                    currentScreen = Screen.Editor(
-                        file = EditorFile(
-                            name = "untitled.js",
-                            code = "// untitled.js\n// Start coding here...\n\n",
-                            lang = "js"
-                        )
-                    )
+                    showNewLocalDialog = true
                 },
                 onCloneGithub = {
                     // TODO: 打开 GitHub 克隆对话框
                 },
                 onImportFile = {
-                    // 打开系统文件夹选择器
                     importFolderLauncher.launch(null)
+                },
+                onFromTemplate = {
+                    // TODO: 打开模板选择页
                 },
                 onSettingsClick = {
                     // TODO: 后续接入设置页
@@ -126,6 +129,27 @@ fun AppNavigation() {
                 }
             )
         }
+    }
+
+    // ── 新建本地项目对话框 ────────────────────────────────
+    if (showNewLocalDialog) {
+        NewLocalProjectDialog(
+            onConfirm = { name, localPath ->
+                val newProject = Project(
+                    id = System.currentTimeMillis().toString(),
+                    name = name,
+                    description = "本地项目",
+                    type = ProjectType.LOCAL,
+                    lastModified = "刚刚",
+                    iconColor = nextLocalColor(),
+                    isActive = false,
+                    localPath = localPath
+                )
+                projects.add(0, newProject)
+                showNewLocalDialog = false
+            },
+            onDismiss = { showNewLocalDialog = false }
+        )
     }
 }
 
