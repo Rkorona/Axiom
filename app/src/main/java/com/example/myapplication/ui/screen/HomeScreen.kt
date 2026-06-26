@@ -24,8 +24,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.myapplication.model.Project
-import com.example.myapplication.model.ProjectType
+import com.example.myapplication.ui.model.Project
+import com.example.myapplication.ui.model.ProjectType
 
 // ---------- Sample Data ----------
 private val sampleProjects = listOf(

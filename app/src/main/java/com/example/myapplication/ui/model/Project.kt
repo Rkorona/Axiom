@@ -12,6 +12,6 @@ data class Project(
     val description: String,
     val type: ProjectType,
     val lastModified: String,
-    val iconColor: Color = Color.Unspecified,
-    val isActive: Boolean = false
+    val iconColor: Color,
+    val isActive: Boolean
 )
