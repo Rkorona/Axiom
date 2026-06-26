@@ -255,25 +255,32 @@ fun EditorScreen(
                 .background(MaterialTheme.colorScheme.surface)
         ) {
             
-            // ── 新增的剪贴板快捷动作操作栏 ──
+            
+                        // ── 🚀 移动端 IDE 专属：多功能防误触辅助动作工具栏 ──
             if (isEditorReady) {
+                var isSelectModeActive by remember { mutableStateOf(false) }
+                val rowScrollState = rememberScrollState()
+
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(MaterialTheme.colorScheme.surfaceContainerLow)
-                        .padding(horizontal = 12.dp, vertical = 2.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        .horizontalScroll(rowScrollState) // 支持横向滑动包裹
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     val btnMod = Modifier.height(36.dp)
+                    
+                    // 1. 基本剪贴功能
                     TextButton(onClick = { webViewRef.value?.evalJs("selectAll();") }, modifier = btnMod) {
-                        Text("全选", style = MaterialTheme.typography.bodyMedium)
+                        Text("全选")
                     }
                     TextButton(onClick = { webViewRef.value?.evalJs("doCopy();") }, modifier = btnMod) {
-                        Text("复制", style = MaterialTheme.typography.bodyMedium)
+                        Text("复制")
                     }
                     TextButton(onClick = { webViewRef.value?.evalJs("doCut();") }, modifier = btnMod) {
-                        Text("剪切", style = MaterialTheme.typography.bodyMedium)
+                        Text("剪切")
                     }
                     TextButton(
                         onClick = {
@@ -290,11 +297,44 @@ fun EditorScreen(
                         },
                         modifier = btnMod
                     ) {
-                        Text("粘贴", style = MaterialTheme.typography.bodyMedium)
+                        Text("粘贴")
+                    }
+
+                    VerticalDivider(modifier = Modifier.height(20.dp), color = MaterialTheme.colorScheme.outlineVariant)
+
+                    // 2. 🌟 锁定选择模式（高亮状态控制）
+                    Button(
+                        onClick = {
+                            isSelectModeActive = !isSelectModeActive
+                            webViewRef.value?.evalJs("toggleSelectionMode();")
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (isSelectModeActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primaryContainer,
+                            contentColor = if (isSelectModeActive) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onPrimaryContainer
+                        ),
+                        modifier = btnMod.padding(horizontal = 2.dp),
+                        contentPadding = PaddingValues(horizontal = 12.dp)
+                    ) {
+                        Text(if (isSelectModeActive) "选择中[🔒]" else "开始选择")
+                    }
+
+                    // 3. 🕹️ 像素级方向键微调光标与选区
+                    FilledIconButton(onClick = { webViewRef.value?.evalJs("moveCursor('left');") }, modifier = Modifier.size(36.dp)) {
+                        Text("◀", style = MaterialTheme.typography.bodySmall)
+                    }
+                    FilledIconButton(onClick = { webViewRef.value?.evalJs("moveCursor('up');") }, modifier = Modifier.size(36.dp)) {
+                        Text("▲", style = MaterialTheme.typography.bodySmall)
+                    }
+                    FilledIconButton(onClick = { webViewRef.value?.evalJs("moveCursor('down');") }, modifier = Modifier.size(36.dp)) {
+                        Text("▼", style = MaterialTheme.typography.bodySmall)
+                    }
+                    FilledIconButton(onClick = { webViewRef.value?.evalJs("moveCursor('right');") }, modifier = Modifier.size(36.dp)) {
+                        Text("▶", style = MaterialTheme.typography.bodySmall)
                     }
                 }
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 0.5.dp)
             }
+
 
             // ── WebView 核心编辑器画布 ──
             Box(modifier = Modifier.weight(1f).fillMaxWidth()) {

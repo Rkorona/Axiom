@@ -14,7 +14,6 @@
 
 <script src="vs/loader.js"></script>
 <script>
-    // 切换到 HTTPS 环境后，直接通过标准 URL 加载同源的 Worker 文件
   globalThis.MonacoEnvironment = {
     getWorkerUrl: function (_id, label) {
       var files = {
@@ -30,11 +29,9 @@
       else if (label === 'html' || label === 'handlebars' || label === 'razor') path = files.html;
       else if (label === 'typescript' || label === 'javascript') path = files.ts;
       
-      // 构建绝对路径：https://appassets.androidplatform.net/assets/monaco/vs/assets/...
       return window.location.origin + '/assets/monaco/' + path;
     }
   };
-
 
   require.config({ paths: { vs: 'vs' } });
 
@@ -59,17 +56,9 @@
       tabCompletion: 'on',
       wordBasedSuggestions: 'currentDocument',
       suggest: {
-        showMethods: true,
-        showFunctions: true,
-        showConstructors: true,
-        showFields: true,
-        showVariables: true,
-        showClasses: true,
-        showModules: true,
-        showProperties: true,
-        showKeywords: true,
-        showWords: true,
-        showSnippets: true
+        showMethods: true, showFunctions: true, showConstructors: true, showFields: true,
+        showVariables: true, showClasses: true, showModules: true, showProperties: true,
+        showKeywords: true, showWords: true, showSnippets: true
       },
       parameterHints: { enabled: true }
     });
@@ -78,8 +67,6 @@
       var model = window.editor.getModel();
       AndroidBridge.onStatsChanged(model.getLineCount(), model.getValueLength());
 
-      // Android WebView 软键盘走 IME 输入，不触发 keydown，Monaco 收不到字符事件
-      // 因此每次内容变化时手动检测，若光标前是合法标识符字符则主动触发智能提示
       try {
         var pos = window.editor.getPosition();
         if (pos && pos.column > 1) {
@@ -92,18 +79,44 @@
       } catch (_) {}
     });
 
-    // 点击编辑区时通知 Kotlin 弹出系统软键盘（Android WebView 中 JS focus() 不会自动触发 IME）
-    document.getElementById('editor').addEventListener('pointerdown', function () {
-      window.editor.focus();
-      AndroidBridge.onEditorTapped();
-    });
+    // ── 🧠 智能滑动防误触算法优化 ──
+    var touchStartX = 0;
+    var touchStartY = 0;
+    var isScrollingMove = false;
+
+    document.getElementById('editor').addEventListener('touchstart', function (e) {
+      if (e.touches.length === 1) {
+        touchStartX = e.touches[0].clientX;
+        touchStartY = e.touches[0].clientY;
+        isScrollingMove = false;
+      }
+    }, { passive: true });
+
+    document.getElementById('editor').addEventListener('touchmove', function (e) {
+      if (e.touches.length === 1) {
+        var dx = Math.abs(e.touches[0].clientX - touchStartX);
+        var dy = Math.abs(e.touches[0].clientY - touchStartY);
+        // 如果手指在屏幕上移动超过 8 个像素，判定为“滚动浏览代码”，中断拉起键盘
+        if (dx > 8 || dy > 8) {
+          isScrollingMove = true;
+        }
+      }
+    }, { passive: true });
+
+    document.getElementById('editor').addEventListener('touchend', function (e) {
+      // 只有当用户是“原地轻点”时，才唤醒光标和键盘输入法
+      if (!isScrollingMove) {
+        window.editor.focus();
+        AndroidBridge.onEditorTapped();
+      }
+    }, { passive: true });
 
     setTimeout(function () {
       AndroidBridge.onReady();
     }, 0);
   });
 
-  // ── Kotlin 通过 evaluateJavascript 调用的 API ────────────────────
+  // ── 📂 核心指令 API ──
 
   function setContent(base64) {
     try {
@@ -121,21 +134,11 @@
   }
 
   function getContentBase64() {
-    try {
-      return btoa(unescape(encodeURIComponent(window.editor.getValue())));
-    } catch (e) {
-      return '';
-    }
+    try { return btoa(unescape(encodeURIComponent(window.editor.getValue()))); } catch (e) { return ''; }
   }
 
-  function setLanguage(lang) {
-    monaco.editor.setModelLanguage(window.editor.getModel(), lang);
-  }
-
-  function setTheme(theme) {
-    monaco.editor.setTheme(theme);
-  }
-
+  function setLanguage(lang) { monaco.editor.setModelLanguage(window.editor.getModel(), lang); }
+  function setTheme(theme) { monaco.editor.setTheme(theme); }
   function layoutEditor() {
     if (!window.editor) return;
     var el = document.getElementById('editor');
@@ -143,31 +146,81 @@
     var h = el.clientHeight || window.innerHeight;
     if (w > 0 && h > 0) window.editor.layout({ width: w, height: h });
   }
-  
-    // 1. 全选功能
+
+  // ── 📝 精准文本选择与移动引擎 ──
+  var isSelectionMode = false;
+  var selectionStartPos = null;
+
+  function toggleSelectionMode() {
+    if (!window.editor) return false;
+    isSelectionMode = !isSelectionMode;
+    if (isSelectionMode) {
+      // 记住按下“选择”按钮那一刻的光标始发位置
+      selectionStartPos = window.editor.getPosition();
+    } else {
+      selectionStartPos = null;
+    }
+    return isSelectionMode;
+  }
+
+  function moveCursor(dir) {
+    if (!window.editor) return;
+    var pos = window.editor.getPosition();
+    var model = window.editor.getModel();
+    var line = pos.lineNumber;
+    var col = pos.column;
+
+    if (dir === 'left') {
+      if (col > 1) col--;
+      else if (line > 1) { line--; col = model.getLineMaxColumn(line); }
+    } else if (dir === 'right') {
+      if (col < model.getLineMaxColumn(line)) col++;
+      else if (line < model.getLineCount()) { line++; col = 1; }
+    } else if (dir === 'up') {
+      if (line > 1) line--;
+    } else if (dir === 'down') {
+      if (line < model.getLineCount()) line++;
+    }
+
+    var newPos = { lineNumber: line, column: col };
+
+    if (isSelectionMode && selectionStartPos) {
+      // 如果开启了选区锁定，则拖拽生成高亮选区蓝条
+      window.editor.setSelection(new monaco.Selection(
+        selectionStartPos.lineNumber, selectionStartPos.column,
+        newPos.lineNumber, newPos.column
+      ));
+    } else {
+      // 正常移动光标
+      window.editor.setPosition(newPos);
+    }
+    window.editor.revealPositionInCenterIfOutsideViewport(newPos);
+  }
+
   function selectAll() {
     if (!window.editor) return;
     window.editor.focus();
     window.editor.getAction('editor.action.selectAll').run();
   }
 
-  // 2. 获取当前选中的文本（用于复制/剪切）
-  function getSelectedText() {
-    if (!window.editor) return '';
-    var selection = window.editor.getSelection();
-    return window.editor.getModel().getValueInRange(selection);
-  }
-
-  // 3. 删除当前选中的文本（用于剪切后的清空）
-  function deleteSelection() {
+  function doCopy() {
     if (!window.editor) return;
     var selection = window.editor.getSelection();
-    var range = new monaco.Range(selection.startLineNumber, selection.startColumn, selection.endLineNumber, selection.endColumn);
-    var op = { range: range, text: '', forceMoveMarkers: true };
-    window.editor.executeEdits('clipboard', [op]);
+    var text = window.editor.getModel().getValueInRange(selection);
+    if (text) AndroidBridge.copyToSystemClipboard(text);
   }
 
-  // 4. 插入/粘贴文本（通过安全可靠的 Base64 传入）
+  function doCut() {
+    if (!window.editor) return;
+    var selection = window.editor.getSelection();
+    var text = window.editor.getModel().getValueInRange(selection);
+    if (text) {
+      AndroidBridge.copyToSystemClipboard(text);
+      var range = new monaco.Range(selection.startLineNumber, selection.startColumn, selection.endLineNumber, selection.endColumn);
+      window.editor.executeEdits('clipboard', [{ range: range, text: '', forceMoveMarkers: true }]);
+    }
+  }
+
   function insertTextBase64(base64) {
     try {
       var text = decodeURIComponent(escape(atob(base64)));
@@ -175,30 +228,11 @@
       window.editor.focus();
       var selection = window.editor.getSelection();
       var range = new monaco.Range(selection.startLineNumber, selection.startColumn, selection.endLineNumber, selection.endColumn);
-      var op = { range: range, text: text, forceMoveMarkers: true };
-      window.editor.executeEdits('clipboard', [op]);
+      window.editor.executeEdits('clipboard', [{ range: range, text: text, forceMoveMarkers: true }]);
     } catch (e) {
       AndroidBridge.onError('insertText error: ' + e.message);
     }
   }
-    // 前端触发：复制并传给系统
-  function doCopy() {
-    var text = getSelectedText();
-    if (text) {
-      AndroidBridge.copyToSystemClipboard(text);
-    }
-  }
-
-  // 前端触发：剪切并传给系统
-  function doCut() {
-    var text = getSelectedText();
-    if (text) {
-      AndroidBridge.copyToSystemClipboard(text);
-      deleteSelection();
-    }
-  }
-
-
 </script>
 </body>
 </html>
