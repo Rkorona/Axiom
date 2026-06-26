@@ -143,6 +143,62 @@
     var h = el.clientHeight || window.innerHeight;
     if (w > 0 && h > 0) window.editor.layout({ width: w, height: h });
   }
+  
+    // 1. 全选功能
+  function selectAll() {
+    if (!window.editor) return;
+    window.editor.focus();
+    window.editor.getAction('editor.action.selectAll').run();
+  }
+
+  // 2. 获取当前选中的文本（用于复制/剪切）
+  function getSelectedText() {
+    if (!window.editor) return '';
+    var selection = window.editor.getSelection();
+    return window.editor.getModel().getValueInRange(selection);
+  }
+
+  // 3. 删除当前选中的文本（用于剪切后的清空）
+  function deleteSelection() {
+    if (!window.editor) return;
+    var selection = window.editor.getSelection();
+    var range = new monaco.Range(selection.startLineNumber, selection.startColumn, selection.endLineNumber, selection.endColumn);
+    var op = { range: range, text: '', forceMoveMarkers: true };
+    window.editor.executeEdits('clipboard', [op]);
+  }
+
+  // 4. 插入/粘贴文本（通过安全可靠的 Base64 传入）
+  function insertTextBase64(base64) {
+    try {
+      var text = decodeURIComponent(escape(atob(base64)));
+      if (!window.editor) return;
+      window.editor.focus();
+      var selection = window.editor.getSelection();
+      var range = new monaco.Range(selection.startLineNumber, selection.startColumn, selection.endLineNumber, selection.endColumn);
+      var op = { range: range, text: text, forceMoveMarkers: true };
+      window.editor.executeEdits('clipboard', [op]);
+    } catch (e) {
+      AndroidBridge.onError('insertText error: ' + e.message);
+    }
+  }
+    // 前端触发：复制并传给系统
+  function doCopy() {
+    var text = getSelectedText();
+    if (text) {
+      AndroidBridge.copyToSystemClipboard(text);
+    }
+  }
+
+  // 前端触发：剪切并传给系统
+  function doCut() {
+    var text = getSelectedText();
+    if (text) {
+      AndroidBridge.copyToSystemClipboard(text);
+      deleteSelection();
+    }
+  }
+
+
 </script>
 </body>
 </html>

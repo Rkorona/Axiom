@@ -39,7 +39,7 @@ data class EditorFile(
 )
 
 // ─────────────────────────────────────────────
-// JS → Kotlin Bridge（与 editor.html 中 AndroidBridge 对接）
+// JS → Kotlin Bridge
 // ─────────────────────────────────────────────
 
 private class MonacoBridge(
@@ -82,6 +82,20 @@ private class MonacoBridge(
 
     @JavascriptInterface
     fun onError(message: String) = main.post { onError.invoke(message) }
+
+    // 接收来自 WebView 的文本并写入 Android 系统原生剪贴板
+    @JavascriptInterface
+    fun copyToSystemClipboard(text: String) {
+        main.post {
+            try {
+                val clipboard = webView.context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                val clip = android.content.ClipData.newPlainText("MonacoCode", text)
+                clipboard.setPrimaryClip(clip)
+            } catch (e: Exception) {
+                onError("复制到系统剪贴板失败: ${e.message}")
+            }
+        }
+    }
 }
 
 // ─────────────────────────────────────────────
@@ -119,7 +133,7 @@ private fun WebView.getEditorContent(callback: (String) -> Unit) {
 }
 
 // ─────────────────────────────────────────────
-// EditorScreen
+// EditorScreen 主界面
 // ─────────────────────────────────────────────
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -131,6 +145,7 @@ fun EditorScreen(
     onSave: (String) -> Unit
 ) {
     val view = LocalView.current
+    val context = androidx.compose.ui.platform.LocalContext.current
     val scope = rememberCoroutineScope()
     val isDark = isSystemInDarkTheme()
 
@@ -161,7 +176,6 @@ fun EditorScreen(
         }
     }
 
-    // Monaco 就绪后写入内容
     LaunchedEffect(isEditorReady) {
         if (!isEditorReady || initDone) return@LaunchedEffect
         val wv = webViewRef.value ?: return@LaunchedEffect
@@ -234,101 +248,138 @@ fun EditorScreen(
             )
         }
     ) { innerPadding ->
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
                 .background(MaterialTheme.colorScheme.surface)
         ) {
-            AndroidView(
-                modifier = Modifier.fillMaxSize(),
-                factory = { ctx ->
-                    WebView(ctx).apply {
-                        layoutParams = android.view.ViewGroup.LayoutParams(
-                            android.view.ViewGroup.LayoutParams.MATCH_PARENT,
-                            android.view.ViewGroup.LayoutParams.MATCH_PARENT
-                        )
-                        isFocusable = true
-                        isFocusableInTouchMode = true
-                        setBackgroundColor(if (isDark) 0xFF0D0D0D.toInt() else 0xFFFAFAFA.toInt())
             
-                        // 创建 资源加载器
-                        val assetLoader = androidx.webkit.WebViewAssetLoader.Builder()
-                            .addPathHandler("/assets/", androidx.webkit.WebViewAssetLoader.AssetsPathHandler(ctx))
-                            .build()
-            
-                        settings.apply {
-                            javaScriptEnabled = true
-                            domStorageEnabled = true
-                            allowFileAccess = true
-                            useWideViewPort = true
-                            loadWithOverviewMode = true
-                            setSupportZoom(false)
-                            builtInZoomControls = false
-                            displayZoomControls = false
-                        }
-            
-                        webChromeClient = object : WebChromeClient() {
-                            override fun onConsoleMessage(msg: ConsoleMessage?): Boolean {
-                                msg?.let {
-                                    android.util.Log.d("EditorJS",
-                                        "[${it.messageLevel()}] ${it.message()} (${it.sourceId()}:${it.lineNumber()})")
+            // ── 新增的剪贴板快捷动作操作栏 ──
+            if (isEditorReady) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                        .padding(horizontal = 12.dp, vertical = 2.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    val btnMod = Modifier.height(36.dp)
+                    TextButton(onClick = { webViewRef.value?.evalJs("selectAll();") }, modifier = btnMod) {
+                        Text("全选", style = MaterialTheme.typography.bodyMedium)
+                    }
+                    TextButton(onClick = { webViewRef.value?.evalJs("doCopy();") }, modifier = btnMod) {
+                        Text("复制", style = MaterialTheme.typography.bodyMedium)
+                    }
+                    TextButton(onClick = { webViewRef.value?.evalJs("doCut();") }, modifier = btnMod) {
+                        Text("剪切", style = MaterialTheme.typography.bodyMedium)
+                    }
+                    TextButton(
+                        onClick = {
+                            try {
+                                val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                                val pasteText = clipboard.primaryClip?.getItemAt(0)?.text?.toString() ?: ""
+                                if (pasteText.isNotEmpty()) {
+                                    val b64 = Base64.encodeToString(pasteText.toByteArray(Charsets.UTF_8), Base64.NO_WRAP)
+                                    webViewRef.value?.evalJs("insertTextBase64('$b64');")
                                 }
-                                return true
+                            } catch (e: Exception) {
+                                snackbarMessage = "粘贴失败: ${e.message}"
                             }
-                        }
-            
-                        addJavascriptInterface(
-                            MonacoBridge(
-                                webView = this,
-                                onReady = { isEditorReady = true },
-                                onContentChanged = { hasUnsavedChanges = true },
-                                onError = { msg -> snackbarMessage = "编辑器错误：$msg" }
-                            ),
-                            "AndroidBridge"
-                        )
-            
-                        webViewClient = object : WebViewClient() {
-                            // 关键拦截点：将 https 虚拟域名的请求映射到本地 assets 文件夹
-                            override fun shouldInterceptRequest(
-                                view: WebView,
-                                request: WebResourceRequest
-                            ): android.webkit.WebResourceResponse? {
-                                return assetLoader.shouldInterceptRequest(request.url)
-                            }
-            
-                            override fun onPageFinished(view: WebView, url: String) {
-                                view.post { view.evalJs("layoutEditor()") }
-                            }
-            
-                            // 更新路由重定向拦截
-                            override fun shouldOverrideUrlLoading(
-                                view: WebView, request: WebResourceRequest
-                            ): Boolean = !request.url.toString().startsWith("https://appassets.androidplatform.net/assets/")
-                        }
-            
-                        webViewRef.value = this
-                        
-                        // 【重要修改】使用虚拟的 HTTPS 域名加载页面
-                        loadUrl("https://appassets.androidplatform.net/assets/monaco/editor.html")
+                        },
+                        modifier = btnMod
+                    ) {
+                        Text("粘贴", style = MaterialTheme.typography.bodyMedium)
                     }
                 }
-            )
-            
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 0.5.dp)
+            }
 
+            // ── WebView 核心编辑器画布 ──
+            Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                AndroidView(
+                    modifier = Modifier.fillMaxSize(),
+                    factory = { ctx ->
+                        WebView(ctx).apply {
+                            layoutParams = android.view.ViewGroup.LayoutParams(
+                                android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                                android.view.ViewGroup.LayoutParams.MATCH_PARENT
+                            )
+                            isFocusable = true
+                            isFocusableInTouchMode = true
+                            setBackgroundColor(if (isDark) 0xFF0D0D0D.toInt() else 0xFFFAFAFA.toInt())
+                
+                            val assetLoader = androidx.webkit.WebViewAssetLoader.Builder()
+                                .addPathHandler("/assets/", androidx.webkit.WebViewAssetLoader.AssetsPathHandler(ctx))
+                                .build()
+                
+                            settings.apply {
+                                javaScriptEnabled = true
+                                domStorageEnabled = true
+                                allowFileAccess = true
+                                useWideViewPort = true
+                                loadWithOverviewMode = true
+                                setSupportZoom(false)
+                                builtInZoomControls = false
+                                displayZoomControls = false
+                            }
+                
+                            webChromeClient = object : WebChromeClient() {
+                                override fun onConsoleMessage(msg: ConsoleMessage?): Boolean {
+                                    msg?.let {
+                                        android.util.Log.d("EditorJS",
+                                            "[${it.messageLevel()}] ${it.message()} (${it.sourceId()}:${it.lineNumber()})")
+                                    }
+                                    return true
+                                }
+                            }
+                
+                            addJavascriptInterface(
+                                MonacoBridge(
+                                    webView = this,
+                                    onReady = { isEditorReady = true },
+                                    onContentChanged = { hasUnsavedChanges = true },
+                                    onError = { msg -> snackbarMessage = "编辑器错误：$msg" }
+                                ),
+                                "AndroidBridge"
+                            )
+                
+                            webViewClient = object : WebViewClient() {
+                                override fun shouldInterceptRequest(
+                                    view: WebView,
+                                    request: WebResourceRequest
+                                ): android.webkit.WebResourceResponse? {
+                                    return assetLoader.shouldInterceptRequest(request.url)
+                                }
+                
+                                override fun onPageFinished(view: WebView, url: String) {
+                                    view.post { view.evalJs("layoutEditor()") }
+                                }
+                
+                                override fun shouldOverrideUrlLoading(
+                                    view: WebView, request: WebResourceRequest
+                                ): Boolean = !request.url.toString().startsWith("https://appassets.androidplatform.net/assets/")
+                            }
+                
+                            webViewRef.value = this
+                            loadUrl("https://appassets.androidplatform.net/assets/monaco/editor.html")
+                        }
+                    }
+                )
 
-
-            if (!isEditorReady) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(MaterialTheme.colorScheme.surface),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        CircularProgressIndicator()
-                        Spacer(Modifier.height(12.dp))
-                        Text("加载编辑器…", style = MaterialTheme.typography.bodyMedium)
+                if (!isEditorReady) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(MaterialTheme.colorScheme.surface),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            CircularProgressIndicator()
+                            Spacer(Modifier.height(12.dp))
+                            Text("加载编辑器…", style = MaterialTheme.typography.bodyMedium)
+                        }
                     }
                 }
             }
@@ -350,10 +401,6 @@ fun EditorScreen(
     }
 }
 
-// ─────────────────────────────────────────────
-// lang ID 映射（本项目短名 → Monaco language ID）
-// ─────────────────────────────────────────────
-
 private fun monacoLang(lang: String): String = when (lang) {
     "js"     -> "javascript"
     "ts"     -> "typescript"
@@ -369,10 +416,6 @@ private fun monacoLang(lang: String): String = when (lang) {
     "json"   -> "json"
     else     -> lang
 }
-
-// ─────────────────────────────────────────────
-// 语言切换下拉菜单
-// ─────────────────────────────────────────────
 
 @Composable
 private fun LangDropdown(current: String, onSelect: (String) -> Unit) {
