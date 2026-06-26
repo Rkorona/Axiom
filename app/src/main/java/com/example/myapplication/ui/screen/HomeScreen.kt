@@ -58,131 +58,63 @@ private val sampleProjects = listOf(
     )
 )
 
-// ---------- Screen ----------
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     onProjectClick: (Project) -> Unit = {},
-    onAddProject: () -> Unit = {},
     onSettingsClick: () -> Unit = {}
 ) {
     var selectedTab by remember { mutableIntStateOf(0) }
     var sortMenuExpanded by remember { mutableStateOf(false) }
+    
+    // 🧠 控制底栏新建菜单的显示状态
+    var showSheet by remember { mutableStateOf(false) }
+    val sheetState = rememberModalBottomSheetState()
 
     Scaffold(
         topBar = {
             TopAppBar(
                 navigationIcon = {
                     IconButton(onClick = {}) {
-                        Icon(
-                            imageVector = Icons.Outlined.Hub,
-                            contentDescription = "返回",
-                            tint = MaterialTheme.colorScheme.onSurface
-                        )
+                        Icon(imageVector = Icons.Outlined.Hub, contentDescription = "主页", tint = MaterialTheme.colorScheme.onSurface)
                     }
                 },
-                title = {
-                    Text(
-                        text = "Projects",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold
-                    )
-                },
+                title = { Text(text = "Projects", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) },
                 actions = {
-                    // Search button
                     IconButton(onClick = {}) {
-                        Icon(
-                            imageVector = Icons.Default.Search,
-                            contentDescription = "搜索",
-                            tint = MaterialTheme.colorScheme.onSurface
-                        )
+                        Icon(imageVector = Icons.Default.Search, contentDescription = "搜索", tint = MaterialTheme.colorScheme.onSurface)
                     }
-                    // Sort button with dropdown
                     Box {
                         IconButton(onClick = { sortMenuExpanded = true }) {
-                            Icon(
-                                imageVector = Icons.Outlined.SortByAlpha,
-                                contentDescription = "排序",
-                                tint = MaterialTheme.colorScheme.onSurface
-                            )
+                            Icon(imageVector = Icons.Outlined.SortByAlpha, contentDescription = "排序", tint = MaterialTheme.colorScheme.onSurface)
                         }
-                        DropdownMenu(
-                            expanded = sortMenuExpanded,
-                            onDismissRequest = { sortMenuExpanded = false }
-                        ) {
-                            DropdownMenuItem(
-                                text = { Text("按名称排序") },
-                                onClick = { sortMenuExpanded = false }
-                            )
-                            DropdownMenuItem(
-                                text = { Text("按修改时间排序") },
-                                onClick = { sortMenuExpanded = false }
-                            )
-                            DropdownMenuItem(
-                                text = { Text("按类型排序") },
-                                onClick = { sortMenuExpanded = false }
-                            )
+                        DropdownMenu(expanded = sortMenuExpanded, onDismissRequest = { sortMenuExpanded = false }) {
+                            DropdownMenuItem(text = { Text("按名称排序") }, onClick = { sortMenuExpanded = false })
+                            DropdownMenuItem(text = { Text("按修改时间排序") }, onClick = { sortMenuExpanded = false })
                         }
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                )
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
             )
         },
         floatingActionButton = {
+            // 点击 FAB 直接拉起底栏菜单
             FloatingActionButton(
-                onClick = onAddProject,
+                onClick = { showSheet = true },
                 shape = RoundedCornerShape(16.dp),
                 containerColor = MaterialTheme.colorScheme.primaryContainer,
                 contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
                 modifier = Modifier.size(64.dp)
             ) {
-                Icon(
-                    imageVector = Icons.Default.Add,
-                    contentDescription = "新建项目",
-                    modifier = Modifier.size(28.dp)
-                )
+                Icon(imageVector = Icons.Default.Add, contentDescription = "新建项目", modifier = Modifier.size(28.dp))
             }
         },
         bottomBar = {
-            NavigationBar(
-                containerColor = MaterialTheme.colorScheme.surface,
-                tonalElevation = 0.dp
-            ) {
-                NavigationBarItem(
-                    selected = selectedTab == 0,
-                    onClick = { selectedTab = 0 },
-                    icon = {
-                        Icon(
-                            imageVector = Icons.Outlined.FolderOpen,
-                            contentDescription = "Projects"
-                        )
-                    },
-                    label = { Text("Projects") }
-                )
-                NavigationBarItem(
-                    selected = selectedTab == 1,
-                    onClick = { selectedTab = 1 },
-                    icon = {
-                        Icon(
-                            imageVector = Icons.Outlined.Hub,
-                            contentDescription = "GitHub"
-                        )
-                    },
-                    label = { Text("GitHub") }
-                )
-                NavigationBarItem(
-                    selected = selectedTab == 2,
-                    onClick = { selectedTab = 2 },
-                    icon = {
-                        Icon(
-                            imageVector = Icons.Outlined.Settings,
-                            contentDescription = "设置"
-                        )
-                    },
-                    label = { Text("设置") }
-                )
+            NavigationBar(containerColor = MaterialTheme.colorScheme.surface, tonalElevation = 0.dp) {
+                NavigationBarItem(selected = selectedTab == 0, onClick = { selectedTab = 0 }, icon = { Icon(Icons.Outlined.FolderOpen, "Projects") }, label = { Text("Projects") })
+                NavigationBarItem(selected = selectedTab == 1, onClick = { selectedTab = 1 }, icon = { Icon(Icons.Outlined.Hub, "GitHub") }, label = { Text("GitHub") })
+                NavigationBarItem(selected = selectedTab == 2, onClick = { selectedTab = 2 }, icon = { Icon(Icons.Outlined.Settings, "设置") }, label = { Text("设置") })
             }
         }
     ) { innerPadding ->
@@ -191,8 +123,111 @@ fun HomeScreen(
             onProjectClick = onProjectClick,
             modifier = Modifier.padding(innerPadding)
         )
+
+        // ── 🚀 新增：M3 规范的 FAB 展开操作面板 ──
+        if (showSheet) {
+            ModalBottomSheet(
+                onDismissRequest = { showSheet = false },
+                sheetState = sheetState,
+                containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                dragHandle = { BottomSheetDefaults.DragHandle() }
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .navigationBarsPadding()
+                        .padding(start = 24.dp, end = 24.dp, bottom = 32.dp, top = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Text(
+                        text = "创建或导入项目",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
+                    // 选项 1：克隆 Git 仓库
+                    FabSheetItem(
+                        icon = Icons.Outlined.Hub,
+                        iconColor = Color(0xFF1E3A5F),
+                        title = "克隆 Git 仓库",
+                        description = "从 GitHub、GitLab 或自定义 URL 克隆远程项目",
+                        onClick = {
+                            showSheet = false
+                            // TODO: 触发你的 Git 克隆逻辑
+                        }
+                    )
+
+                    // 选项 2：新建本地项目
+                    FabSheetItem(
+                        icon = Icons.Outlined.CreateNewFolder,
+                        iconColor = Color(0xFFE53935),
+                        title = "新建本地项目",
+                        description = "在沙盒中创建一个空白项目或选择运行模版",
+                        onClick = {
+                            showSheet = false
+                            // TODO: 触发新建文件夹/模版逻辑
+                        }
+                    )
+
+                    // 选项 3：导入本地存储
+                    FabSheetItem(
+                        icon = Icons.Outlined.Folder,
+                        iconColor = Color(0xFFF57C00),
+                        title = "导入本地文件夹",
+                        description = "通过系统文件选择器，授权外部文件夹访问权限",
+                        onClick = {
+                            showSheet = false
+                            // TODO: 触发 SAF 选择器
+                        }
+                    )
+                }
+            }
+        }
     }
 }
+
+// ── 🎨 提取的可复用 Sheet 列表项组件 ──
+@Composable
+private fun FabSheetItem(
+    icon: ImageVector,
+    iconColor: Color,
+    title: String,
+    description: String,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            .clickable { onClick() }
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(iconColor.copy(alpha = 0.12f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(imageVector = icon, contentDescription = null, tint = iconColor, modifier = Modifier.size(22.dp))
+        }
+        
+        Spacer(modifier = Modifier.width(16.dp))
+        
+        Column(modifier = Modifier.weight(1f)) {
+            Text(text = title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(text = description, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+
 
 // ---------- Project List ----------
 @Composable
@@ -387,3 +422,4 @@ fun AvatarGroup() {
         }
     }
 }
+
