@@ -61,9 +61,10 @@
       AndroidBridge.onStatsChanged(model.getLineCount(), model.getValueLength());
     });
 
-    // 点击编辑区时让 Monaco 聚焦其内部 textarea，触发系统软键盘
-    document.getElementById('editor').addEventListener('click', function () {
+    // 点击编辑区时通知 Kotlin 弹出系统软键盘（Android WebView 中 JS focus() 不会自动触发 IME）
+    document.getElementById('editor').addEventListener('pointerdown', function () {
       window.editor.focus();
+      AndroidBridge.onEditorTapped();
     });
 
     setTimeout(function () {

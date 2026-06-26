@@ -43,6 +43,7 @@ data class EditorFile(
 // ─────────────────────────────────────────────
 
 private class MonacoBridge(
+    private val webView: WebView,
     private val onReady: () -> Unit,
     private val onContentChanged: () -> Unit,
     private val onError: (String) -> Unit
@@ -65,7 +66,13 @@ private class MonacoBridge(
     fun onSelectionChanged(hasSelection: Boolean, base64Text: String) {}
 
     @JavascriptInterface
-    fun onEditorTapped() {}
+    fun onEditorTapped() {
+        main.post {
+            webView.requestFocus()
+            val imm = webView.context.getSystemService(android.view.inputmethod.InputMethodManager::class.java)
+            imm?.showSoftInput(webView, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT)
+        }
+    }
 
     @JavascriptInterface
     fun onEditorDismissed() {}
@@ -272,6 +279,7 @@ fun EditorScreen(
 
                         addJavascriptInterface(
                             MonacoBridge(
+                                webView = this,
                                 onReady = { isEditorReady = true },
                                 onContentChanged = { hasUnsavedChanges = true },
                                 onError = { msg -> snackbarMessage = "编辑器错误：$msg" }
