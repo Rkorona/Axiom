@@ -1,5 +1,8 @@
 package com.example.myapplication.ui.screen
 
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+
 import android.annotation.SuppressLint
 import android.os.Handler
 import android.os.Looper
