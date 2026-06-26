@@ -13,5 +13,6 @@ data class Project(
     val type: ProjectType,
     val lastModified: String,
     val iconColor: Color,
-    val isActive: Boolean
+    val isActive: Boolean,
+    val localPath: String? = null   // 本地导入项目的 URI 字符串
 )

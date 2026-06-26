@@ -29,41 +29,11 @@ import com.example.myapplication.ui.component.AppBottomNavBar
 import com.example.myapplication.ui.model.Project
 import com.example.myapplication.ui.model.ProjectType
 
-// ---------- Sample Data ----------
-private val sampleProjects = listOf(
-    Project(
-        id = "1",
-        name = "MyApplication",
-        description = "local, android, compose",
-        type = ProjectType.LOCAL,
-        lastModified = "今天",
-        iconColor = Color(0xFFE53935),
-        isActive = false
-    ),
-    Project(
-        id = "2",
-        name = "sing-box-dashboard",
-        description = "github, flutter, proxy-ui",
-        type = ProjectType.GITHUB,
-        lastModified = "昨天",
-        iconColor = Color(0xFF1E3A5F),
-        isActive = true
-    ),
-    Project(
-        id = "3",
-        name = "fishing-venue-app",
-        description = "github, react-native, management",
-        type = ProjectType.GITHUB,
-        lastModified = "3 天前",
-        iconColor = Color(0xFF1565C0),
-        isActive = false
-    )
-)
-
 // ---------- Screen ----------
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
+    projects: List<Project>,
     selectedTab: Int,
     onTabSelected: (Int) -> Unit,
     onProjectClick: (Project) -> Unit = {},
@@ -159,7 +129,7 @@ fun HomeScreen(
         }
     ) { innerPadding ->
         ProjectList(
-            projects = sampleProjects,
+            projects = projects,
             onProjectClick = onProjectClick,
             modifier = Modifier.padding(innerPadding)
         )
@@ -187,6 +157,38 @@ fun ProjectList(
     onProjectClick: (Project) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    if (projects.isEmpty()) {
+        // 空列表提示
+        Box(
+            modifier = modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.FolderOpen,
+                    contentDescription = null,
+                    modifier = Modifier.size(52.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+                )
+                Text(
+                    text = "还没有项目",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                    fontWeight = FontWeight.Medium
+                )
+                Text(
+                    text = "点击右下角的 + 按钮来添加项目",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+                )
+            }
+        }
+        return
+    }
+
     LazyColumn(
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
@@ -207,7 +209,6 @@ fun ProjectList(
                     color = MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.SemiBold
                 )
-                // Avatar group (decorative, mirrors the Termius screenshot)
                 AvatarGroup()
             }
         }
@@ -275,13 +276,12 @@ fun ProjectCard(
                 )
             }
 
-            // Active badge / last modified
-            if (project.isActive) {
-                Spacer(modifier = Modifier.width(8.dp))
-                ActiveBadge()
-            } else {
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
+            // 右侧状态区域：Active 徽章 > LOCAL 徽章 > 修改时间
+            Spacer(modifier = Modifier.width(8.dp))
+            when {
+                project.isActive              -> ActiveBadge()
+                project.type == ProjectType.LOCAL -> LocalBadge()
+                else -> Text(
                     text = project.lastModified,
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -330,6 +330,23 @@ fun ActiveBadge() {
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSecondaryContainer,
+            fontWeight = FontWeight.Medium
+        )
+    }
+}
+
+// ---------- Local Badge ----------
+@Composable
+fun LocalBadge() {
+    Surface(
+        shape = RoundedCornerShape(6.dp),
+        color = MaterialTheme.colorScheme.primaryContainer
+    ) {
+        Text(
+            text = "LOCAL",
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onPrimaryContainer,
             fontWeight = FontWeight.Medium
         )
     }
