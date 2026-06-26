@@ -14,9 +14,9 @@
 
 <script src="vs/loader.js"></script>
 <script>
-  // Android WebView 在 file:// 协议下无法直接创建 Worker，需通过 Blob URL 绕过
+    // 切换到 HTTPS 环境后，直接通过标准 URL 加载同源的 Worker 文件
   globalThis.MonacoEnvironment = {
-    getWorker: function (_id, label) {
+    getWorkerUrl: function (_id, label) {
       var files = {
         json:   'vs/assets/json.worker-CvNsV1ln.js',
         css:    'vs/assets/css.worker-CgWp-mpq.js',
@@ -29,13 +29,12 @@
       else if (label === 'css' || label === 'scss' || label === 'less') path = files.css;
       else if (label === 'html' || label === 'handlebars' || label === 'razor') path = files.html;
       else if (label === 'typescript' || label === 'javascript') path = files.ts;
-      var xhr = new XMLHttpRequest();
-      xhr.open('GET', path, false);
-      xhr.send(null);
-      var blob = new Blob([xhr.responseText], { type: 'application/javascript' });
-      return new Worker(URL.createObjectURL(blob));
+      
+      // 构建绝对路径：https://appassets.androidplatform.net/assets/monaco/vs/assets/...
+      return window.location.origin + '/assets/monaco/' + path;
     }
   };
+
 
   require.config({ paths: { vs: 'vs' } });
 

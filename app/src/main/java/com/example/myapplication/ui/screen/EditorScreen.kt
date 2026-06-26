@@ -251,22 +251,23 @@ fun EditorScreen(
                         isFocusable = true
                         isFocusableInTouchMode = true
                         setBackgroundColor(if (isDark) 0xFF0D0D0D.toInt() else 0xFFFAFAFA.toInt())
-
+            
+                        // 创建 资源加载器
+                        val assetLoader = androidx.webkit.WebViewAssetLoader.Builder()
+                            .addPathHandler("/assets/", androidx.webkit.WebViewAssetLoader.AssetsPathHandler(ctx))
+                            .build()
+            
                         settings.apply {
                             javaScriptEnabled = true
                             domStorageEnabled = true
                             allowFileAccess = true
-                            @Suppress("DEPRECATION")
-                            allowFileAccessFromFileURLs = true
-                            @Suppress("DEPRECATION")
-                            allowUniversalAccessFromFileURLs = true
                             useWideViewPort = true
                             loadWithOverviewMode = true
                             setSupportZoom(false)
                             builtInZoomControls = false
                             displayZoomControls = false
                         }
-
+            
                         webChromeClient = object : WebChromeClient() {
                             override fun onConsoleMessage(msg: ConsoleMessage?): Boolean {
                                 msg?.let {
@@ -276,7 +277,7 @@ fun EditorScreen(
                                 return true
                             }
                         }
-
+            
                         addJavascriptInterface(
                             MonacoBridge(
                                 webView = this,
@@ -286,21 +287,36 @@ fun EditorScreen(
                             ),
                             "AndroidBridge"
                         )
-
+            
                         webViewClient = object : WebViewClient() {
+                            // 关键拦截点：将 https 虚拟域名的请求映射到本地 assets 文件夹
+                            override fun shouldInterceptRequest(
+                                view: WebView,
+                                request: WebResourceRequest
+                            ): android.webkit.WebResourceResponse? {
+                                return assetLoader.shouldInterceptRequest(request.url)
+                            }
+            
                             override fun onPageFinished(view: WebView, url: String) {
                                 view.post { view.evalJs("layoutEditor()") }
                             }
+            
+                            // 更新路由重定向拦截
                             override fun shouldOverrideUrlLoading(
                                 view: WebView, request: WebResourceRequest
-                            ): Boolean = !request.url.toString().startsWith("file:///android_asset/")
+                            ): Boolean = !request.url.toString().startsWith("https://appassets.androidplatform.net/assets/")
                         }
-
+            
                         webViewRef.value = this
-                        loadUrl("file:///android_asset/monaco/editor.html")
+                        
+                        // 【重要修改】使用虚拟的 HTTPS 域名加载页面
+                        loadUrl("https://appassets.androidplatform.net/assets/monaco/editor.html")
                     }
                 }
             )
+            
+
+
 
             if (!isEditorReady) {
                 Box(
