@@ -13,6 +13,7 @@ import com.example.myapplication.ui.model.Project
 import com.example.myapplication.ui.model.ProjectType
 import com.example.myapplication.ui.screen.EditorFile
 import com.example.myapplication.ui.screen.EditorScreen
+import com.example.myapplication.ui.screen.FileExplorerScreen
 import com.example.myapplication.ui.screen.HomeScreen
 
 // ─────────────────────────────────────────────
@@ -21,6 +22,7 @@ import com.example.myapplication.ui.screen.HomeScreen
 
 sealed class Screen {
     object Home : Screen()
+    data class FileExplorer(val project: Project) : Screen()
     data class Editor(val file: EditorFile) : Screen()
 }
 
@@ -79,11 +81,10 @@ fun AppNavigation() {
         // URI lastPathSegment 格式通常是 "primary:Documents/my-project"
         val rawSegment = uri.lastPathSegment ?: uri.toString()
         val folderName = rawSegment
-            .substringAfterLast(':')  // 去存储卷前缀（primary:/secondary:）
-            .substringAfterLast('/')  // 取最后一段
+            .substringAfterLast(':')
+            .substringAfterLast('/')
             .ifBlank { rawSegment }
 
-        // 拼出用户友好的可读路径，例如 /storage/emulated/0/Documents/my-project
         val readablePath = rawSegment
             .substringAfterLast(':')
             .let { relativePath ->
@@ -99,22 +100,33 @@ fun AppNavigation() {
             lastModified = "刚刚",
             iconColor = nextLocalColor(),
             isActive = false,
-            localPath = uri.toString()   // 保存原始 content URI，用于后续文件操作
+            localPath = uri.toString()
         )
         projects.add(0, newProject)
     }
 
     // ── 页面渲染 ─────────────────────────────────────────
     when (val screen = currentScreen) {
+
+        // ── 主页 ────────────────────────────────────────
         is Screen.Home -> {
             HomeScreen(
                 projects = projects,
                 selectedTab = selectedTab,
                 onTabSelected = { selectedTab = it },
                 onProjectClick = { project ->
-                    currentScreen = Screen.Editor(
-                        file = projectToEditorFile(project)
-                    )
+                    // 有本地路径的项目 → 文件浏览器；否则直接打开编辑器（占位）
+                    if (project.localPath != null) {
+                        currentScreen = Screen.FileExplorer(project)
+                    } else {
+                        currentScreen = Screen.Editor(
+                            file = EditorFile(
+                                name = project.name,
+                                code = "// ${project.name}\n",
+                                lang = "js"
+                            )
+                        )
+                    }
                 },
                 onNewLocalProject = {
                     showNewLocalDialog = true
@@ -134,6 +146,20 @@ fun AppNavigation() {
             )
         }
 
+        // ── 文件浏览器 ───────────────────────────────────
+        is Screen.FileExplorer -> {
+            FileExplorerScreen(
+                project = screen.project,
+                onBack = {
+                    currentScreen = Screen.Home
+                },
+                onOpenFile = { editorFile ->
+                    currentScreen = Screen.Editor(file = editorFile)
+                }
+            )
+        }
+
+        // ── 代码编辑器 ───────────────────────────────────
         is Screen.Editor -> {
             EditorScreen(
                 file = screen.file,
@@ -168,22 +194,4 @@ fun AppNavigation() {
             onDismiss = { showNewLocalDialog = false }
         )
     }
-}
-
-// ─────────────────────────────────────────────
-// Project → EditorFile 转换
-// ─────────────────────────────────────────────
-
-private fun projectToEditorFile(project: Project): EditorFile {
-    val lang = when {
-        "flutter" in project.description  -> "dart"
-        "compose" in project.description  -> "kotlin"
-        "react" in project.description    -> "jsx"
-        else                              -> "js"
-    }
-    return EditorFile(
-        name = project.name,
-        code = "// ${project.name}\n// ${project.description}\n",
-        lang = lang
-    )
 }
