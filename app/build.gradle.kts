@@ -78,7 +78,7 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     debugImplementation(libs.androidx.compose.ui.tooling)
     implementation(libs.androidx.compose.material.icons.extended)
-    
+    implementation("androidx.webkit:webkit:1.11.0")
     implementation("org.apache.commons:commons-compress:1.28.0")
 
     implementation("dev.rikka.shizuku:api:13.1.5")

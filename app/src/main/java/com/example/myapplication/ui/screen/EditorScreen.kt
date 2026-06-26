@@ -1,5 +1,8 @@
 package com.example.myapplication.ui.screen
 
+import androidx.webkit.WebViewAssetLoader
+import androidx.webkit.WebViewAssetLoader.AssetsPathHandler
+
 import android.annotation.SuppressLint
 import android.os.Handler
 import android.os.Looper
@@ -169,12 +172,18 @@ fun EditorScreen(
             AndroidView(
                 modifier = Modifier.fillMaxSize(),
                 factory = { ctx ->
+                    
+                    val assetLoader = WebViewAssetLoader.Builder()
+                        .setDomain("appassets.androidplatform.net")
+                        .addPathHandler("/assets/", AssetsPathHandler(ctx))
+                        .build()
+                    
                     WebView(ctx).apply {
                         settings.apply {
                             javaScriptEnabled = true
                             domStorageEnabled = true
-                            allowFileAccessFromFileURLs = true
-                            allowUniversalAccessFromFileURLs = true
+                            // allowFileAccessFromFileURLs = true
+                            // allowUniversalAccessFromFileURLs = true
                             setSupportZoom(false)
                             builtInZoomControls = false
                             displayZoomControls = false
@@ -198,19 +207,28 @@ fun EditorScreen(
                         )
                         addJavascriptInterface(bridge, "Android")
                         webViewRef.value = this
+                        
+                        
 
                         webViewClient = object : WebViewClient() {
+                            override fun shouldInterceptRequest(
+                                view: WebView,
+                                request: WebResourceRequest
+                            ) = assetLoader.shouldInterceptRequest(request.url)
+                                ?: super.shouldInterceptRequest(view, request)
+                
                             override fun onPageFinished(view: WebView, url: String) {
-                                // 页面 HTML 加载完毕，开始轮询等待 JS 模块执行
                                 handler.postDelayed({ pollAndInit(view) }, 100)
                             }
+                
                             override fun shouldOverrideUrlLoading(
                                 view: WebView,
                                 request: WebResourceRequest
-                            ): Boolean = request.url.scheme != "file"
+                            ): Boolean = request.url.scheme != "https"
                         }
-
-                        loadUrl("file:///android_asset/editor/src/index.html")
+                
+                        // ✅ 改用 https:// 地址
+                        loadUrl("https://appassets.androidplatform.net/assets/editor/src/index.html")
                     }
                 }
             )
