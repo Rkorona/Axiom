@@ -2,6 +2,7 @@ package com.example.myapplication.ui.screen
 
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
+import androidx.webkit.WebViewAssetLoader
 
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -409,14 +410,22 @@ fun EditorScreen(
                 .padding(innerPadding)
                 .background(if (isDarkTheme) Color(0xFF282C34) else Color.White)
         ) {
-            
-           
             AndroidView(
                 factory = { ctx ->
                     WebView(ctx).apply {
-                        setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null)
-                        settings.javaScriptEnabled = true
-            
+                        webViewRef = this
+
+                        // 必要的 WebView 安全与功能配置
+                        settings.apply {
+                            javaScriptEnabled = true
+                            domStorageEnabled = true
+                            allowFileAccess = true
+                            allowContentAccess = true
+                            loadWithOverviewMode = true
+                            useWideViewPort = true
+                        }
+
+                        // 注入桥接，回调全部分发至 Compose 状态层（切回 Dispatchers.Main 线程）
                         addJavascriptInterface(
                             WebAppInterface(
                                 onReady = {
@@ -424,29 +433,40 @@ fun EditorScreen(
                                         isEditorReady = true
                                     }
                                 },
-                                onStatsChanged = { _, _ -> },
-                                onCursorChanged = { _, _ -> }
+                                onStatsChanged = { lines, length ->
+                                    coroutineScope.launch(Dispatchers.Main) {
+                                        linesCount = lines
+                                        charCount = length
+                                    }
+                                },
+                                onCursorChanged = { line, col ->
+                                    coroutineScope.launch(Dispatchers.Main) {
+                                        cursorLine = line
+                                        cursorCol = col
+                                    }
+                                }
                             ),
                             "AndroidBridge"
                         )
-            
-                        val testHtml = """<!doctype html>
-            <html>
-            <body style="background:white;color:black;font-size:16px;padding:20px;">
-            <div id="out">检测中...</div>
-            <script>
-              if (window.AndroidBridge) {
-                AndroidBridge.onReady();
-                document.getElementById('out').innerText = 'Bridge OK！onReady已调用';
-              } else {
-                document.getElementById('out').innerText = 'AndroidBridge不存在！';
-                document.getElementById('out').style.color = 'red';
-              }
-            </script>
-            </body>
-            </html>"""
-            
-                        loadDataWithBaseURL("file:///android_asset/editor/", testHtml, "text/html", "UTF-8", null)
+
+                        // 使用 WebViewAssetLoader 将 assets 以 HTTPS 源提供服务
+                        // 这样 type="module" 脚本可以正常加载，彻底解决 CORS 问题
+                        val assetLoader = WebViewAssetLoader.Builder()
+                            .setDomain("appassets.androidplatform.net")
+                            .addPathHandler("/assets/", WebViewAssetLoader.AssetsPathHandler(ctx))
+                            .build()
+
+                        webViewClient = object : WebViewClient() {
+                            override fun shouldInterceptRequest(
+                                view: WebView,
+                                request: WebResourceRequest
+                            ): WebResourceResponse? {
+                                return assetLoader.shouldInterceptRequest(request.url)
+                            }
+                        }
+
+                        // 直接加载 index.html，无需内联 800KB JS 到字符串
+                        loadUrl("https://appassets.androidplatform.net/assets/editor/index.html")
                     }
                 },
                 modifier = Modifier.fillMaxSize(),
@@ -455,7 +475,7 @@ fun EditorScreen(
                     webViewRef = null
                 }
             )
-            
+
             // WebView 未初始化完成前展示转圈
             if (!isEditorReady) {
                 Box(
