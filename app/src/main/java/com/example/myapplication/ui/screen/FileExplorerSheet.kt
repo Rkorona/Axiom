@@ -88,7 +88,7 @@ fun FileExplorerSheet(
             loadState = SheetLoadState.Error("该项目没有关联本地路径")
             return@LaunchedEffect
         }
-        loadState = withContext(Dispatchers.IO) {
+        val result = withContext(Dispatchers.IO) {
             runCatching {
                 val root: SheetFileNode = if (path.startsWith("content://")) {
                     val treeUri = Uri.parse(path)
@@ -105,6 +105,12 @@ fun FileExplorerSheet(
                 SheetLoadState.Error("加载失败：${e.message}")
             }
         }
+        // SAF 的 doc.uri 与原始 tree URI 可能不同，加载完成后
+        // 用实际根节点路径初始化 expandedPaths，确保根始终展开
+        if (result is SheetLoadState.Loaded) {
+            expandedPaths = setOf(result.root.path)
+        }
+        loadState = result
     }
 
     ModalBottomSheet(
