@@ -20,19 +20,15 @@
         margin: 0;
         padding: 0;
         width: 100%;
-        height: 100%;
+        height: 100dvh;
         overflow: hidden;
         background-color: var(--editor-bg);
-        /* 防止编辑器滚动到边界时事件冒泡给外层 WebView，避免整页抖动 */
         overscroll-behavior: none;
       }
       #editor {
-        width: 100%;
-        height: 100%;
+        position: fixed;
+        inset: 0;
       }
-      /* 让 CodeMirror 内部区域占满容器高度，并支持自然滚动 */
-      /* 注意：.cm-scroller 绝对不能设置 height:100%，否则 CM6 虚拟渲染
-         的视口高度计算会出错（scrollHeight === clientHeight），导致内容全部不渲染 */
       .cm-editor {
         height: 100%;
       }

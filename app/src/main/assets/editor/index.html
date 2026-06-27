@@ -20,19 +20,23 @@
         margin: 0;
         padding: 0;
         width: 100%;
-        height: 100%;
+        /* 使用 100dvh 而非 100%：Android WebView 在 Compose AndroidView 中初始
+           布局高度为 0，height:100% 会沿继承链全部坍塌为 0；dvh/vh 直接取视口高度，
+           不依赖父元素高度，确保 CM6 初始化时 #editor.clientHeight > 0 */
+        height: 100dvh;
         overflow: hidden;
         background-color: var(--editor-bg);
         /* 防止编辑器滚动到边界时事件冒泡给外层 WebView，避免整页抖动 */
         overscroll-behavior: none;
       }
       #editor {
-        width: 100%;
-        height: 100%;
+        /* position:fixed + inset:0 确保 #editor 始终铺满视口，彻底绕开
+           height:100% 继承链在 WebView 中坍塌为 0 的问题 */
+        position: fixed;
+        inset: 0;
       }
-      /* 让 CodeMirror 内部区域占满容器高度，并支持自然滚动 */
-      /* 注意：.cm-scroller 绝对不能设置 height:100%，否则 CM6 虚拟渲染
-         的视口高度计算会出错（scrollHeight === clientHeight），导致内容全部不渲染 */
+      /* CM6 内部会自行给 .cm-editor 应用 height:100% 和 .cm-scroller 应用
+         overflow-x:auto / height:100%，此处只补充 overflow:auto 开启双轴滚动 */
       .cm-editor {
         height: 100%;
       }

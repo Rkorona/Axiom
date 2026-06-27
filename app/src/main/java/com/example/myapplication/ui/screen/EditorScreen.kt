@@ -192,6 +192,14 @@ fun EditorScreen(
             executeJs("window.editorAPI.setLanguage('$fileExtension')")
             executeJs("window.editorAPI.setTheme($isDarkTheme)")
             executeJs("window.editorAPI.setReadOnly($isReadOnly)")
+            // 内容注入后强制触发 resize 事件：
+            // CM6 在 WebView 初始布局完成前（clientHeight=0）测量视口，导致渲染 0 行。
+            // resize 事件会使 CM6 重新 requestMeasure()，用正确的视口高度重绘所有行。
+            webViewRef?.postDelayed({
+                webViewRef?.evaluateJavascript(
+                    "window.dispatchEvent(new Event('resize'))", null
+                )
+            }, 150)
         }
     }
 
@@ -427,6 +435,9 @@ fun EditorScreen(
                         webViewRef = this
 
                         // 必要的 WebView 安全与功能配置
+                        // 注意：不设置 loadWithOverviewMode/useWideViewPort，
+                        // 这两项会让 WebView 使用宽布局视口（980px）再缩放，
+                        // 可能导致 CM6 初始测量高度异常。
                         settings.apply {
                             javaScriptEnabled = true
                             domStorageEnabled = true
@@ -434,8 +445,6 @@ fun EditorScreen(
                             allowContentAccess = true
                             allowFileAccessFromFileURLs = true
                             allowUniversalAccessFromFileURLs = true
-                            loadWithOverviewMode = true
-                            useWideViewPort = true
                         }
 
                         // 注入桥接，回调全部分发至 Compose 状态层（切回 Dispatchers.Main 线程）
