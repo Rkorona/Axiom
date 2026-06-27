@@ -463,6 +463,18 @@ fun EditorScreen(
                             ): WebResourceResponse? {
                                 return assetLoader.shouldInterceptRequest(request.url)
                             }
+
+                            override fun onPageFinished(view: WebView, url: String) {
+                                super.onPageFinished(view, url)
+                                // 兜底触发：type="module" 脚本在部分 WebView 版本中执行时
+                                // AndroidBridge 可能尚未注入，导致 notifyReady() 内的检查失败。
+                                // onPageFinished 触发时 module 脚本已执行完毕，在此再调用一次
+                                // notifyReady() 可确保 isEditorReady 正常置为 true。
+                                view.evaluateJavascript(
+                                    "window.editorAPI && window.editorAPI.notifyReady()",
+                                    null
+                                )
+                            }
                         }
 
                         // 直接加载 index.html，无需内联 800KB JS 到字符串
