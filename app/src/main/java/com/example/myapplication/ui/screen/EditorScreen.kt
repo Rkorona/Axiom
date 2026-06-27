@@ -410,17 +410,37 @@ fun EditorScreen(
                 .background(if (isDarkTheme) Color(0xFF282C34) else Color.White)
         ) {
             
+           
             AndroidView(
                 factory = { ctx ->
                     WebView(ctx).apply {
                         settings.javaScriptEnabled = true
             
+                        addJavascriptInterface(
+                            WebAppInterface(
+                                onReady = {
+                                    coroutineScope.launch(Dispatchers.Main) {
+                                        isEditorReady = true
+                                    }
+                                },
+                                onStatsChanged = { _, _ -> },
+                                onCursorChanged = { _, _ -> }
+                            ),
+                            "AndroidBridge"
+                        )
+            
                         val testHtml = """<!doctype html>
             <html>
             <body style="background:white;color:black;font-size:16px;padding:20px;">
-            <div id="out">JS未执行</div>
+            <div id="out">检测中...</div>
             <script>
-              document.getElementById('out').innerText = 'JS执行成功！';
+              if (window.AndroidBridge) {
+                AndroidBridge.onReady();
+                document.getElementById('out').innerText = 'Bridge OK！onReady已调用';
+              } else {
+                document.getElementById('out').innerText = 'AndroidBridge不存在！';
+                document.getElementById('out').style.color = 'red';
+              }
             </script>
             </body>
             </html>"""
