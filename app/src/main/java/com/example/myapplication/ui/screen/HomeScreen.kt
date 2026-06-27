@@ -117,7 +117,7 @@ fun HomeScreen(
     selectedProject: Project? = null,
     onProjectClick: (Project) -> Unit = {},
     onProjectSheetDismiss: () -> Unit = {},
-    onOpenFile: (EditorFile) -> Unit = {},
+    onOpenFile: (String) -> Unit = {},
     onNewLocalProject: () -> Unit = {},
     onCloneGithub: () -> Unit = {},
     onImportFile: () -> Unit = {},

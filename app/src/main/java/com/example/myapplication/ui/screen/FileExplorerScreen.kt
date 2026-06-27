@@ -67,7 +67,7 @@ private sealed class LoadState {
 fun FileExplorerScreen(
     project: Project,
     onBack: () -> Unit,
-    onOpenFile: (EditorFile) -> Unit
+    onOpenFile: (String) -> Unit
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -236,18 +236,9 @@ fun FileExplorerScreen(
                                             if (!openingFile) {
                                                 openingFile = true
                                                 scope.launch(Dispatchers.IO) {
-                                                    val content =
-                                                        readFileContent(context, row.node.path)
                                                     withContext(Dispatchers.Main) {
                                                         openingFile = false
-                                                        onOpenFile(
-                                                            EditorFile(
-                                                                name = row.node.name,
-                                                                code = content,
-                                                                lang = row.node.extension
-                                                                    .ifBlank { "txt" }
-                                                            )
-                                                        )
+                                                        onOpenFile(row.node.path)
                                                     }
                                                 }
                                             }

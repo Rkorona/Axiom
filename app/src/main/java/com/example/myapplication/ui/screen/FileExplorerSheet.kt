@@ -605,7 +605,7 @@ private fun validateFileName(name: String): String? {
 fun FileExplorerSheet(
     project: Project,
     onDismiss: () -> Unit,
-    onOpenFile: (EditorFile) -> Unit
+    onOpenFile: (String) -> Unit
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -887,16 +887,9 @@ fun FileExplorerSheet(
                                                     if (!openingFile) {
                                                         openingFile = true
                                                         scope.launch(Dispatchers.IO) {
-                                                            val content = readSheetFileContent(context, row.node.path)
                                                             withContext(Dispatchers.Main) {
                                                                 openingFile = false
-                                                                onOpenFile(
-                                                                    EditorFile(
-                                                                        name = row.node.name,
-                                                                        code = content,
-                                                                        lang = row.node.extension.ifBlank { "txt" }
-                                                                    )
-                                                                )
+                                                                onOpenFile(row.node.path)
                                                             }
                                                         }
                                                     }

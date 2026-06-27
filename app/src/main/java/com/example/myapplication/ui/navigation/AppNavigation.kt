@@ -11,7 +11,6 @@ import androidx.compose.ui.platform.LocalContext
 import com.example.myapplication.ui.component.NewLocalProjectDialog
 import com.example.myapplication.ui.model.Project
 import com.example.myapplication.ui.model.ProjectType
-import com.example.myapplication.ui.screen.EditorFile
 import com.example.myapplication.ui.screen.EditorScreen
 import com.example.myapplication.ui.screen.HomeScreen
 
@@ -21,7 +20,7 @@ import com.example.myapplication.ui.screen.HomeScreen
 
 sealed class Screen {
     object Home : Screen()
-    data class Editor(val file: EditorFile) : Screen()
+    data class Editor(val filePath: String) : Screen()
 }
 
 // ─────────────────────────────────────────────
@@ -117,25 +116,17 @@ fun AppNavigation() {
                 onTabSelected = { selectedTab = it },
                 selectedProject = selectedProject,
                 onProjectClick = { project ->
-                    // 点击项目 → 底部弹出文件树（无本地路径则打开空编辑器）
+                    // 点击项目 → 底部弹出文件树（有本地路径才展开）
                     if (!project.localPath.isNullOrBlank()) {
                         selectedProject = project
-                    } else {
-                        currentScreen = Screen.Editor(
-                            file = EditorFile(
-                                name = project.name,
-                                code = "// ${project.name}\n",
-                                lang = "js"
-                            )
-                        )
                     }
                 },
                 onProjectSheetDismiss = {
                     selectedProject = null
                 },
-                onOpenFile = { editorFile ->
+                onOpenFile = { filePath ->
                     selectedProject = null
-                    currentScreen = Screen.Editor(file = editorFile)
+                    currentScreen = Screen.Editor(filePath = filePath)
                 },
                 onNewLocalProject = {
                     showNewLocalDialog = true
@@ -158,12 +149,8 @@ fun AppNavigation() {
         // ── 代码编辑器 ───────────────────────────────────
         is Screen.Editor -> {
             EditorScreen(
-                file = screen.file,
-                onBack = {
-                    currentScreen = Screen.Home
-                },
-                onSave = { _ ->
-                    // TODO: 写入本地文件或推送到 GitHub
+                filePath = screen.filePath,
+                onNavigateBack = {
                     currentScreen = Screen.Home
                 }
             )
