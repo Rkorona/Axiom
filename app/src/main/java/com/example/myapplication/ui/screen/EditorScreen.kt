@@ -300,6 +300,7 @@ fun EditorScreen(
     // 8. 页面 UI 布局构建
     // ─────────────────────────────────────────────────────────
     Scaffold(
+        modifier = Modifier.imePadding(),
         topBar = {
             TopAppBar(
                 title = {
