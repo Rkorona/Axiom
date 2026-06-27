@@ -68,6 +68,15 @@ class WebAppInterface(
     fun onCursorChanged(line: Int, col: Int) {
         onCursorChanged(line, col)
     }
+
+    @JavascriptInterface
+    fun log(message: String) {
+        try {
+            android.util.Log.d("WebViewJS", message)
+        } catch (e: Exception) {
+            // ignore logging failures
+        }
+    }
 }
 
 // ═════════════════════════════════════════════════════════════

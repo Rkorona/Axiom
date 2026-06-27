@@ -36,6 +36,47 @@
       }
     </style>
     <script>
+      // 将页面中的 console 与未捕获错误转发到 Kotlin 注入的 AndroidBridge.log
+      // 这能把运行时错误和重要调试信息带回 Android 日志，便于定位 editor 未初始化/内容未注入的问题。
+      function setupBridgeLogging() {
+        if ((window as any).__bridgeLoggingInstalled) return
+        function forward(level, args) {
+          try {
+            const msg = args.map(a => {
+              try { return typeof a === 'string' ? a : JSON.stringify(a)
+              } catch (e) { return String(a) }
+            }).join(' ')
+            if (window.AndroidBridge && typeof window.AndroidBridge.log === 'function') {
+              window.AndroidBridge.log(`[${level}] ${msg}`)
+            }
+          } catch (e) {
+            // ignore
+          }
+        }
+
+        const methods = ['log','info','warn','error','debug']
+        for (const m of methods) {
+          const orig = console[m]
+          console[m] = function(...args) {
+            try { forward(m, args) } catch (e) {}
+            try { orig.apply(console, args) } catch (e) {}
+          }
+        }
+
+        window.addEventListener('error', (ev) => {
+          try {
+            const err = ev.error || ev.message || 'unknown'
+            forward('error', [err])
+          } catch (e) {}
+        })
+
+        window.addEventListener('unhandledrejection', (ev) => {
+          try { forward('error', [ev.reason || 'unhandledrejection']) } catch (e) {}
+        })
+
+        ;(window as any).__bridgeLoggingInstalled = true
+      }
+
       // 延迟在 DOM 准备好后再动态加载 module，避免在某些 WebView 版本中模块在 DOM 尚未解析时执行，
       // 导致 document.getElementById('editor') 返回 null 从而抛出异常，造成 editor 未初始化。
       function loadEditorModule() {
@@ -56,12 +97,23 @@
         }
       }
 
+      // 等待 AndroidBridge 注入后安装日志转发；若注入较晚，轮询直到可用
+      function waitForBridgeAndSetupLogging() {
+        if (window.AndroidBridge && typeof window.AndroidBridge.log === 'function') {
+          setupBridgeLogging()
+        } else {
+          setTimeout(waitForBridgeAndSetupLogging, 100)
+        }
+      }
+
       window.addEventListener('DOMContentLoaded', () => {
+        waitForBridgeAndSetupLogging()
         loadEditorModule();
         notifyEditorReady();
       });
-      // 兜底：若 DOMContentLoaded 已经触发，仍尝试立刻加载
+      // 兜底：若 DOMContentLoaded 已经触发，仍尝试立刻加载并安装日志转发
       if (document.readyState === 'interactive' || document.readyState === 'complete') {
+        waitForBridgeAndSetupLogging()
         loadEditorModule();
         notifyEditorReady();
       }
