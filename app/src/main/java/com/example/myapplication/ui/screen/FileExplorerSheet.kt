@@ -862,6 +862,13 @@ private fun flattenSheetVisible(node: SheetFileNode, depth: Int, expanded: Set<S
     } else listOf(selfRow)
 }
 
+@Composable
+private fun SheetBottomAction(label: String, onClick: () -> Unit) {
+    TextButton(onClick = onClick) {
+        Text(text = label, style = MaterialTheme.typography.labelLarge)
+    }
+}
+
 private fun sheetFileIconColor(extension: String): Color = when (extension) {
     "js", "jsx", "mjs"            -> Color(0xFFF5C518)
     "ts", "tsx"                    -> Color(0xFF3178C6)
