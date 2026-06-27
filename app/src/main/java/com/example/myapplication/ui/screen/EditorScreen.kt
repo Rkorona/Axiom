@@ -49,24 +49,25 @@ fun String.fromBase64(): String {
 // WebView 桥接接口类
 // 所有接口方法均在 WebView 的私有 Binder 线程中被调用
 // ═════════════════════════════════════════════════════════════
+
 class WebAppInterface(
-    private val onReady: () -> Unit,
-    private val onStatsChanged: (lines: Int, length: Int) -> Unit,
-    private val onCursorChanged: (line: Int, col: Int) -> Unit
+    private val onReadyCallback: () -> Unit,
+    private val onStatsChangedCallback: (lines: Int, length: Int) -> Unit,
+    private val onCursorChangedCallback: (line: Int, col: Int) -> Unit
 ) {
     @JavascriptInterface
     fun onReady() {
-        onReady()
+        onReadyCallback()
     }
 
     @JavascriptInterface
     fun onStatsChanged(lines: Int, length: Int) {
-        onStatsChanged(lines, length)
+        onStatsChangedCallback(lines, length)
     }
 
     @JavascriptInterface
     fun onCursorChanged(line: Int, col: Int) {
-        onCursorChanged(line, col)
+        onCursorChangedCallback(line, col)
     }
 
     @JavascriptInterface
@@ -439,18 +440,18 @@ fun EditorScreen(
                         // 注入桥接，回调全部分发至 Compose 状态层（切回 Dispatchers.Main 线程）
                         addJavascriptInterface(
                             WebAppInterface(
-                                onReady = {
+                                onReadyCallback = {
                                     coroutineScope.launch(Dispatchers.Main) {
                                         isEditorReady = true
                                     }
                                 },
-                                onStatsChanged = { lines, length ->
+                                onStatsChangedCallback = { lines, length ->
                                     coroutineScope.launch(Dispatchers.Main) {
                                         linesCount = lines
                                         charCount = length
                                     }
                                 },
-                                onCursorChanged = { line, col ->
+                                onCursorChangedCallback = { line, col ->
                                     coroutineScope.launch(Dispatchers.Main) {
                                         cursorLine = line
                                         cursorCol = col
