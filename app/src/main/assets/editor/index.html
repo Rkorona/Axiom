@@ -35,8 +35,19 @@
         height: 100% !important;
       }
     </style>
-    <script type="module" src="./assets/index-zMJymWgQ.js"></script>
     <script>
+      // 延迟在 DOM 准备好后再动态加载 module，避免在某些 WebView 版本中模块在 DOM 尚未解析时执行，
+      // 导致 document.getElementById('editor') 返回 null 从而抛出异常，造成 editor 未初始化。
+      function loadEditorModule() {
+        try {
+          import('./assets/index-zMJymWgQ.js').catch((err) => {
+            console.error('Failed to import editor module:', err);
+          });
+        } catch (e) {
+          console.error('Dynamic import not supported:', e);
+        }
+      }
+
       function notifyEditorReady() {
         if (window.editorAPI && typeof window.editorAPI.notifyReady === 'function') {
           window.editorAPI.notifyReady();
@@ -44,8 +55,16 @@
           setTimeout(notifyEditorReady, 100);
         }
       }
-      window.addEventListener('DOMContentLoaded', notifyEditorReady);
-      notifyEditorReady();
+
+      window.addEventListener('DOMContentLoaded', () => {
+        loadEditorModule();
+        notifyEditorReady();
+      });
+      // 兜底：若 DOMContentLoaded 已经触发，仍尝试立刻加载
+      if (document.readyState === 'interactive' || document.readyState === 'complete') {
+        loadEditorModule();
+        notifyEditorReady();
+      }
     </script>
   </head>
   <body>
