@@ -496,7 +496,7 @@ fun EditorScreen(
                             }
                         }
 
-                        // 直接加载 index.html，无需内联 800KB JS 到字符串
+                        
                         loadUrl("https://appassets.androidplatform.net/assets/editor/index.html")
                     }
                 },

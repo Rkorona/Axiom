@@ -85,9 +85,7 @@
       // 导致 document.getElementById('editor') 返回 null 从而抛出异常，造成 editor 未初始化。
       function loadEditorModule() {
         try {
-          import('./assets/index-zMJymWgQ.js').catch((err) => {
-            console.error('Failed to import editor module:', err);
-          });
+          import('./assets/index.js').catch(err => console.error('Failed:', err));
         } catch (e) {
           console.error('Dynamic import not supported:', e);
         }
