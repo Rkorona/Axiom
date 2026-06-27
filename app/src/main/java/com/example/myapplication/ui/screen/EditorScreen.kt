@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import android.net.Uri
+import androidx.activity.compose.BackHandler
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.io.File
@@ -96,6 +97,9 @@ fun EditorScreen(
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
+
+    // 拦截硬件返回键，返回首页而不是退出应用
+    BackHandler { onNavigateBack() }
 
     // ─────────────────────────────────────────────────────────
     // 1. 持有 WebView 引用及 JS 执行函数（挪到顶部，确保后续逻辑可安全引用）
