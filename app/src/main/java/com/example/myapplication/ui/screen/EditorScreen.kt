@@ -412,95 +412,24 @@ fun EditorScreen(
             AndroidView(
                 factory = { ctx ->
                     WebView(ctx).apply {
-                        webViewRef = this
-
-                        // 必要的 WebView 安全与功能配置
-                        settings.apply {
-                            javaScriptEnabled = true
-                            domStorageEnabled = true
-                            allowFileAccess = true
-                            allowContentAccess = true
-                            loadWithOverviewMode = true
-                            useWideViewPort = true
+                        settings.javaScriptEnabled = true
+            
+                        val fileList = try {
+                            ctx.assets.list("editor/assets")?.joinToString("\n") ?: "目录为空"
+                        } catch (e: Exception) {
+                            "读取失败: ${e.message}"
                         }
-
-                        // 注入桥接，回调全部分发至 Compose 状态层（切回 Dispatchers.Main 线程）
-                        addJavascriptInterface(
-                            WebAppInterface(
-                                onReady = {
-                                    coroutineScope.launch(Dispatchers.Main) {
-                                        isEditorReady = true
-                                    }
-                                },
-                                onStatsChanged = { lines, length ->
-                                    coroutineScope.launch(Dispatchers.Main) {
-                                        linesCount = lines
-                                        charCount = length
-                                    }
-                                },
-                                onCursorChanged = { line, col ->
-                                    coroutineScope.launch(Dispatchers.Main) {
-                                        cursorLine = line
-                                        cursorCol = col
-                                    }
-                                }
-                            ),
-                            "AndroidBridge"
-                        )
-
-                        webViewClient = WebViewClient()
-
-                        // 从 assets 读取打包后的 JS，内联进 HTML 字符串
-                        // 彻底绕过 WebViewAssetLoader + type="module" 的 CORS 问题
-                        val jsFileName = ctx.assets.list("editor/assets")
-                            ?.firstOrNull { it.endsWith(".js") }
-                            ?: "index.js"
-                        val jsContent = ctx.assets
-                            .open("editor/assets/$jsFileName")
-                            .bufferedReader(Charsets.UTF_8)
-                            .use { it.readText() }
-
-                        val html = """<!doctype html>
-<html lang="zh-CN">
-<head>
-<meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"/>
-<title>CodeMirror 6</title>
-<style>
-:root{--editor-bg:#282c34}
-html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background-color:var(--editor-bg);overscroll-behavior:none}
-#editor{width:100%;height:100%}
-.cm-editor{height:100%!important}
-</style>
-</head>
-<body>
-<div id="editor"></div>
-<script>$jsContent</script>
-</body>
-</html>"""
-
-                        // baseUrl 指向 asset 目录，保证相对路径资源可访问
-                        // 临时测试：用最简单的内联 HTML 验证桥接是否正常
+            
                         val testHtml = """<!doctype html>
-                        <html><body>
-                        <script>
-                          if (window.AndroidBridge) {
-                            AndroidBridge.onReady();
-                            document.body.innerHTML = 'Bridge OK, onReady called!';
-                          } else {
-                            document.body.innerHTML = 'AndroidBridge NOT found!';
-                            document.body.style.color = 'red';
-                          }
-                        </script>
-                        </body></html>"""
-                        
-                        loadDataWithBaseURL(
-                            "file:///android_asset/editor/",
-                            testHtml,
-                            "text/html",
-                            "UTF-8",
-                            null
-                        )
+            <html>
+            <body style="background:white;color:black;font-size:16px;padding:20px;">
+            <pre>editor/assets/ 下的文件：
+            
+            $fileList</pre>
+            </body>
+            </html>"""
+            
+                        loadDataWithBaseURL("file:///android_asset/editor/", testHtml, "text/html", "UTF-8", null)
                     }
                 },
                 modifier = Modifier.fillMaxSize(),
@@ -509,7 +438,7 @@ html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background-c
                     webViewRef = null
                 }
             )
-
+            
             // WebView 未初始化完成前展示转圈
             if (!isEditorReady) {
                 Box(
