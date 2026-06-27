@@ -3,7 +3,7 @@ package com.example.myapplication.ui.screen
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import androidx.webkit.WebViewAssetLoader
-
+import androidx.compose.foundation.isSystemInDarkTheme
 import android.content.Context
 import android.util.Base64
 import android.webkit.JavascriptInterface
@@ -144,9 +144,10 @@ fun EditorScreen(
     var cursorLine by rememberSaveable { mutableIntStateOf(1) }
     var cursorCol by rememberSaveable { mutableIntStateOf(1) }
 
-    // 主题、只读、键盘控制（支持旋屏状态保留）
-    var isDarkTheme by rememberSaveable { mutableStateOf(true) }
-    var isReadOnly by rememberSaveable { mutableStateOf(false) }
+    // 主题、键盘控制（支持旋屏状态保留）
+    val isSystemDark = isSystemInDarkTheme()
+    var isDarkTheme by rememberSaveable { mutableStateOf(isSystemDark) }
+    // var isReadOnly by rememberSaveable { mutableStateOf(false) }
     var isKeyboardEnabled by rememberSaveable { mutableStateOf(false) }
 
     // ─────────────────────────────────────────────────────────
@@ -184,7 +185,14 @@ fun EditorScreen(
             }
         }
     }
-
+    
+    LaunchedEffect(isSystemDark) {
+        isDarkTheme = isSystemDark
+        if (isEditorReady) {
+            executeJs("window.editorAPI.setTheme($isDarkTheme)")
+        }
+    }
+    
     // ─────────────────────────────────────────────────────────
     // 5. 初始化加载逻辑：当 H5 准备好且文件读取完毕时注入
     // ─────────────────────────────────────────────────────────
@@ -319,42 +327,7 @@ fun EditorScreen(
                         )
                     }
                 },
-                actions = {
-                    // 只读/编辑模式切换
-                    IconButton(onClick = {
-                        isReadOnly = !isReadOnly
-                        executeJs("window.editorAPI.setReadOnly($isReadOnly)")
-                    }) {
-                        Icon(
-                            imageVector = if (isReadOnly) Icons.Default.Lock else Icons.Default.LockOpen,
-                            contentDescription = "只读状态",
-                            tint = if (isReadOnly)
-                                MaterialTheme.colorScheme.error
-                            else
-                                LocalContentColor.current
-                        )
-                    }
-
-                    // 暗黑/亮色主题切换
-                    IconButton(onClick = {
-                        isDarkTheme = !isDarkTheme
-                        executeJs("window.editorAPI.setTheme($isDarkTheme)")
-                    }) {
-                        Icon(
-                            imageVector = if (isDarkTheme) Icons.Default.LightMode else Icons.Default.DarkMode,
-                            contentDescription = "切换主题"
-                        )
-                    }
-
-                    // 保存按钮（高亮 primary 颜色，视觉重要性更强）
-                    IconButton(onClick = { saveFile() }) {
-                        Icon(
-                            imageVector = Icons.Default.Save,
-                            contentDescription = "保存",
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                },
+                actions = {},
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(3.dp)
                 )
