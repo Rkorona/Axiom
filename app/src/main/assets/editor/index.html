@@ -31,12 +31,13 @@
         height: 100%;
       }
       /* 让 CodeMirror 内部区域占满容器高度，并支持自然滚动 */
+      /* 注意：.cm-scroller 绝对不能设置 height:100%，否则 CM6 虚拟渲染
+         的视口高度计算会出错（scrollHeight === clientHeight），导致内容全部不渲染 */
       .cm-editor {
-        height: 100% !important;
+        height: 100%;
       }
       .cm-scroller {
-        height: 100% !important;
-        overflow: auto !important;
+        overflow: auto;
       }
     </style>
     <script>
