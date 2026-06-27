@@ -389,6 +389,10 @@ fun EditorScreen(
                     WebView(ctx).apply {
                         webViewRef = this
 
+                        // 将 WebView 自身背景设为透明，使其下方 Compose Box 的背景色
+                        // 在页面加载完成前就可见，彻底消除打开编辑器时的白色闪烁帧。
+                        setBackgroundColor(android.graphics.Color.TRANSPARENT)
+
                         settings.apply {
                             javaScriptEnabled = true
                             domStorageEnabled = true
