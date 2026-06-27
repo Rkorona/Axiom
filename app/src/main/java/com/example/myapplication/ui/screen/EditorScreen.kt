@@ -460,8 +460,13 @@ fun EditorScreen(
                                 view: WebView,
                                 request: WebResourceRequest
                             ): WebResourceResponse? {
-                                // 拦截并利用代理加载 assets 目录下的静态资源
-                                return assetLoader.shouldInterceptRequest(request.url)
+                                val response = assetLoader.shouldInterceptRequest(request.url)
+                                    ?: return null
+                                // 注入 CORS 头，解除 crossorigin 的跨域限制
+                                response.responseHeaders = (response.responseHeaders ?: emptyMap()).toMutableMap().apply {
+                                    put("Access-Control-Allow-Origin", "*")
+                                }
+                                return response
                             }
                         }
                         // 加载编译后的 H5 静态资源
