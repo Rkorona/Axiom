@@ -1,8 +1,11 @@
 package com.example.myapplication.ui.screen
 
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.net.Uri
 import android.provider.DocumentsContract
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -10,18 +13,18 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowRight
-import androidx.compose.material.icons.outlined.FolderOpen
-import androidx.compose.material.icons.outlined.Folder
-import androidx.compose.material.icons.outlined.SentimentDissatisfied
+import androidx.compose.material.icons.outlined.*
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -58,6 +61,26 @@ private sealed class SheetLoadState {
 }
 
 // ─────────────────────────────────────────────
+// 上下文菜单 Action 定义
+// ─────────────────────────────────────────────
+
+private data class SheetContextAction(
+    val label: String,
+    val icon: ImageVector,
+    val isDestructive: Boolean = false,
+    val forFolder: Boolean? = null   // null=通用  true=仅文件夹  false=仅文件
+)
+
+private val SHEET_CONTEXT_ACTIONS = listOf(
+    SheetContextAction("重命名",       Icons.Outlined.Edit),
+    SheetContextAction("新建文件",     Icons.Outlined.NoteAdd,         forFolder = true),
+    SheetContextAction("新建文件夹",   Icons.Outlined.CreateNewFolder,  forFolder = true),
+    SheetContextAction("在此打开终端", Icons.Outlined.Terminal,         forFolder = true),
+    SheetContextAction("复制路径",     Icons.Outlined.ContentCopy),
+    SheetContextAction("删除",         Icons.Outlined.Delete,           isDestructive = true),
+)
+
+// ─────────────────────────────────────────────
 // 主入口：底部弹出文件树
 // ─────────────────────────────────────────────
 
@@ -79,6 +102,22 @@ fun FileExplorerSheet(
         mutableStateOf(setOf(project.localPath ?: ""))
     }
     var openingFile by remember { mutableStateOf(false) }
+
+    // ── 上下文菜单状态 ──
+    var contextNode         by remember { mutableStateOf<SheetFileNode?>(null) }
+    var showContextSheet    by remember { mutableStateOf(false) }
+    val contextSheetState   = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    // ── 对话框状态 ──
+    var showRenameDialog    by remember { mutableStateOf(false) }
+    var showNewFileDialog   by remember { mutableStateOf(false) }
+    var showNewFolderDialog by remember { mutableStateOf(false) }
+    var showDeleteDialog    by remember { mutableStateOf(false) }
+    // 重命名/删除 → 操作目标节点；新建 → 目标目录路径
+    var dialogTargetNode    by remember { mutableStateOf<SheetFileNode?>(null) }
+    var newItemTargetPath   by remember { mutableStateOf("") }
+
+    val snackbarHostState   = remember { SnackbarHostState() }
 
     // 加载文件树
     LaunchedEffect(project.localPath) {
@@ -120,11 +159,12 @@ fun FileExplorerSheet(
         containerColor = MaterialTheme.colorScheme.surface,
         shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
     ) {
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .fillMaxHeight(0.85f)
         ) {
+            Column(modifier = Modifier.fillMaxSize()) {
             // ── 标题栏 ──────────────────────────────────────────
             Row(
                 modifier = Modifier
@@ -290,6 +330,10 @@ fun FileExplorerSheet(
                                                     }
                                                 }
                                             }
+                                        },
+                                        onContextMenu = {
+                                            contextNode = row.node
+                                            showContextSheet = true
                                         }
                                     )
                                 }
@@ -322,12 +366,200 @@ fun FileExplorerSheet(
                     .padding(horizontal = 8.dp, vertical = 8.dp),
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
-                SheetBottomAction(label = "新建文件", onClick = { /* TODO */ })
-                SheetBottomAction(label = "新建文件夹", onClick = { /* TODO */ })
+                SheetBottomAction(label = "新建文件") {
+                    newItemTargetPath = project.localPath ?: ""
+                    showNewFileDialog = true
+                }
+                SheetBottomAction(label = "新建文件夹") {
+                    newItemTargetPath = project.localPath ?: ""
+                    showNewFolderDialog = true
+                }
                 SheetBottomAction(label = "上传文件", onClick = { /* TODO */ })
                 SheetBottomAction(label = "下载", onClick = { /* TODO */ })
             }
+        } // end Column
+
+            // Snackbar 悬浮在内容上方
+            SnackbarHost(
+                hostState = snackbarHostState,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .navigationBarsPadding()
+                    .padding(bottom = 64.dp)
+            )
+        } // end Box
+    } // end ModalBottomSheet
+
+    // ── 上下文菜单 BottomSheet ────────────────────────────────────────────────
+    if (showContextSheet) {
+        val node = contextNode ?: return
+        val isFolder = node.isDirectory
+        ModalBottomSheet(
+            onDismissRequest = { showContextSheet = false },
+            sheetState = contextSheetState,
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+            ) {
+                // 节点信息头
+                ListItem(
+                    headlineContent = {
+                        Text(
+                            node.name,
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    },
+                    leadingContent = {
+                        if (isFolder) {
+                            Icon(
+                                Icons.Outlined.Folder, null,
+                                tint = Color(0xFFFFB74D),
+                                modifier = Modifier.size(24.dp)
+                            )
+                        } else {
+                            SheetFileExtBadge(node.extension)
+                        }
+                    },
+                    supportingContent = {
+                        Text(
+                            node.path,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            fontFamily = FontFamily.Monospace
+                        )
+                    }
+                )
+                HorizontalDivider(
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                )
+                Spacer(Modifier.height(4.dp))
+
+                SHEET_CONTEXT_ACTIONS
+                    .filter { action ->
+                        when (action.forFolder) {
+                            true  -> isFolder
+                            false -> !isFolder
+                            null  -> true
+                        }
+                    }
+                    .forEach { action ->
+                        ListItem(
+                            headlineContent = {
+                                Text(
+                                    action.label,
+                                    color = if (action.isDestructive)
+                                        MaterialTheme.colorScheme.error
+                                    else
+                                        MaterialTheme.colorScheme.onSurface
+                                )
+                            },
+                            leadingContent = {
+                                Icon(
+                                    action.icon, null,
+                                    modifier = Modifier.size(20.dp),
+                                    tint = if (action.isDestructive)
+                                        MaterialTheme.colorScheme.error
+                                    else
+                                        MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            },
+                            modifier = Modifier.clickable {
+                                scope.launch { contextSheetState.hide() }
+                                showContextSheet = false
+                                when (action.label) {
+                                    "重命名"       -> { dialogTargetNode = node; showRenameDialog = true }
+                                    "新建文件"     -> { newItemTargetPath = node.path; showNewFileDialog = true }
+                                    "新建文件夹"   -> { newItemTargetPath = node.path; showNewFolderDialog = true }
+                                    "在此打开终端" -> { /* TODO: open terminal at node.path */ }
+                                    "复制路径"     -> {
+                                        val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                        cm.setPrimaryClip(ClipData.newPlainText("path", node.path))
+                                        scope.launch { snackbarHostState.showSnackbar("路径已复制") }
+                                    }
+                                    "删除"         -> { dialogTargetNode = node; showDeleteDialog = true }
+                                }
+                            }
+                        )
+                    }
+                Spacer(Modifier.height(8.dp))
+            }
         }
+    }
+
+    // ── 重命名对话框 ──────────────────────────────────────────────────────────
+    if (showRenameDialog) {
+        val target = dialogTargetNode ?: return
+        SheetInputDialog(
+            title = "重命名",
+            label = "新名称",
+            initialText = target.name,
+            confirmLabel = "重命名",
+            onConfirm = { newName ->
+                // TODO: 调用 FS rename（兼容 SAF / File 两种路径）
+                showRenameDialog = false
+            },
+            onDismiss = { showRenameDialog = false }
+        )
+    }
+
+    // ── 新建文件对话框 ────────────────────────────────────────────────────────
+    if (showNewFileDialog) {
+        SheetInputDialog(
+            title = "新建文件",
+            label = "文件名",
+            placeholder = "例如：main.js",
+            confirmLabel = "创建",
+            onConfirm = { name ->
+                // TODO: 调用 FS create file 于 newItemTargetPath
+                showNewFileDialog = false
+            },
+            onDismiss = { showNewFileDialog = false }
+        )
+    }
+
+    // ── 新建文件夹对话框 ──────────────────────────────────────────────────────
+    if (showNewFolderDialog) {
+        SheetInputDialog(
+            title = "新建文件夹",
+            label = "文件夹名",
+            confirmLabel = "创建",
+            onConfirm = { name ->
+                // TODO: 调用 FS mkdir 于 newItemTargetPath
+                showNewFolderDialog = false
+            },
+            onDismiss = { showNewFolderDialog = false }
+        )
+    }
+
+    // ── 删除确认对话框 ────────────────────────────────────────────────────────
+    if (showDeleteDialog) {
+        val target = dialogTargetNode ?: return
+        AlertDialog(
+            onDismissRequest = { showDeleteDialog = false },
+            icon = { Icon(Icons.Outlined.Delete, null, tint = MaterialTheme.colorScheme.error) },
+            title = { Text("确认删除") },
+            text = { Text("将永久删除「${target.name}」，此操作不可撤销。") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        // TODO: 调用 FS delete（兼容 SAF / File 两种路径）
+                        showDeleteDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error
+                    )
+                ) { Text("删除") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteDialog = false }) { Text("取消") }
+            }
+        )
     }
 }
 
@@ -357,19 +589,37 @@ private fun SheetBottomAction(label: String, onClick: () -> Unit) {
 private fun SheetFileTreeRow(
     row: SheetDisplayRow,
     isExpanded: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onContextMenu: () -> Unit
 ) {
     val node = row.node
-    val indentDp = (row.depth * 18 + 16).dp
+    val indentDp = (row.depth * 18 + 8).dp
+
+    // 文件夹 chevron 旋转动画
+    val chevronDeg by animateFloatAsState(
+        targetValue = if (isExpanded) 90f else 0f,
+        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+        label = "chevron_${node.path}"
+    )
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(start = indentDp, end = 12.dp, top = 7.dp, bottom = 7.dp),
+            .padding(start = indentDp, end = 4.dp, top = 5.dp, bottom = 5.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        // ── 左侧：chevron（文件夹） 或 对齐空位（文件） ──
         if (node.isDirectory) {
+            Icon(
+                imageVector = Icons.Outlined.ChevronRight,
+                contentDescription = null,
+                modifier = Modifier
+                    .size(18.dp)
+                    .rotate(chevronDeg),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f)
+            )
+            Spacer(Modifier.width(4.dp))
             Icon(
                 imageVector = if (isExpanded) Icons.Outlined.FolderOpen else Icons.Outlined.Folder,
                 contentDescription = null,
@@ -377,21 +627,8 @@ private fun SheetFileTreeRow(
                 tint = Color(0xFFFFB74D)
             )
         } else {
-            Box(
-                modifier = Modifier
-                    .size(20.dp)
-                    .clip(RoundedCornerShape(4.dp))
-                    .background(sheetFileIconColor(node.extension).copy(alpha = 0.15f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = node.extension.take(2).uppercase().ifBlank { "  " },
-                    fontSize = 7.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = sheetFileIconColor(node.extension),
-                    maxLines = 1
-                )
-            }
+            Spacer(Modifier.width(22.dp))   // 与文件夹 chevron(18) + gap(4) 对齐
+            SheetFileExtBadge(node.extension)
         }
 
         Spacer(modifier = Modifier.width(10.dp))
@@ -402,19 +639,88 @@ private fun SheetFileTreeRow(
             color = MaterialTheme.colorScheme.onSurface,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f)
+            modifier = Modifier.weight(1f),
+            fontFamily = if (!node.isDirectory) FontFamily.Monospace else FontFamily.Default,
+            fontWeight = if (node.isDirectory) FontWeight.Medium else FontWeight.Normal
         )
 
-        if (node.isDirectory && node.children.isNotEmpty()) {
+        // ── 右侧：⋮ 上下文菜单按钮 ──
+        IconButton(
+            onClick = onContextMenu,
+            modifier = Modifier.size(36.dp)
+        ) {
             Icon(
-                imageVector = if (isExpanded) Icons.Default.KeyboardArrowDown
-                              else Icons.Default.KeyboardArrowRight,
-                contentDescription = null,
+                imageVector = Icons.Default.MoreVert,
+                contentDescription = "更多操作",
                 modifier = Modifier.size(18.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
             )
         }
     }
+}
+
+// ─────────────────────────────────────────────
+// 文件扩展名 Badge（上下文菜单头部 & 文件行）
+// ─────────────────────────────────────────────
+
+@Composable
+private fun SheetFileExtBadge(extension: String) {
+    val bg = sheetFileIconColor(extension)
+    Box(
+        modifier = Modifier
+            .size(width = 28.dp, height = 20.dp)
+            .clip(RoundedCornerShape(4.dp))
+            .background(bg.copy(alpha = 0.18f)),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = extension.take(3).uppercase().ifBlank { "?" },
+            fontSize = 7.sp,
+            fontWeight = FontWeight.Bold,
+            color = bg,
+            maxLines = 1
+        )
+    }
+}
+
+// ─────────────────────────────────────────────
+// 通用输入对话框（重命名 / 新建）
+// ─────────────────────────────────────────────
+
+@Composable
+private fun SheetInputDialog(
+    title: String,
+    label: String,
+    initialText: String = "",
+    placeholder: String = "",
+    confirmLabel: String = "确定",
+    onConfirm: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var text by remember(initialText) { mutableStateOf(initialText) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            OutlinedTextField(
+                value = text,
+                onValueChange = { text = it },
+                label = { Text(label) },
+                placeholder = if (placeholder.isNotEmpty()) ({ Text(placeholder) }) else null,
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+        },
+        confirmButton = {
+            Button(
+                onClick = { if (text.isNotBlank()) onConfirm(text.trim()) },
+                enabled = text.isNotBlank()
+            ) { Text(confirmLabel) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("取消") }
+        }
+    )
 }
 
 // ─────────────────────────────────────────────
