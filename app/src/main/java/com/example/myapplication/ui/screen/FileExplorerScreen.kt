@@ -1,6 +1,5 @@
 package com.example.myapplication.ui.screen
 
-import android.content.Context
 import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
@@ -31,14 +30,12 @@ import androidx.compose.ui.unit.sp
 import androidx.documentfile.provider.DocumentFile
 import com.example.myapplication.ui.model.Project
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 
 // ─────────────────────────────────────────────
 // 内部数据模型
 // ─────────────────────────────────────────────
-
 private data class FileNode(
     val name: String,
     val path: String,           // 绝对路径 或 SAF content URI 字符串
@@ -61,7 +58,6 @@ private sealed class LoadState {
 // ─────────────────────────────────────────────
 // 主屏幕
 // ─────────────────────────────────────────────
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FileExplorerScreen(
@@ -70,9 +66,9 @@ fun FileExplorerScreen(
     onOpenFile: (String) -> Unit
 ) {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
 
     var loadState by remember { mutableStateOf<LoadState>(LoadState.Loading) }
+    // 核心修复：初始值不限死，在加载成功后同步更新为 root 的真实路径
     var expandedPaths by remember { mutableStateOf(setOf(project.localPath ?: "")) }
     var openingFile by remember { mutableStateOf(false) }
 
@@ -84,7 +80,7 @@ fun FileExplorerScreen(
             loadState = LoadState.Error("该项目没有关联本地路径")
             return@LaunchedEffect
         }
-        loadState = withContext(Dispatchers.IO) {
+        val result = withContext(Dispatchers.IO) {
             runCatching {
                 val root: FileNode = if (path.startsWith("content://")) {
                     val treeUri = Uri.parse(path)
@@ -98,9 +94,16 @@ fun FileExplorerScreen(
                 }
                 LoadState.Loaded(root)
             }.getOrElse { e ->
-                LoadState.Error("加载失败：${e.message}")
+                LoadState.Error("加载失败：${e.localizedMessage ?: e.message}")
             }
         }
+
+        // 核心修复：加载成功后，自动将 expandedPaths 的初始项同步为 root 真实的 document URI 路径，
+        // 否则 SAF 树根路径无法匹配，首屏会显示一片空白！
+        if (result is LoadState.Loaded) {
+            expandedPaths = setOf(result.root.path)
+        }
+        loadState = result
     }
 
     BackHandler { onBack() }
@@ -146,7 +149,6 @@ fun FileExplorerScreen(
                 .padding(innerPadding)
         ) {
             when (val state = loadState) {
-                // ── 加载中 ────────────────────────────────────────
                 is LoadState.Loading -> {
                     Column(
                         modifier = Modifier.align(Alignment.Center),
@@ -162,7 +164,6 @@ fun FileExplorerScreen(
                     }
                 }
 
-                // ── 加载失败 ──────────────────────────────────────
                 is LoadState.Error -> {
                     Column(
                         modifier = Modifier
@@ -186,14 +187,12 @@ fun FileExplorerScreen(
                     }
                 }
 
-                // ── 加载成功：显示文件树 ───────────────────────────
                 is LoadState.Loaded -> {
                     val displayRows = remember(state.root, expandedPaths) {
                         flattenVisible(state.root, depth = 0, expanded = expandedPaths)
                     }
 
                     if (displayRows.isEmpty()) {
-                        // 目录为空
                         Column(
                             modifier = Modifier
                                 .align(Alignment.Center)
@@ -225,39 +224,22 @@ fun FileExplorerScreen(
                                     isExpanded = isExpanded,
                                     onClick = {
                                         if (row.node.isDirectory) {
-                                            // 展开或折叠目录
                                             expandedPaths = if (isExpanded) {
                                                 expandedPaths - row.node.path
                                             } else {
                                                 expandedPaths + row.node.path
                                             }
                                         } else {
-                                            // 打开文件到编辑器（IO 线程读取内容）
+                                            // 极简跳转优化，不再做冗余的后台 IO 调度（因为异步读取文件内容已完美移交 EditorScreen 内部承接）
                                             if (!openingFile) {
                                                 openingFile = true
-                                                scope.launch(Dispatchers.IO) {
-                                                    withContext(Dispatchers.Main) {
-                                                        openingFile = false
-                                                        onOpenFile(row.node.path)
-                                                    }
-                                                }
+                                                onOpenFile(row.node.path)
+                                                openingFile = false
                                             }
                                         }
                                     }
                                 )
                             }
-                        }
-                    }
-
-                    // 打开文件时的半透明遮罩
-                    if (openingFile) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.25f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            CircularProgressIndicator()
                         }
                     }
                 }
@@ -269,7 +251,6 @@ fun FileExplorerScreen(
 // ─────────────────────────────────────────────
 // 文件树行 UI
 // ─────────────────────────────────────────────
-
 @Composable
 private fun FileTreeRow(
     row: DisplayRow,
@@ -286,17 +267,15 @@ private fun FileTreeRow(
             .padding(start = indentDp, end = 12.dp, top = 7.dp, bottom = 7.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // ── 图标区域 ────────────────────────────────────
         if (node.isDirectory) {
             Icon(
                 imageVector = if (isExpanded) Icons.Outlined.FolderOpen
-                              else Icons.Outlined.Folder,
+                else Icons.Outlined.Folder,
                 contentDescription = null,
                 modifier = Modifier.size(20.dp),
-                tint = Color(0xFFFFB74D)    // 文件夹统一琥珀色
+                tint = Color(0xFFFFB74D) // 文件夹琥珀色
             )
         } else {
-            // 小色块：扩展名缩写徽标
             Box(
                 modifier = Modifier
                     .size(20.dp)
@@ -316,7 +295,6 @@ private fun FileTreeRow(
 
         Spacer(modifier = Modifier.width(10.dp))
 
-        // ── 名称 ────────────────────────────────────────
         Text(
             text = node.name,
             style = MaterialTheme.typography.bodyMedium,
@@ -326,11 +304,10 @@ private fun FileTreeRow(
             modifier = Modifier.weight(1f)
         )
 
-        // ── 目录展开箭头 ─────────────────────────────────
         if (node.isDirectory && node.children.isNotEmpty()) {
             Icon(
                 imageVector = if (isExpanded) Icons.Default.KeyboardArrowDown
-                              else Icons.Default.KeyboardArrowRight,
+                else Icons.Default.KeyboardArrowRight,
                 contentDescription = null,
                 modifier = Modifier.size(18.dp),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
@@ -342,7 +319,6 @@ private fun FileTreeRow(
 // ─────────────────────────────────────────────
 // 树构建：java.io.File（本地绝对路径）
 // ─────────────────────────────────────────────
-
 private fun buildNodeFromFile(file: File): FileNode {
     return if (file.isDirectory) {
         val sorted = (file.listFiles() ?: emptyArray())
@@ -367,7 +343,6 @@ private fun buildNodeFromFile(file: File): FileNode {
 // ─────────────────────────────────────────────
 // 树构建：SAF DocumentFile（content URI）
 // ─────────────────────────────────────────────
-
 private fun buildNodeFromSaf(doc: DocumentFile): FileNode {
     val name = doc.name ?: "未知"
     return if (doc.isDirectory) {
@@ -392,17 +367,14 @@ private fun buildNodeFromSaf(doc: DocumentFile): FileNode {
 }
 
 // ─────────────────────────────────────────────
-// 将树展平为可见行列表（根据 expandedPaths 状态）
-// 根节点（depth=0）本身不显示，只展示其子节点
+// 将树展平为可见行列表
 // ─────────────────────────────────────────────
-
 private fun flattenVisible(
     node: FileNode,
     depth: Int,
     expanded: Set<String>
 ): List<DisplayRow> {
     if (depth == 0) {
-        // 根节点不显示自身，只要展开就递归展示子节点
         if (node.path !in expanded) return emptyList()
         return node.children.flatMap { flattenVisible(it, 1, expanded) }
     }
@@ -415,46 +387,26 @@ private fun flattenVisible(
 }
 
 // ─────────────────────────────────────────────
-// 读取文件内容（支持绝对路径 和 SAF content URI）
+// 扩展名颜色映射
 // ─────────────────────────────────────────────
-
-private fun readFileContent(context: Context, path: String): String {
-    return try {
-        if (path.startsWith("content://")) {
-            val uri = Uri.parse(path)
-            context.contentResolver.openInputStream(uri)
-                ?.use { it.bufferedReader(Charsets.UTF_8).readText() }
-                ?: "（无法读取文件内容）"
-        } else {
-            File(path).readText(Charsets.UTF_8)
-        }
-    } catch (e: Exception) {
-        "// 读取文件失败：${e.message}\n"
-    }
-}
-
-// ─────────────────────────────────────────────
-// 扩展名 → 图标颜色映射
-// ─────────────────────────────────────────────
-
 private fun fileIconColor(extension: String): Color = when (extension) {
-    "js", "jsx", "mjs"           -> Color(0xFFF5C518) // 黄
-    "ts", "tsx"                   -> Color(0xFF3178C6) // TypeScript 蓝
-    "py"                          -> Color(0xFF3572A5) // Python 蓝
-    "kt", "kts"                   -> Color(0xFF7F52FF) // Kotlin 紫
-    "java"                        -> Color(0xFFB07219) // Java 棕橙
-    "dart"                        -> Color(0xFF00B4AB) // Dart 青
-    "html", "htm"                 -> Color(0xFFE34C26) // HTML 红橙
-    "css", "scss", "sass", "less" -> Color(0xFF563D7C) // CSS 紫
-    "json", "jsonc"               -> Color(0xFF40BF40) // JSON 绿
-    "md", "markdown"              -> Color(0xFF888888) // Markdown 灰
-    "xml", "svg"                  -> Color(0xFFE07020) // XML 橙
-    "sh", "bash", "zsh"           -> Color(0xFF89E051) // Shell 浅绿
-    "go"                          -> Color(0xFF00ADD8) // Go 青蓝
-    "rs"                          -> Color(0xFFDEA584) // Rust 肉桂
-    "cpp", "cc", "cxx", "c", "h" -> Color(0xFF555599) // C/C++ 深蓝
-    "rb"                          -> Color(0xFFCC342D) // Ruby 红
-    "php"                         -> Color(0xFF4F5D95) // PHP 蓝紫
-    "swift"                       -> Color(0xFFFF6940) // Swift 橙红
-    else                          -> Color(0xFF9E9E9E) // 默认灰
+    "js", "jsx", "mjs"           -> Color(0xFFF5C518)
+    "ts", "tsx"                   -> Color(0xFF3178C6)
+    "py"                          -> Color(0xFF3572A5)
+    "kt", "kts"                   -> Color(0xFF7F52FF)
+    "java"                        -> Color(0xFFB07219)
+    "dart"                        -> Color(0xFF00B4AB)
+    "html", "htm"                 -> Color(0xFFE34C26)
+    "css", "scss", "sass", "less" -> Color(0xFF563D7C)
+    "json", "jsonc"               -> Color(0xFF40BF40)
+    "md", "markdown"              -> Color(0xFF888888)
+    "xml", "svg"                  -> Color(0xFFE07020)
+    "sh", "bash", "zsh"           -> Color(0xFF89E051)
+    "go"                          -> Color(0xFF00ADD8)
+    "rs"                          -> Color(0xFFDEA584)
+    "cpp", "cc", "cxx", "c", "h" -> Color(0xFF555599)
+    "rb"                          -> Color(0xFFCC342D)
+    "php"                         -> Color(0xFF4F5D95)
+    "swift"                       -> Color(0xFFFF6940)
+    else                          -> Color(0xFF9E9E9E)
 }

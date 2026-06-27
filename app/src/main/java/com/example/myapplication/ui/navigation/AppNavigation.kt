@@ -17,15 +17,10 @@ import com.example.myapplication.ui.screen.HomeScreen
 // ─────────────────────────────────────────────
 // 导航路由定义
 // ─────────────────────────────────────────────
-
 sealed class Screen {
     object Home : Screen()
     data class Editor(val filePath: String) : Screen()
 }
-
-// ─────────────────────────────────────────────
-// 本地项目图标颜色循环色盘
-// ─────────────────────────────────────────────
 
 private val localProjectIconColors = listOf(
     Color(0xFFE53935), // 红
@@ -41,7 +36,6 @@ private val localProjectIconColors = listOf(
 // ─────────────────────────────────────────────
 // 导航状态机
 // ─────────────────────────────────────────────
-
 @Composable
 fun AppNavigation() {
     val context = LocalContext.current
@@ -49,13 +43,12 @@ fun AppNavigation() {
     var currentScreen by remember { mutableStateOf<Screen>(Screen.Home) }
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
 
-    // 项目列表：动态管理，无硬编码
+    // 项目列表临时状态管理（内存暂存）
     val projects = remember { mutableStateListOf<Project>() }
 
     // 弹窗状态
     var showNewLocalDialog by remember { mutableStateOf(false) }
 
-    // ── 工具函数：计算下一个本地项目图标颜色 ────────────
     fun nextLocalColor(): Color {
         val localCount = projects.count { it.type == ProjectType.LOCAL }
         return localProjectIconColors[localCount % localProjectIconColors.size]
@@ -67,15 +60,12 @@ fun AppNavigation() {
     ) { uri: Uri? ->
         if (uri == null) return@rememberLauncherForActivityResult
 
-        // 持久化 URI 访问权限，app 重启后仍可读写该目录
-        val persistFlags =
-            Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+        // 核心安全：持久化 SAF 目录访问权限，App 重启后依然具有读写该目录及其子节点的完整权限
+        val persistFlags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
         runCatching {
             context.contentResolver.takePersistableUriPermission(uri, persistFlags)
         }
 
-        // 从 URI 解析文件夹名和可读路径
-        // URI lastPathSegment 格式通常是 "primary:Documents/my-project"
         val rawSegment = uri.lastPathSegment ?: uri.toString()
         val folderName = rawSegment
             .substringAfterLast(':')
@@ -97,18 +87,14 @@ fun AppNavigation() {
             lastModified = "刚刚",
             iconColor = nextLocalColor(),
             isActive = false,
-            localPath = uri.toString()
+            localPath = uri.toString() // 传递 H5 与原生层识别的标准的 content:// 格式
         )
         projects.add(0, newProject)
     }
 
-    // 底部弹出文件树的选中项目（null = 未展开）
     var selectedProject by remember { mutableStateOf<Project?>(null) }
 
-    // ── 页面渲染 ─────────────────────────────────────────
     when (val screen = currentScreen) {
-
-        // ── 主页 ────────────────────────────────────────
         is Screen.Home -> {
             HomeScreen(
                 projects = projects,
@@ -116,7 +102,6 @@ fun AppNavigation() {
                 onTabSelected = { selectedTab = it },
                 selectedProject = selectedProject,
                 onProjectClick = { project ->
-                    // 点击项目 → 底部弹出文件树（有本地路径才展开）
                     if (!project.localPath.isNullOrBlank()) {
                         selectedProject = project
                     }
@@ -132,21 +117,20 @@ fun AppNavigation() {
                     showNewLocalDialog = true
                 },
                 onCloneGithub = {
-                    // TODO: 打开 GitHub 克隆对话框
+                    // TODO: 预留：打开 GitHub 克隆对话框
                 },
                 onImportFile = {
                     importFolderLauncher.launch(null)
                 },
                 onFromTemplate = {
-                    // TODO: 打开模板选择页
+                    // TODO: 预留：打开模板选择页
                 },
                 onSettingsClick = {
-                    // TODO: 后续接入设置页
+                    // TODO: 预留：后续接入设置页
                 }
             )
         }
 
-        // ── 代码编辑器 ───────────────────────────────────
         is Screen.Editor -> {
             EditorScreen(
                 filePath = screen.filePath,
@@ -157,7 +141,6 @@ fun AppNavigation() {
         }
     }
 
-    // ── 新建本地项目对话框 ────────────────────────────────
     if (showNewLocalDialog) {
         NewLocalProjectDialog(
             onConfirm = { name, localPath ->
