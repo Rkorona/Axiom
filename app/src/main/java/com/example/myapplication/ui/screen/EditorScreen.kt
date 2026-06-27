@@ -468,6 +468,27 @@ fun EditorScreen(
                                 }
                                 return response
                             }
+                            
+                            override fun onPageFinished(view: WebView, url: String) {
+                                super.onPageFinished(view, url)
+                                view.evaluateJavascript("""
+                                    window.onerror = function(msg, src, line, col, err) {
+                                        document.body.style.color = 'red';
+                                        document.body.style.fontSize = '14px';
+                                        document.body.style.padding = '16px';
+                                        document.body.innerHTML = '<b>JS Error:</b><br>' + msg + '<br>at ' + src + ':' + line;
+                                        return true;
+                                    };
+                                    window.addEventListener('unhandledrejection', function(e) {
+                                        document.body.style.color = 'red';
+                                        document.body.style.fontSize = '14px'; 
+                                        document.body.style.padding = '16px';
+                                        document.body.innerHTML = '<b>Promise Error:</b><br>' + e.reason;
+                                    });
+                                """.trimIndent(), null)
+                            }
+                            
+                            
                         }
                         // 加载编译后的 H5 静态资源
                         loadUrl("https://appassets.androidplatform.net/assets/editor/index.html")
