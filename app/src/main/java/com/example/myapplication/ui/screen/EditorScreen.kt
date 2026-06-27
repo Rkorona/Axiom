@@ -480,9 +480,23 @@ html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background-c
 </html>"""
 
                         // baseUrl 指向 asset 目录，保证相对路径资源可访问
+                        // 临时测试：用最简单的内联 HTML 验证桥接是否正常
+                        val testHtml = """<!doctype html>
+                        <html><body>
+                        <script>
+                          if (window.AndroidBridge) {
+                            AndroidBridge.onReady();
+                            document.body.innerHTML = 'Bridge OK, onReady called!';
+                          } else {
+                            document.body.innerHTML = 'AndroidBridge NOT found!';
+                            document.body.style.color = 'red';
+                          }
+                        </script>
+                        </body></html>"""
+                        
                         loadDataWithBaseURL(
                             "file:///android_asset/editor/",
-                            html,
+                            testHtml,
                             "text/html",
                             "UTF-8",
                             null
