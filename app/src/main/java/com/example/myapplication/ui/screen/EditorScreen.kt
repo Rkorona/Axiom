@@ -85,7 +85,22 @@ fun EditorScreen(
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
 
-    // 1. 文件及文件信息解析
+    // ─────────────────────────────────────────────────────────
+    // 1. 持有 WebView 引用及 JS 执行函数（挪到顶部，确保后续逻辑可安全引用）
+    // ─────────────────────────────────────────────────────────
+    var webViewRef by remember { mutableStateOf<WebView?>(null) }
+
+    fun executeJs(script: String) {
+        webViewRef?.let { wv ->
+            wv.post {
+                wv.evaluateJavascript(script, null)
+            }
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // 2. 文件及文件信息解析
+    // ─────────────────────────────────────────────────────────
     val isSafUri = filePath.startsWith("content://")
     val file = remember(filePath) { if (isSafUri) null else File(filePath) }
     val fileName = remember(filePath) {
@@ -94,7 +109,6 @@ fun EditorScreen(
                 ?.substringAfterLast('/')
                 ?.substringAfterLast('%')
                 ?.let { seg ->
-                    // document id is like "primary:QLPanel/main.js" — take part after last /
                     Uri.decode(Uri.parse(filePath).lastPathSegment ?: "")
                         .substringAfterLast('/')
                         .ifBlank { "untitled" }
@@ -105,9 +119,11 @@ fun EditorScreen(
     }
     val fileExtension = fileName.substringAfterLast('.', "")
 
-    // 2. 状态保持与监听
+    // ─────────────────────────────────────────────────────────
+    // 3. 状态保持与监听
+    // ─────────────────────────────────────────────────────────
     var fileContent by remember { mutableStateOf("") }
-    var isFileLoaded by remember { mutableStateOf(false) } // 新增：标记文件是否真正读取就绪
+    var isFileLoaded by remember { mutableStateOf(false) } // 标记文件是否真正读取就绪
     var isEditorReady by remember { mutableStateOf(false) }
     
     // 状态统计与光标位置
@@ -121,7 +137,9 @@ fun EditorScreen(
     var isReadOnly by rememberSaveable { mutableStateOf(false) }
     var isKeyboardEnabled by rememberSaveable { mutableStateOf(false) }
 
-    // 3. 异步读取本地文件内容
+    // ─────────────────────────────────────────────────────────
+    // 4. 异步读取本地文件内容
+    // ─────────────────────────────────────────────────────────
     LaunchedEffect(filePath) {
         // 每次文件路径改变时，重置加载状态
         isFileLoaded = false 
@@ -144,10 +162,9 @@ fun EditorScreen(
                     }
                 }
                 
-                // 👈 修改：切换到主线程统一更新状态
                 launch(Dispatchers.Main) {
                     fileContent = text
-                    isFileLoaded = true // 👈 标记读取完毕
+                    isFileLoaded = true // 标记读取完毕
                 }
             } catch (e: Exception) {
                 launch(Dispatchers.Main) {
@@ -157,7 +174,9 @@ fun EditorScreen(
         }
     }
 
-    // 👈 顺便在这里放入新的 LaunchedEffect
+    // ─────────────────────────────────────────────────────────
+    // 5. 初始化加载逻辑：当 H5 准备好且文件读取完毕时注入
+    // ─────────────────────────────────────────────────────────
     LaunchedEffect(isEditorReady, isFileLoaded) {
         if (isEditorReady && isFileLoaded) {
             executeJs("window.editorAPI.setContentBase64('${fileContent.toBase64()}')")
@@ -167,22 +186,11 @@ fun EditorScreen(
         }
     }
 
-    // 4. 持有 WebView 引用
-    var webViewRef by remember { mutableStateOf<WebView?>(null) }
-
-    // 安全、线程安全的 JS 命令执行工具
-    fun executeJs(script: String) {
-        webViewRef?.let { wv ->
-            wv.post {
-                wv.evaluateJavascript(script, null)
-            }
-        }
-    }
-
-    // 5. 文件保存业务逻辑
+    // ─────────────────────────────────────────────────────────
+    // 6. 文件保存业务逻辑
+    // ─────────────────────────────────────────────────────────
     val saveFile = {
         webViewRef?.let { wv ->
-            // 调用 JS 获取当前最新的 Base64 文本
             wv.evaluateJavascript("window.editorAPI.getContentBase64()") { base64WithQuotes ->
                 val cleanBase64 = base64WithQuotes?.trim('"') ?: ""
                 if (cleanBase64.isNotEmpty() && cleanBase64 != "null") {
@@ -212,7 +220,9 @@ fun EditorScreen(
         }
     }
 
-    // 6. 系统原生剪贴板接管与中转
+    // ─────────────────────────────────────────────────────────
+    // 7. 系统原生剪贴板接管与中转
+    // ─────────────────────────────────────────────────────────
     val clipboardManager = remember {
         context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
     }
@@ -269,7 +279,9 @@ fun EditorScreen(
         }
     }
 
-    // 7. 页面 UI 布局构建
+    // ─────────────────────────────────────────────────────────
+    // 8. 页面 UI 布局构建
+    // ─────────────────────────────────────────────────────────
     Scaffold(
         topBar = {
             TopAppBar(
@@ -374,7 +386,7 @@ fun EditorScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .navigationBarsPadding() // 确保全面屏手势不遮挡
+                            .navigationBarsPadding()
                             .padding(horizontal = 16.dp, vertical = 6.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
@@ -425,14 +437,6 @@ fun EditorScreen(
                                 onReady = {
                                     coroutineScope.launch(Dispatchers.Main) {
                                         isEditorReady = true
-                                        // 1. 初始化写入文件内容 (Base64格式规避复杂符号崩溃)
-                                        // executeJs("window.editorAPI.setContentBase64('${fileContent.toBase64()}')")
-                                        // 2. 初始化切换语言
-                                        // executeJs("window.editorAPI.setLanguage('$fileExtension')")
-                                        // 3. 同步主题状态
-                                        // executeJs("window.editorAPI.setTheme($isDarkTheme)")
-                                        // 4. 同步只读状态
-                                        // executeJs("window.editorAPI.setReadOnly($isReadOnly)")
                                     }
                                 },
                                 onStatsChanged = { lines, length ->
@@ -451,7 +455,6 @@ fun EditorScreen(
                             "AndroidBridge"
                         )
 
-                       
                         webViewClient = object : WebViewClientCompat() {
                             override fun shouldInterceptRequest(
                                 view: WebView,
@@ -467,7 +470,6 @@ fun EditorScreen(
                 },
                 modifier = Modifier.fillMaxSize(),
                 onRelease = { webView ->
-                    // 彻底销毁 WebView 规避内存泄漏
                     webView.destroy()
                     webViewRef = null
                 }
