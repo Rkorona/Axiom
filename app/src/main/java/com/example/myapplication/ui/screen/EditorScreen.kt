@@ -1,5 +1,10 @@
 package com.example.myapplication.ui.screen
 
+import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
+import androidx.webkit.WebViewAssetLoader
+import androidx.webkit.WebViewClientCompat
+
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -102,6 +107,7 @@ fun EditorScreen(
 
     // 2. 状态保持与监听
     var fileContent by remember { mutableStateOf("") }
+    var isFileLoaded by remember { mutableStateOf(false) } // 新增：标记文件是否真正读取就绪
     var isEditorReady by remember { mutableStateOf(false) }
     
     // 状态统计与光标位置
@@ -117,29 +123,47 @@ fun EditorScreen(
 
     // 3. 异步读取本地文件内容
     LaunchedEffect(filePath) {
+        // 每次文件路径改变时，重置加载状态
+        isFileLoaded = false 
+        
         launch(Dispatchers.IO) {
             try {
-                if (isSafUri) {
+                val text = if (isSafUri) {
                     val uri = Uri.parse(filePath)
-                    val text = context.contentResolver.openInputStream(uri)
+                    context.contentResolver.openInputStream(uri)
                         ?.use { it.readBytes().toString(Charsets.UTF_8) }
                         ?: ""
-                    fileContent = text
                 } else {
                     val f = file!!
                     if (f.exists()) {
-                        fileContent = f.readText(Charsets.UTF_8)
+                        f.readText(Charsets.UTF_8)
                     } else {
                         f.parentFile?.mkdirs()
                         f.createNewFile()
-                        fileContent = ""
+                        ""
                     }
+                }
+                
+                // 👈 修改：切换到主线程统一更新状态
+                launch(Dispatchers.Main) {
+                    fileContent = text
+                    isFileLoaded = true // 👈 标记读取完毕
                 }
             } catch (e: Exception) {
                 launch(Dispatchers.Main) {
                     Toast.makeText(context, "读取文件失败: ${e.message}", Toast.LENGTH_LONG).show()
                 }
             }
+        }
+    }
+
+    // 👈 顺便在这里放入新的 LaunchedEffect
+    LaunchedEffect(isEditorReady, isFileLoaded) {
+        if (isEditorReady && isFileLoaded) {
+            executeJs("window.editorAPI.setContentBase64('${fileContent.toBase64()}')")
+            executeJs("window.editorAPI.setLanguage('$fileExtension')")
+            executeJs("window.editorAPI.setTheme($isDarkTheme)")
+            executeJs("window.editorAPI.setReadOnly($isReadOnly)")
         }
     }
 
@@ -391,7 +415,10 @@ fun EditorScreen(
                             useWideViewPort = true
                             mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
                         }
-
+                        val assetLoader = WebViewAssetLoader.Builder()
+                            .addPathHandler("/assets/", WebViewAssetLoader.AssetsPathHandler(ctx))
+                            .build()
+                        
                         // 注入桥接，回调全部分发至 Compose 状态层（切回 Dispatchers.Main 线程）
                         addJavascriptInterface(
                             WebAppInterface(
@@ -399,13 +426,13 @@ fun EditorScreen(
                                     coroutineScope.launch(Dispatchers.Main) {
                                         isEditorReady = true
                                         // 1. 初始化写入文件内容 (Base64格式规避复杂符号崩溃)
-                                        executeJs("window.editorAPI.setContentBase64('${fileContent.toBase64()}')")
+                                        // executeJs("window.editorAPI.setContentBase64('${fileContent.toBase64()}')")
                                         // 2. 初始化切换语言
-                                        executeJs("window.editorAPI.setLanguage('$fileExtension')")
+                                        // executeJs("window.editorAPI.setLanguage('$fileExtension')")
                                         // 3. 同步主题状态
-                                        executeJs("window.editorAPI.setTheme($isDarkTheme)")
+                                        // executeJs("window.editorAPI.setTheme($isDarkTheme)")
                                         // 4. 同步只读状态
-                                        executeJs("window.editorAPI.setReadOnly($isReadOnly)")
+                                        // executeJs("window.editorAPI.setReadOnly($isReadOnly)")
                                     }
                                 },
                                 onStatsChanged = { lines, length ->
@@ -424,15 +451,18 @@ fun EditorScreen(
                             "AndroidBridge"
                         )
 
-                        // 阻止 WebView 跳转外部分页
-                        webViewClient = object : WebViewClient() {
-                            override fun onPageFinished(view: WebView?, url: String?) {
-                                super.onPageFinished(view, url)
+                       
+                        webViewClient = object : WebViewClientCompat() {
+                            override fun shouldInterceptRequest(
+                                view: WebView,
+                                request: WebResourceRequest
+                            ): WebResourceResponse? {
+                                // 拦截并利用代理加载 assets 目录下的静态资源
+                                return assetLoader.shouldInterceptRequest(request.url)
                             }
                         }
-
                         // 加载编译后的 H5 静态资源
-                        loadUrl("file:///android_asset/editor/index.html")
+                        loadUrl("https://appassets.androidplatform.net/assets/editor/index.html")
                     }
                 },
                 modifier = Modifier.fillMaxSize(),
