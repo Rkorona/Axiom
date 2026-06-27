@@ -4,8 +4,6 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import androidx.webkit.WebViewAssetLoader
 
-import android.content.ClipData
-import android.content.ClipboardManager
 import android.content.Context
 import android.util.Base64
 import android.webkit.JavascriptInterface
@@ -16,6 +14,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
@@ -24,12 +23,17 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import android.net.Uri
-import android.view.View
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.io.File
@@ -50,7 +54,6 @@ fun String.fromBase64(): String {
 // WebView 桥接接口类
 // 所有接口方法均在 WebView 的私有 Binder 线程中被调用
 // ═════════════════════════════════════════════════════════════
-
 class WebAppInterface(
     private val onReadyCallback: () -> Unit,
     private val onStatsChangedCallback: (lines: Int, length: Int) -> Unit,
@@ -132,9 +135,9 @@ fun EditorScreen(
     // 3. 状态保持与监听
     // ─────────────────────────────────────────────────────────
     var fileContent by remember { mutableStateOf("") }
-    var isFileLoaded by remember { mutableStateOf(false) } // 标记文件是否真正读取就绪
+    var isFileLoaded by remember { mutableStateOf(false) }
     var isEditorReady by remember { mutableStateOf(false) }
-    
+
     // 状态统计与光标位置
     var linesCount by rememberSaveable { mutableIntStateOf(0) }
     var charCount by rememberSaveable { mutableIntStateOf(0) }
@@ -142,7 +145,7 @@ fun EditorScreen(
     var cursorCol by rememberSaveable { mutableIntStateOf(1) }
 
     // 主题、只读、键盘控制（支持旋屏状态保留）
-    var isDarkTheme by rememberSaveable { mutableStateOf(true) } 
+    var isDarkTheme by rememberSaveable { mutableStateOf(true) }
     var isReadOnly by rememberSaveable { mutableStateOf(false) }
     var isKeyboardEnabled by rememberSaveable { mutableStateOf(false) }
 
@@ -150,9 +153,8 @@ fun EditorScreen(
     // 4. 异步读取本地文件内容
     // ─────────────────────────────────────────────────────────
     LaunchedEffect(filePath) {
-        // 每次文件路径改变时，重置加载状态
-        isFileLoaded = false 
-        
+        isFileLoaded = false
+
         launch(Dispatchers.IO) {
             try {
                 val text = if (isSafUri) {
@@ -170,10 +172,10 @@ fun EditorScreen(
                         ""
                     }
                 }
-                
+
                 launch(Dispatchers.Main) {
                     fileContent = text
-                    isFileLoaded = true // 标记读取完毕
+                    isFileLoaded = true
                 }
             } catch (e: Exception) {
                 launch(Dispatchers.Main) {
@@ -192,9 +194,6 @@ fun EditorScreen(
             executeJs("window.editorAPI.setLanguage('$fileExtension')")
             executeJs("window.editorAPI.setTheme($isDarkTheme)")
             executeJs("window.editorAPI.setReadOnly($isReadOnly)")
-            // 内容注入后强制触发 resize 事件：
-            // CM6 在 WebView 初始布局完成前（clientHeight=0）测量视口，导致渲染 0 行。
-            // resize 事件会使 CM6 重新 requestMeasure()，用正确的视口高度重绘所有行。
             webViewRef?.postDelayed({
                 webViewRef?.evaluateJavascript(
                     "window.dispatchEvent(new Event('resize'))", null
@@ -238,83 +237,78 @@ fun EditorScreen(
     }
 
     // ─────────────────────────────────────────────────────────
-    // 7. 系统原生剪贴板接管与中转
-    // ─────────────────────────────────────────────────────────
-    val clipboardManager = remember {
-        context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-    }
-
-    val handleCopy = {
-        webViewRef?.let { wv ->
-            wv.evaluateJavascript("window.editorAPI.copySelected()") { base64WithQuotes ->
-                val cleanBase64 = base64WithQuotes?.trim('"') ?: ""
-                if (cleanBase64.isNotEmpty() && cleanBase64 != "null") {
-                    try {
-                        val text = cleanBase64.fromBase64()
-                        if (text.isNotEmpty()) {
-                            val clip = ClipData.newPlainText("Code", text)
-                            clipboardManager.setPrimaryClip(clip)
-                            Toast.makeText(context, "已复制到系统剪贴板", Toast.LENGTH_SHORT).show()
-                        }
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                    }
-                }
-            }
-        }
-    }
-
-    val handleCut = {
-        webViewRef?.let { wv ->
-            wv.evaluateJavascript("window.editorAPI.cutSelected()") { base64WithQuotes ->
-                val cleanBase64 = base64WithQuotes?.trim('"') ?: ""
-                if (cleanBase64.isNotEmpty() && cleanBase64 != "null") {
-                    try {
-                        val text = cleanBase64.fromBase64()
-                        if (text.isNotEmpty()) {
-                            val clip = ClipData.newPlainText("Code", text)
-                            clipboardManager.setPrimaryClip(clip)
-                            Toast.makeText(context, "已剪切到系统剪贴板", Toast.LENGTH_SHORT).show()
-                        }
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                    }
-                }
-            }
-        }
-    }
-
-    val handlePaste = {
-        val clipData = clipboardManager.primaryClip
-        if (clipData != null && clipData.itemCount > 0) {
-            val text = clipData.getItemAt(0).text?.toString() ?: ""
-            if (text.isNotEmpty()) {
-                executeJs("window.editorAPI.insertTextBase64('${text.toBase64()}')")
-            }
-        } else {
-            Toast.makeText(context, "剪贴板为空", Toast.LENGTH_SHORT).show()
-        }
-    }
-
-    // ─────────────────────────────────────────────────────────
-    // 8. 页面 UI 布局构建
+    // 7. 页面 UI 布局构建
     // ─────────────────────────────────────────────────────────
     Scaffold(
         modifier = Modifier.imePadding(),
         topBar = {
             TopAppBar(
                 title = {
-                    Column {
-                        Text(
-                            text = fileName,
-                            style = MaterialTheme.typography.titleMedium,
-                            maxLines = 1
-                        )
-                        Text(
-                            text = "行: $cursorLine, 列: $cursorCol",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        // 文件名 + 语言类型徽章
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Text(
+                                text = fileName,
+                                style = MaterialTheme.typography.titleSmall.copy(
+                                    fontWeight = FontWeight.SemiBold
+                                ),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            if (fileExtension.isNotBlank()) {
+                                Surface(
+                                    color = MaterialTheme.colorScheme.primaryContainer,
+                                    shape = RoundedCornerShape(4.dp),
+                                    tonalElevation = 0.dp
+                                ) {
+                                    Text(
+                                        text = fileExtension.uppercase(),
+                                        style = MaterialTheme.typography.labelSmall.copy(
+                                            fontFamily = FontFamily.Monospace,
+                                            fontWeight = FontWeight.Bold,
+                                            letterSpacing = 0.5.sp
+                                        ),
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                                    )
+                                }
+                            }
+                        }
+                        // 文件路径提示（只读时显示 READ ONLY 标签）
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Text(
+                                text = if (isSafUri) "外部文件" else filePath
+                                    .substringBeforeLast('/')
+                                    .let { dir -> if (dir.length > 28) "…" + dir.takeLast(28) else dir },
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            if (isReadOnly) {
+                                Surface(
+                                    color = MaterialTheme.colorScheme.errorContainer,
+                                    shape = RoundedCornerShape(3.dp)
+                                ) {
+                                    Text(
+                                        text = "READ ONLY",
+                                        style = MaterialTheme.typography.labelSmall.copy(
+                                            fontFamily = FontFamily.Monospace,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 9.sp
+                                        ),
+                                        color = MaterialTheme.colorScheme.onErrorContainer,
+                                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                    )
+                                }
+                            }
+                        }
                     }
                 },
                 navigationIcon = {
@@ -330,15 +324,14 @@ fun EditorScreen(
                     IconButton(onClick = {
                         isReadOnly = !isReadOnly
                         executeJs("window.editorAPI.setReadOnly($isReadOnly)")
-                        Toast.makeText(
-                            context,
-                            if (isReadOnly) "只读模式" else "编辑模式",
-                            Toast.LENGTH_SHORT
-                        ).show()
                     }) {
                         Icon(
                             imageVector = if (isReadOnly) Icons.Default.Lock else Icons.Default.LockOpen,
-                            contentDescription = "只读状态"
+                            contentDescription = "只读状态",
+                            tint = if (isReadOnly)
+                                MaterialTheme.colorScheme.error
+                            else
+                                LocalContentColor.current
                         )
                     }
 
@@ -353,11 +346,12 @@ fun EditorScreen(
                         )
                     }
 
-                    // 保存按钮
+                    // 保存按钮（高亮 primary 颜色，视觉重要性更强）
                     IconButton(onClick = { saveFile() }) {
                         Icon(
                             imageVector = Icons.Default.Save,
-                            contentDescription = "保存"
+                            contentDescription = "保存",
+                            tint = MaterialTheme.colorScheme.primary
                         )
                     }
                 },
@@ -368,7 +362,7 @@ fun EditorScreen(
         },
         bottomBar = {
             Column {
-                // 顶部滑动辅助输入工具栏（方向键、快捷符号、剪贴板管理）
+                // ── 辅助输入工具栏 ───────────────────────────────────────
                 QuickActionButtonBar(
                     isKeyboardEnabled = isKeyboardEnabled,
                     onToggleKeyboard = {
@@ -384,39 +378,40 @@ fun EditorScreen(
                     },
                     onMoveCursor = { dir ->
                         executeJs("window.editorAPI.moveCursor('$dir')")
-                    },
-                    onSelectAll = {
-                        executeJs("window.editorAPI.selectAll()")
-                    },
-                    onCopy = { handleCopy() },
-                    onCut = { handleCut() },
-                    onPaste = { handlePaste() },
-                    onSearch = {
-                        executeJs("window.editorAPI.openSearch()")
                     }
                 )
 
-                // 统计信息底栏
+                // ── IDE 风格状态栏 ────────────────────────────────────────
                 Surface(
-                    tonalElevation = 1.dp,
+                    tonalElevation = 6.dp,
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .navigationBarsPadding()
-                            .padding(horizontal = 16.dp, vertical = 6.dp),
+                            .height(26.dp)
+                            .padding(horizontal = 14.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = "${linesCount} 行 | ${charCount} 字符",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Text(
-                            text = fileExtension.uppercase(),
-                            style = MaterialTheme.typography.labelSmall,
+                        // 左侧：光标位置 + 文件统计 + 编码
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            StatusBarLabel("Ln $cursorLine")
+                            StatusBarLabel("Col $cursorCol")
+                            StatusBarPipe()
+                            StatusBarLabel("$linesCount 行")
+                            StatusBarPipe()
+                            StatusBarLabel("$charCount 字符")
+                            StatusBarPipe()
+                            StatusBarLabel("UTF-8")
+                        }
+                        // 右侧：文件类型
+                        StatusBarLabel(
+                            text = fileExtension.uppercase().ifBlank { "TEXT" },
                             color = MaterialTheme.colorScheme.primary
                         )
                     }
@@ -435,10 +430,6 @@ fun EditorScreen(
                     WebView(ctx).apply {
                         webViewRef = this
 
-                        // 必要的 WebView 安全与功能配置
-                        // 注意：不设置 loadWithOverviewMode/useWideViewPort，
-                        // 这两项会让 WebView 使用宽布局视口（980px）再缩放，
-                        // 可能导致 CM6 初始测量高度异常。
                         settings.apply {
                             javaScriptEnabled = true
                             domStorageEnabled = true
@@ -448,7 +439,6 @@ fun EditorScreen(
                             allowUniversalAccessFromFileURLs = true
                         }
 
-                        // 注入桥接，回调全部分发至 Compose 状态层（切回 Dispatchers.Main 线程）
                         addJavascriptInterface(
                             WebAppInterface(
                                 onReadyCallback = {
@@ -472,8 +462,6 @@ fun EditorScreen(
                             "AndroidBridge"
                         )
 
-                        // 使用 WebViewAssetLoader 将 assets 以 HTTPS 源提供服务
-                        // 这样 type="module" 脚本可以正常加载，彻底解决 CORS 问题
                         val assetLoader = WebViewAssetLoader.Builder()
                             .setDomain("appassets.androidplatform.net")
                             .addPathHandler("/assets/", WebViewAssetLoader.AssetsPathHandler(ctx))
@@ -489,10 +477,6 @@ fun EditorScreen(
 
                             override fun onPageFinished(view: WebView, url: String) {
                                 super.onPageFinished(view, url)
-                                // 兜底触发：type="module" 脚本在部分 WebView 版本中执行时
-                                // AndroidBridge 可能尚未注入，导致 notifyReady() 内的检查失败。
-                                // onPageFinished 触发时 module 脚本已执行完毕，在此再调用一次
-                                // notifyReady() 可确保 isEditorReady 正常置为 true。
                                 view.evaluateJavascript(
                                     "window.editorAPI && window.editorAPI.notifyReady()",
                                     null
@@ -506,7 +490,6 @@ fun EditorScreen(
                             }
                         }
 
-                        
                         loadUrl("https://appassets.androidplatform.net/assets/editor/index.html")
                     }
                 },
@@ -517,7 +500,6 @@ fun EditorScreen(
                 }
             )
 
-            // WebView 未初始化完成前展示转圈
             if (!isEditorReady) {
                 Box(
                     modifier = Modifier.fillMaxSize(),
@@ -531,19 +513,44 @@ fun EditorScreen(
 }
 
 // ═════════════════════════════════════════════════════════════
+// 状态栏辅助组件
+// ═════════════════════════════════════════════════════════════
+
+@Composable
+private fun StatusBarLabel(
+    text: String,
+    color: Color = MaterialTheme.colorScheme.onSurfaceVariant
+) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelSmall.copy(
+            fontFamily = FontFamily.Monospace,
+            fontSize = 10.sp
+        ),
+        color = color
+    )
+}
+
+@Composable
+private fun StatusBarPipe() {
+    Box(
+        modifier = Modifier
+            .height(10.dp)
+            .width(1.dp)
+            .background(MaterialTheme.colorScheme.outlineVariant)
+    )
+}
+
+// ═════════════════════════════════════════════════════════════
 // 横向滚动辅助输入工具栏（键盘上方附件栏）
 // ═════════════════════════════════════════════════════════════
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun QuickActionButtonBar(
     isKeyboardEnabled: Boolean,
     onToggleKeyboard: () -> Unit,
     onInsertChar: (String) -> Unit,
     onMoveCursor: (String) -> Unit,
-    onSelectAll: () -> Unit,
-    onCopy: () -> Unit,
-    onCut: () -> Unit,
-    onPaste: () -> Unit,
-    onSearch: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val scrollState = rememberScrollState()
@@ -556,73 +563,56 @@ fun QuickActionButtonBar(
             modifier = Modifier
                 .fillMaxWidth()
                 .horizontalScroll(scrollState)
-                .padding(vertical = 4.dp, horizontal = 8.dp),
+                .padding(vertical = 5.dp, horizontal = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
+            horizontalArrangement = Arrangement.spacedBy(3.dp)
         ) {
-            // 软键盘编辑锁定状态控制
-            IconButton(onClick = onToggleKeyboard) {
+
+            // ── 软键盘开关（键帽样式，激活时高亮）────────────────────────────
+            EditorKeyButton(
+                onClick = onToggleKeyboard,
+                isActive = isKeyboardEnabled,
+                modifier = Modifier.size(38.dp)
+            ) {
                 Icon(
-                    imageVector = if (isKeyboardEnabled) Icons.Default.KeyboardHide else Icons.Default.Edit,
-                    contentDescription = "软键盘控制键",
-                    tint = if (isKeyboardEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                    imageVector = if (isKeyboardEnabled)
+                        Icons.Default.KeyboardHide else Icons.Default.Keyboard,
+                    contentDescription = "软键盘控制",
+                    modifier = Modifier.size(18.dp),
+                    tint = if (isKeyboardEnabled)
+                        MaterialTheme.colorScheme.onPrimaryContainer
+                    else
+                        MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
-            // 分割线
-            Box(
-                modifier = Modifier
-                    .height(24.dp)
-                    .width(1.dp)
-                    .background(MaterialTheme.colorScheme.outlineVariant)
+            ToolbarDivider()
+
+            // ── 方向键组 ─────────────────────────────────────────────────────
+            EditorArrowKey(
+                icon = Icons.Default.KeyboardArrowLeft,
+                description = "向左",
+                onClick = { onMoveCursor("left") }
+            )
+            EditorArrowKey(
+                icon = Icons.Default.KeyboardArrowUp,
+                description = "向上",
+                onClick = { onMoveCursor("up") }
+            )
+            EditorArrowKey(
+                icon = Icons.Default.KeyboardArrowDown,
+                description = "向下",
+                onClick = { onMoveCursor("down") }
+            )
+            EditorArrowKey(
+                icon = Icons.Default.KeyboardArrowRight,
+                description = "向右",
+                onClick = { onMoveCursor("right") }
             )
 
-            // 方向导航
-            IconButton(onClick = { onMoveCursor("left") }) {
-                Icon(Icons.Default.KeyboardArrowLeft, contentDescription = "向左")
-            }
-            IconButton(onClick = { onMoveCursor("right") }) {
-                Icon(Icons.Default.KeyboardArrowRight, contentDescription = "向右")
-            }
-            IconButton(onClick = { onMoveCursor("up") }) {
-                Icon(Icons.Default.KeyboardArrowUp, contentDescription = "向上")
-            }
-            IconButton(onClick = { onMoveCursor("down") }) {
-                Icon(Icons.Default.KeyboardArrowDown, contentDescription = "向下")
-            }
+            ToolbarDivider()
 
-            Box(
-                modifier = Modifier
-                    .height(24.dp)
-                    .width(1.dp)
-                    .background(MaterialTheme.colorScheme.outlineVariant)
-            )
-
-            // 全选与剪贴板控制、搜索
-            IconButton(onClick = onSelectAll) {
-                Icon(Icons.Default.SelectAll, contentDescription = "全选")
-            }
-            IconButton(onClick = onCopy) {
-                Icon(Icons.Default.ContentCopy, contentDescription = "复制")
-            }
-            IconButton(onClick = onCut) {
-                Icon(Icons.Default.ContentCut, contentDescription = "剪切")
-            }
-            IconButton(onClick = onPaste) {
-                Icon(Icons.Default.ContentPaste, contentDescription = "粘贴")
-            }
-            IconButton(onClick = onSearch) {
-                Icon(Icons.Default.Search, contentDescription = "搜索")
-            }
-
-            Box(
-                modifier = Modifier
-                    .height(24.dp)
-                    .width(1.dp)
-                    .background(MaterialTheme.colorScheme.outlineVariant)
-            )
-
-            // 针对触屏键盘难以输入的符号、Tab键、大括号直接一键快捷插入
+            // ── 编程符号快捷键 ────────────────────────────────────────────────
             val programmingChars = listOf(
                 "\t" to "Tab",
                 "{" to "{",
@@ -647,18 +637,101 @@ fun QuickActionButtonBar(
             )
 
             programmingChars.forEach { (charValue, display) ->
-                TextButton(
-                    onClick = { onInsertChar(charValue) },
-                    contentPadding = PaddingValues(horizontal = 8.dp),
-                    modifier = Modifier.defaultMinSize(minWidth = 36.dp, minHeight = 36.dp)
-                ) {
-                    Text(
-                        text = display,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                }
+                EditorSymbolKey(
+                    display = display,
+                    onClick = { onInsertChar(charValue) }
+                )
             }
         }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────
+// 工具栏子组件
+// ─────────────────────────────────────────────────────────────
+
+/** 工具栏竖向分隔线 */
+@Composable
+private fun ToolbarDivider() {
+    Spacer(modifier = Modifier.width(2.dp))
+    Box(
+        modifier = Modifier
+            .height(22.dp)
+            .width(1.dp)
+            .background(MaterialTheme.colorScheme.outlineVariant)
+    )
+    Spacer(modifier = Modifier.width(2.dp))
+}
+
+/** 通用键帽按钮基座（支持激活高亮态） */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun EditorKeyButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    isActive: Boolean = false,
+    content: @Composable BoxScope.() -> Unit
+) {
+    val bgColor = if (isActive)
+        MaterialTheme.colorScheme.primaryContainer
+    else
+        MaterialTheme.colorScheme.surfaceColorAtElevation(10.dp)
+
+    Surface(
+        onClick = onClick,
+        color = bgColor,
+        shape = RoundedCornerShape(7.dp),
+        tonalElevation = 0.dp,
+        modifier = modifier
+    ) {
+        Box(
+            contentAlignment = Alignment.Center,
+            content = content
+        )
+    }
+}
+
+/** 方向键（带图标的固定尺寸键帽） */
+@Composable
+private fun EditorArrowKey(
+    icon: ImageVector,
+    description: String,
+    onClick: () -> Unit
+) {
+    EditorKeyButton(
+        onClick = onClick,
+        modifier = Modifier.size(38.dp)
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = description,
+            modifier = Modifier.size(20.dp),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+/** 符号键（等宽字体文本，自适应宽度） */
+@Composable
+private fun EditorSymbolKey(
+    display: String,
+    onClick: () -> Unit
+) {
+    EditorKeyButton(
+        onClick = onClick,
+        modifier = Modifier
+            .height(38.dp)
+            .defaultMinSize(minWidth = 38.dp)
+    ) {
+        Text(
+            text = display,
+            style = MaterialTheme.typography.bodyMedium.copy(
+                fontFamily = FontFamily.Monospace,
+                fontWeight = FontWeight.Medium,
+                fontSize = 13.sp
+            ),
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(horizontal = 7.dp)
+        )
     }
 }
