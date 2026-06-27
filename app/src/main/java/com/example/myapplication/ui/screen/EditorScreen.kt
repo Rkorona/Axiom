@@ -2,15 +2,12 @@ package com.example.myapplication.ui.screen
 
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
-import androidx.webkit.WebViewAssetLoader
-import androidx.webkit.WebViewClientCompat
 
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.util.Base64
 import android.webkit.JavascriptInterface
-import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.Toast
@@ -425,12 +422,8 @@ fun EditorScreen(
                             allowContentAccess = true
                             loadWithOverviewMode = true
                             useWideViewPort = true
-                            mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
                         }
-                        val assetLoader = WebViewAssetLoader.Builder()
-                            .addPathHandler("/assets/", WebViewAssetLoader.AssetsPathHandler(ctx))
-                            .build()
-                        
+
                         // 注入桥接，回调全部分发至 Compose 状态层（切回 Dispatchers.Main 线程）
                         addJavascriptInterface(
                             WebAppInterface(
@@ -455,41 +448,45 @@ fun EditorScreen(
                             "AndroidBridge"
                         )
 
-                        webViewClient = object : WebViewClientCompat() {
-                            override fun shouldInterceptRequest(
-                                view: WebView,
-                                request: WebResourceRequest
-                            ): WebResourceResponse? {
-                                val response = assetLoader.shouldInterceptRequest(request.url)
-                                    ?: return null
-                                response.responseHeaders = (response.responseHeaders ?: emptyMap())
-                                    .toMutableMap()
-                                    .apply { put("Access-Control-Allow-Origin", "*") }
-                                return response
-                            }
+                        webViewClient = WebViewClient()
 
-                            override fun onPageFinished(view: WebView, url: String) {
-                                super.onPageFinished(view, url)
-                                // 把所有 type="module" 的 script 转成普通 script 重新执行
-                                // 终极方案：绕过 WebViewAssetLoader + ES module 的 CORS 限制
-                                view.evaluateJavascript("""
-                                    (function() {
-                                        var moduleScripts = document.querySelectorAll('script[type="module"]');
-                                        moduleScripts.forEach(function(orig) {
-                                            var s = document.createElement('script');
-                                            if (orig.src) {
-                                                s.src = orig.src;
-                                            } else {
-                                                s.textContent = orig.textContent;
-                                            }
-                                            orig.parentNode.replaceChild(s, orig);
-                                        });
-                                    })();
-                                """.trimIndent(), null)
-                            }
-                        }
-                        // 加载编译后的 H5 静态资源
-                        loadUrl("https://appassets.androidplatform.net/assets/editor/index.html")
+                        // 从 assets 读取打包后的 JS，内联进 HTML 字符串
+                        // 彻底绕过 WebViewAssetLoader + type="module" 的 CORS 问题
+                        val jsFileName = ctx.assets.list("editor/assets")
+                            ?.firstOrNull { it.endsWith(".js") }
+                            ?: "index.js"
+                        val jsContent = ctx.assets
+                            .open("editor/assets/$jsFileName")
+                            .bufferedReader(Charsets.UTF_8)
+                            .use { it.readText() }
+
+                        val html = """<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"/>
+<title>CodeMirror 6</title>
+<style>
+:root{--editor-bg:#282c34}
+html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background-color:var(--editor-bg);overscroll-behavior:none}
+#editor{width:100%;height:100%}
+.cm-editor{height:100%!important}
+</style>
+</head>
+<body>
+<div id="editor"></div>
+<script>$jsContent</script>
+</body>
+</html>"""
+
+                        // baseUrl 指向 asset 目录，保证相对路径资源可访问
+                        loadDataWithBaseURL(
+                            "file:///android_asset/editor/",
+                            html,
+                            "text/html",
+                            "UTF-8",
+                            null
+                        )
                     }
                 },
                 modifier = Modifier.fillMaxSize(),
