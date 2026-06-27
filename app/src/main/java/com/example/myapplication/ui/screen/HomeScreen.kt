@@ -80,11 +80,10 @@ private fun filterAndSortProjects(
         ProjectSortOrder.DEFAULT -> filtered  // 保持原顺序（newest first）
 
         ProjectSortOrder.NAME_ASC ->
-            filtered.sortedWith(compareBy<Project>(String.CASE_INSENSITIVE_ORDER) { it.name })
+            filtered.sortedWith { a, b -> String.CASE_INSENSITIVE_ORDER.compare(a.name, b.name) }
 
         ProjectSortOrder.NAME_DESC ->
-            // reversed() 是 Comparator 的 Java8 方法，Kotlin 可直接调用
-            filtered.sortedWith(compareBy<Project>(String.CASE_INSENSITIVE_ORDER) { it.name }.reversed())
+            filtered.sortedWith { a, b -> String.CASE_INSENSITIVE_ORDER.compare(b.name, a.name) }
 
         ProjectSortOrder.TYPE_LOCAL_FIRST ->
             // 多选择器 compareBy：先按类型（LOCAL=0，其他=1），再按名称忽略大小写
