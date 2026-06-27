@@ -10,35 +10,37 @@
     />
     <title>CodeMirror 6</title>
     <style>
-      /* Kotlin 侧可在注入内容前调用：
-         document.documentElement.style.setProperty('--editor-bg', '#fafafa')
-         提前设置背景色，避免主题切换时出现闪烁帧 */
+      /* --editor-bg：背景色 token，Kotlin 侧调用 setTheme 时同步注入：
+            dark  → #282c34
+            light → #ffffff
+         初始值由 prefers-color-scheme 决定，供页面首帧使用，
+         避免 Kotlin bridge 就绪前出现颜色错乱 */
       :root { --editor-bg: #282c34; }
+      @media (prefers-color-scheme: light) {
+        :root { --editor-bg: #ffffff; }
+      }
 
       html,
       body {
         margin: 0;
         padding: 0;
         width: 100%;
-        /* 使用 100dvh 而非 100%：Android WebView 在 Compose AndroidView 中初始
-           布局高度为 0，height:100% 会沿继承链全部坍塌为 0；dvh/vh 直接取视口高度，
-           不依赖父元素高度，确保 CM6 初始化时 #editor.clientHeight > 0 */
         height: 100dvh;
         overflow: hidden;
         background-color: var(--editor-bg);
-        /* 防止编辑器滚动到边界时事件冒泡给外层 WebView，避免整页抖动 */
         overscroll-behavior: none;
       }
       #editor {
-        /* position:fixed + inset:0 确保 #editor 始终铺满视口，彻底绕开
-           height:100% 继承链在 WebView 中坍塌为 0 的问题 */
         position: fixed;
         inset: 0;
       }
-      /* CM6 内部会自行给 .cm-editor 应用 height:100% 和 .cm-scroller 应用
-         overflow-x:auto / height:100%，此处只补充 overflow:auto 开启双轴滚动 */
+      /* 关键：cm-editor 必须显式继承背景色。
+         oneDark 主题启用时会自行覆盖为 #282c34；
+         移除 oneDark（亮色模式）时若不设置，编辑器变透明，
+         暗色 body 背景透出，导致亮色模式下仍显示深色。 */
       .cm-editor {
         height: 100%;
+        background-color: var(--editor-bg);
       }
       .cm-scroller {
         overflow: auto;

@@ -189,6 +189,8 @@ fun EditorScreen(
     LaunchedEffect(isSystemDark) {
         isDarkTheme = isSystemDark
         if (isEditorReady) {
+            val bg = if (isDarkTheme) "#282c34" else "#ffffff"
+            executeJs("document.documentElement.style.setProperty('--editor-bg','$bg')")
             executeJs("window.editorAPI.setTheme($isDarkTheme)")
         }
     }
@@ -198,6 +200,8 @@ fun EditorScreen(
     // ─────────────────────────────────────────────────────────
     LaunchedEffect(isEditorReady, isFileLoaded) {
         if (isEditorReady && isFileLoaded) {
+            val bg = if (isDarkTheme) "#282c34" else "#ffffff"
+            executeJs("document.documentElement.style.setProperty('--editor-bg','$bg')")
             executeJs("window.editorAPI.setContentBase64('${fileContent.toBase64()}')")
             executeJs("window.editorAPI.setLanguage('$fileExtension')")
             executeJs("window.editorAPI.setTheme($isDarkTheme)")
