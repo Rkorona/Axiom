@@ -149,6 +149,7 @@ fun TerminalScreen(
                             settings.allowFileAccess = true
                             settings.allowFileAccessFromFileURLs = true
                             settings.allowUniversalAccessFromFileURLs = true
+                            setLayerType(android.view.View.LAYER_TYPE_SOFTWARE, null)
 
                             webChromeClient = object : android.webkit.WebChromeClient() {
                                 override fun onConsoleMessage(consoleMessage: android.webkit.ConsoleMessage): Boolean {
@@ -157,6 +158,13 @@ fun TerminalScreen(
                                         "WebView console: ${consoleMessage.message()} (${consoleMessage.sourceId()}:${consoleMessage.lineNumber()})"
                                     )
                                     return true
+                                }
+                            }
+
+                            webViewClient = object : WebViewClient() {
+                                override fun onPageFinished(view: WebView?, url: String?) {
+                                    super.onPageFinished(view, url)
+                                    android.util.Log.d("TerminalScreen", "WebView page finished: $url")
                                 }
                             }
 

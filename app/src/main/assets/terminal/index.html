@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
-  <link rel="stylesheet" href="file:///android_asset/terminal/xterm.css">
+  <link rel="stylesheet" href="xterm.css">
   <style>
     * { box-sizing: border-box; }
     html, body {
@@ -24,9 +24,21 @@
 <body>
   <div id="terminal"></div>
 
-  <script src="file:///android_asset/terminal/xterm.js"></script>
-  <script src="file:///android_asset/terminal/xterm-addon-fit.js"></script>
+  <script src="xterm.js"></script>
   <script>
+    console.log('terminal index loaded');
+    window.onerror = function(message, source, lineno, colno, error) {
+      console.error('Terminal error:', message, 'at', source + ':' + lineno + ':' + colno, error);
+      var err = document.createElement('pre');
+      err.style.color = '#f87171';
+      err.style.padding = '16px';
+      err.style.whiteSpace = 'pre-wrap';
+      err.textContent = 'Terminal JavaScript error:\n' + message + '\n' + source + ':' + lineno + ':' + colno;
+      document.body.innerHTML = '';
+      document.body.appendChild(err);
+      return false;
+    };
+
     var term = new Terminal({
       theme: {
         background:    '#111625',
@@ -61,19 +73,8 @@
       convertEol: false,
     });
 
-    var fitAddon = new FitAddon.FitAddon();
-    term.loadAddon(fitAddon);
     term.open(document.getElementById('terminal'));
-
-    function doFit() {
-      try { fitAddon.fit(); } catch(e) {}
-    }
-    doFit();
-    setTimeout(doFit, 100);
-
-    // Resize observer for accurate fit
-    var ro = new ResizeObserver(function() { doFit(); });
-    ro.observe(document.getElementById('terminal'));
+    console.log('xterm open called');
 
     // ── User input → Kotlin ──────────────────────────────────────
     term.onData(function(data) {
@@ -117,12 +118,7 @@
     window.injectInput = function(base64) {
       try {
         var binary = atob(base64);
-        var bytes = new Uint8Array(binary.length);
-        for (var i = 0; i < binary.length; i++) {
-          bytes[i] = binary.charCodeAt(i);
-        }
-        var text = bytesToString(bytes);
-        term.write(text);          // echo locally
+        term.write(binary);          // echo locally
         Android.sendInput(base64); // also send to PTY
       } catch(e) {
         console.error('injectInput error', e);
