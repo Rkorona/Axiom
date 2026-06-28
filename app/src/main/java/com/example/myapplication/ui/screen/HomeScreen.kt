@@ -402,14 +402,9 @@ fun HomeScreen(
                 )
             }
             3 -> {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(innerPadding),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("全局设置页面（预留）", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
+                SettingsScreen(
+                    modifier = Modifier.padding(innerPadding)
+                )
             }
         }
     }
