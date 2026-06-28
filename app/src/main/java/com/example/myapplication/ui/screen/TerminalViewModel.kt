@@ -28,6 +28,16 @@ import java.net.URL
 import java.nio.file.Files
 import java.nio.file.LinkOption
 
+// ── 新增定义 EnvironmentState 枚举，解决 Unresolved reference 问题 ──
+enum class EnvironmentState {
+    Checking,
+    NotInstalled,
+    Downloading,
+    Extracting,
+    Initializing,
+    Ready
+}
+
 class TerminalViewModel(application: Application) : AndroidViewModel(application) {
 
     // ── 安装阶段日志（NotInstalled / Downloading / Extracting / Initializing）──
