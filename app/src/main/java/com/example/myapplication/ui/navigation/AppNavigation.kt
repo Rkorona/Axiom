@@ -7,9 +7,11 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.platform.LocalContext
+import androidx.documentfile.provider.DocumentFile
 import com.example.myapplication.data.ProjectRepository
 import com.example.myapplication.ui.component.NewLocalProjectDialog
 import com.example.myapplication.ui.model.Project
+import com.example.myapplication.ui.model.ProjectLanguage
 import com.example.myapplication.ui.model.ProjectType
 import com.example.myapplication.ui.screen.EditorScreen
 import com.example.myapplication.ui.screen.HomeScreen
@@ -22,6 +24,7 @@ sealed class Screen {
     object Home : Screen()
     data class Editor(val filePath: String) : Screen()
 }
+
 
 // ─────────────────────────────────────────────
 // 导航状态机
@@ -66,6 +69,13 @@ fun AppNavigation() {
                 else uri.toString()
             }
 
+        // 用 DocumentFile 列出根目录文件名，推断项目语言
+        val fileNames = DocumentFile.fromTreeUri(context, uri)
+            ?.listFiles()
+            ?.mapNotNull { it.name?.lowercase() }
+            ?: emptyList()
+        val detectedLanguage = ProjectLanguage.detect(fileNames)
+
         val newProject = Project(
             id = System.currentTimeMillis().toString(),
             name = folderName,
@@ -73,7 +83,8 @@ fun AppNavigation() {
             type = ProjectType.LOCAL,
             lastModified = System.currentTimeMillis(),
             isActive = false,
-            localPath = uri.toString()
+            localPath = uri.toString(),
+            language = detectedLanguage,
         )
         scope.launch { repository.addProject(newProject) }
     }
@@ -130,6 +141,7 @@ fun AppNavigation() {
     if (showNewLocalDialog) {
         NewLocalProjectDialog(
             onConfirm = { name, localPath ->
+                // 新建空项目，暂无文件可检测；后续打开时可再推断
                 val newProject = Project(
                     id = System.currentTimeMillis().toString(),
                     name = name,
@@ -137,7 +149,11 @@ fun AppNavigation() {
                     type = ProjectType.LOCAL,
                     lastModified = System.currentTimeMillis(),
                     isActive = false,
-                    localPath = localPath
+                    localPath = localPath,
+                    language = localPath?.let { path ->
+                        val files = java.io.File(path).list()?.toList() ?: emptyList()
+                        ProjectLanguage.detect(files)
+                    } ?: ProjectLanguage.UNKNOWN,
                 )
                 scope.launch { repository.addProject(newProject) }
                 showNewLocalDialog = false

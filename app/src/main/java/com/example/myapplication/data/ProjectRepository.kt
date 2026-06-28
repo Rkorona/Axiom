@@ -32,8 +32,10 @@ class ProjectRepository(context: Context) {
         lastModified = lastModified.toLongOrNull() ?: System.currentTimeMillis(),
         isActive = isActive,
         localPath = localPath,
-        // TODO: 将 language 持久化到 ProjectEntity（需要 Room 迁移）
-        language = ProjectLanguage.UNKNOWN,
+        // iconColorLong 列已复用：存语言枚举的 ordinal，超出范围则退回 UNKNOWN
+        language = ProjectLanguage.entries.getOrElse(iconColorLong.toInt()) {
+            ProjectLanguage.UNKNOWN
+        },
     )
 
     private fun Project.toEntity(): ProjectEntity = ProjectEntity(
@@ -42,7 +44,7 @@ class ProjectRepository(context: Context) {
         description = description,
         type = type.name,
         lastModified = lastModified.toString(),
-        iconColorLong = 0L,   // 字段已废弃，保留仅为兼容现有数据库结构
+        iconColorLong = language.ordinal.toLong(),   // 复用列存语言类型
         isActive = isActive,
         localPath = localPath
     )
