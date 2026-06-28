@@ -185,6 +185,29 @@ class TerminalViewModel(application: Application) : AndroidViewModel(application
                 }
                 // ────────────────────────────────────────────────────────────────────────
 
+                // ── libtalloc.so.2 动态库修复 ─────────────────────────────────────────
+                // Android jniLibs 只接受 lib*.so 格式的文件名，libtalloc.so.2 带版本后缀
+                // 无法直接打包进 APK 的 nativeLibraryDir。
+                // 变通方案：jniLibs 中命名为 libtalloc.so，运行时复制并重命名为
+                // libtalloc.so.2 放到 filesDir/lib，再将该目录加入 LD_LIBRARY_PATH。
+                val libDir = File(context.filesDir, "lib").also { it.mkdirs() }
+                val tallocDest = File(libDir, "libtalloc.so.2")
+                val tallocSrc  = File(nativeDirPath, "libtalloc.so")
+                if (!tallocDest.exists() && tallocSrc.exists()) {
+                    try {
+                        tallocSrc.copyTo(tallocDest, overwrite = true)
+                        tallocDest.setReadable(true, false)
+                    } catch (_: Exception) {}
+                }
+                if (libDir.exists()) {
+                    val existingLdPath = env["LD_LIBRARY_PATH"]
+                    env["LD_LIBRARY_PATH"] = if (existingLdPath.isNullOrEmpty())
+                        libDir.absolutePath
+                    else
+                        "${libDir.absolutePath}:$existingLdPath"
+                }
+                // ────────────────────────────────────────────────────────────────────────
+
                 env["PATH"] =
                     "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/system/bin:/system/xbin"
                 env["HOME"] = "/root"
