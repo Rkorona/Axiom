@@ -104,11 +104,19 @@
 
     window.writeOutput = function(base64) {
       try {
+        console.log('writeOutput received, len=' + base64.length);
         var binary = atob(base64);
         var bytes = new Uint8Array(binary.length);
         for (var i = 0; i < binary.length; i++) {
           bytes[i] = binary.charCodeAt(i);
         }
+        try {
+          var preview = '';
+          for (var i = 0; i < Math.min(12, bytes.length); i++) {
+            preview += ('0' + (bytes[i] & 0xFF).toString(16)).slice(-2) + ' ';
+          }
+          console.log('writeOutput preview hex:', preview);
+        } catch(_e) {}
         term.write(bytesToString(bytes));
       } catch(e) {
         console.error('writeOutput error', e);
@@ -118,6 +126,7 @@
     // ── Inject raw bytes (toolbar special keys) ──────────────────
     window.injectInput = function(base64) {
       try {
+        console.log('injectInput called, len=' + base64.length);
         var binary = atob(base64);
         term.write(binary);          // echo locally
         Android.sendInput(base64); // also send to PTY

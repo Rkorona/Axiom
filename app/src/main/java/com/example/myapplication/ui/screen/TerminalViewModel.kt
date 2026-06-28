@@ -212,6 +212,7 @@ class TerminalViewModel(application: Application) : AndroidViewModel(application
                 childPid = result[1]
                 val pfd = ParcelFileDescriptor.adoptFd(masterFdInt)
                 masterPfd = pfd
+                Log.d("TerminalViewModel", "adopted masterFd=$masterFdInt childPid=$childPid")
                 val fdObj = pfd.fileDescriptor
 
                 // ── 持续从 PTY master 读取原始字节并发射 ──
@@ -223,7 +224,12 @@ class TerminalViewModel(application: Application) : AndroidViewModel(application
                         break
                     }
                     if (n <= 0) break
-                    _ptyOutput.emit(buf.copyOf(n))
+                    Log.d("TerminalViewModel", "read pty bytes: n=$n")
+                    try {
+                        _ptyOutput.emit(buf.copyOf(n))
+                    } catch (e: Exception) {
+                        Log.e("TerminalViewModel", "emit pty output failed", e)
+                    }
                 }
 
                 withContext(Dispatchers.Main) { shellStarted = false }
