@@ -17,7 +17,6 @@
       width: 100%;
       height: 100%;
     }
-    /* xterm viewport uses 100% height */
     .xterm { height: 100%; }
     .xterm-viewport { overflow-y: auto !important; }
   </style>
@@ -26,6 +25,7 @@
   <div id="terminal"></div>
 
   <script src="xterm.js"></script>
+  <script src="xterm-addon-fit.js"></script>
   <script>
     console.log('terminal index loaded');
     window.onerror = function(message, source, lineno, colno, error) {
@@ -39,6 +39,8 @@
       document.body.appendChild(err);
       return false;
     };
+
+    var fitAddon = new FitAddon.FitAddon();
 
     var term = new Terminal({
       theme: {
@@ -74,13 +76,34 @@
       convertEol: false,
     });
 
+    term.loadAddon(fitAddon);
     term.open(document.getElementById('terminal'));
     console.log('xterm open called');
+
+    function doFit() {
+      try {
+        fitAddon.fit();
+        console.log('fitAddon.fit() done, rows=' + term.rows + ' cols=' + term.cols);
+      } catch(e) {
+        console.error('doFit error', e);
+      }
+    }
+
+    // Initial fit after a short delay to let layout settle
+    setTimeout(doFit, 100);
+    setTimeout(doFit, 400);
+
+    // Re-fit whenever the container resizes (e.g. keyboard appears/hides)
+    if (window.ResizeObserver) {
+      var ro = new ResizeObserver(function() { doFit(); });
+      ro.observe(document.getElementById('terminal'));
+    } else {
+      window.addEventListener('resize', doFit);
+    }
 
     // ── User input → Kotlin ──────────────────────────────────────
     term.onData(function(data) {
       try {
-        // Encode UTF-8 string to base64 safely
         var bytes = new TextEncoder().encode(data);
         var binary = '';
         bytes.forEach(function(b) { binary += String.fromCharCode(b); });
@@ -120,7 +143,6 @@
         try {
           term.write(__utf8decoder.decode(bytes));
         } catch (e) {
-          // fallback to naive conversion
           var s = '';
           for (var i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
           term.write(s);
@@ -142,7 +164,7 @@
         } catch (e) {
           term.write(binary);
         }
-        Android.sendInput(base64); // also send to PTY
+        Android.sendInput(base64);
       } catch(e) {
         console.error('injectInput error', e);
       }
@@ -162,7 +184,6 @@
 
     window.clearTerminal = function() { term.clear(); };
 
-    // Focus so keyboard comes up on tap
     term.focus();
   </script>
 </body>
