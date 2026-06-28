@@ -119,7 +119,7 @@ class TerminalViewModel(application: Application) : AndroidViewModel(application
                 val pb = if (prootFile != null && prootFile.exists()) {
                     // ─────────────────────────────────────────────
                     // Debian trixie UsrMerge：/bin /lib /sbin 都是指向 usr/* 的符号链接。
-                    // 用 PRoot 的 -b host_path:guest_path 直接将真实目录挂载到 guest 的
+                    // 用 PRoot 的 -b host_path:guest_path 直接将真实目录挂载 to guest 的
                     // 传统路径，完全绕过符号链接解析，保证 ELF 动态链接器可以被找到。
                     // ─────────────────────────────────────────────
                     val shellPath = listOf("/usr/bin/bash", "/bin/bash", "/usr/bin/sh", "/bin/sh")
