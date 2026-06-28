@@ -12,7 +12,8 @@ data class Project(
     val description: String,
     val type: ProjectType,
     val lastModified: String,
-    val iconColor: Color,
     val isActive: Boolean,
     val localPath: String? = null   // 本地导入项目的 URI 字符串
+    val language: ProjectLanguage = ProjectLanguage.UNKNOWN,   // ← 新增
+    val lastModified: Long = System.currentTimeMillis()
 )

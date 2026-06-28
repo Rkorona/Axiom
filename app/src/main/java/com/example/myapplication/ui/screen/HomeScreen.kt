@@ -23,19 +23,66 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Outline
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.myapplication.ui.component.AddProjectAction
 import com.example.myapplication.ui.component.AddProjectSheet
 import com.example.myapplication.ui.component.AppBottomNavBar
 import com.example.myapplication.ui.model.Project
+import com.example.myapplication.ui.model.ProjectLanguage
 import com.example.myapplication.ui.model.ProjectType
+import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.sin
+
+// ─────────────────────────────────────────────
+// 六边形 Shape（Node.js 图标专用）
+// ─────────────────────────────────────────────
+
+private class HexagonShape : Shape {
+    override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density): Outline {
+        val cx = size.width / 2f
+        val cy = size.height / 2f
+        val r = minOf(size.width, size.height) / 2f * 0.92f
+        val path = Path()
+        for (i in 0..5) {
+            val angle = PI / 3.0 * i - PI / 6.0
+            val x = cx + r * cos(angle).toFloat()
+            val y = cy + r * sin(angle).toFloat()
+            if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
+        }
+        path.close()
+        return Outline.Generic(path)
+    }
+}
+
+// ─────────────────────────────────────────────
+// 相对时间格式化
+// ─────────────────────────────────────────────
+
+fun formatRelativeTime(lastModifiedMs: Long): String {
+    val diff = System.currentTimeMillis() - lastModifiedMs
+    return when {
+        diff < 60_000L         -> "刚刚"
+        diff < 3_600_000L      -> "${diff / 60_000} 分钟前"
+        diff < 86_400_000L     -> "${diff / 3_600_000} 小时前"
+        diff < 2_592_000_000L  -> "${diff / 86_400_000} 天前"
+        diff < 31_536_000_000L -> "${diff / 2_592_000_000} 个月前"
+        else                   -> "${diff / 31_536_000_000L} 年前"
+    }
+}
 
 // ─────────────────────────────────────────────
 // 排序方式枚举
@@ -499,67 +546,103 @@ fun ProjectCard(
                 .padding(horizontal = 16.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            ProjectIcon(
-                color = project.iconColor,
-                type = project.type
-            )
+            // ── 语言图标 ──────────────────────────────────
+            LanguageIcon(language = project.language)
 
             Spacer(modifier = Modifier.width(14.dp))
 
             Column(modifier = Modifier.weight(1f)) {
+                // ── 项目名 + 类型徽章（内联紧跟） ────────────
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text(
+                        text = project.name,
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        // fill=false：内容短时徽章紧跟名称；内容长时截断后徽章紧跟
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
+                    InlineTypeBadge(type = project.type)
+                }
+                Spacer(modifier = Modifier.height(3.dp))
+                // ── 上次修改时间（相对） ──────────────────────
                 Text(
-                    text = project.name,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = project.description,
-                    style = MaterialTheme.typography.bodyMedium,
+                    text = formatRelativeTime(project.lastModified),
+                    style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    maxLines = 1
                 )
-            }
-
-            Spacer(modifier = Modifier.width(8.dp))
-            when (project.type) {
-                ProjectType.LOCAL  -> LocalBadge()
-                ProjectType.GITHUB -> GithubBadge()
             }
         }
     }
 }
 
 // ─────────────────────────────────────────────
-// 项目图标
+// 语言图标（替代原 ProjectIcon）
 // ─────────────────────────────────────────────
 
 @Composable
-fun ProjectIcon(
-    color: Color,
-    type: ProjectType,
+fun LanguageIcon(
+    language: ProjectLanguage,
     modifier: Modifier = Modifier
 ) {
+    // Node.js 使用六边形轮廓，其余使用圆角矩形
+    val shape: Shape = if (language == ProjectLanguage.NODEJS) HexagonShape()
+                       else RoundedCornerShape(12.dp)
+
     Box(
         modifier = modifier
             .size(48.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .background(color),
+            .clip(shape)
+            .background(language.bgColor),
         contentAlignment = Alignment.Center
     ) {
-        val icon: ImageVector = when (type) {
-            ProjectType.LOCAL  -> Icons.Outlined.FolderOpen
-            ProjectType.GITHUB -> Icons.Outlined.Hub
-        }
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = Color.White,
-            modifier = Modifier.size(26.dp)
+        Text(
+            text = language.symbol,
+            color = language.fgColor,
+            fontWeight = FontWeight.ExtraBold,
+            fontSize = when (language.symbol.length) {
+                1    -> 22.sp
+                2    -> 17.sp
+                else -> 13.sp
+            },
+            letterSpacing = 0.sp
+        )
+    }
+}
+
+// ─────────────────────────────────────────────
+// 内联类型徽章（紧跟项目名后）
+// ─────────────────────────────────────────────
+
+@Composable
+fun InlineTypeBadge(type: ProjectType) {
+    val bgColor = when (type) {
+        ProjectType.LOCAL  -> MaterialTheme.colorScheme.primaryContainer
+        ProjectType.GITHUB -> MaterialTheme.colorScheme.surfaceContainerHigh
+    }
+    val textColor = when (type) {
+        ProjectType.LOCAL  -> MaterialTheme.colorScheme.onPrimaryContainer
+        ProjectType.GITHUB -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    val label = when (type) {
+        ProjectType.LOCAL  -> "LOCAL"
+        ProjectType.GITHUB -> "GITHUB"
+    }
+    Surface(shape = RoundedCornerShape(4.dp), color = bgColor) {
+        Text(
+            text = label,
+            modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp),
+            style = MaterialTheme.typography.labelSmall,
+            fontSize = 9.sp,
+            color = textColor,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 0.3.sp
         )
     }
 }
