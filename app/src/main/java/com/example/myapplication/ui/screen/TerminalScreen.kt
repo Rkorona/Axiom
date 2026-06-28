@@ -7,6 +7,7 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import androidx.webkit.WebViewAssetLoader
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -203,7 +204,46 @@ fun TerminalScreen(
                                 ),
                                 "Android"
                             )
-                            loadUrl("file:///android_asset/terminal/index.html")
+
+                            val assetLoader = WebViewAssetLoader.Builder()
+                                .addPathHandler(
+                                    "/assets/",
+                                    WebViewAssetLoader.AssetsPathHandler(ctx)
+                                )
+                                .build()
+                            webViewClient = object : WebViewClient() {
+                                override fun shouldInterceptRequest(
+                                    view: WebView,
+                                    request: WebResourceRequest
+                                ): WebResourceResponse? =
+                                    assetLoader.shouldInterceptRequest(request.url)
+
+                                override fun onPageFinished(view: WebView?, url: String?) {
+                                    super.onPageFinished(view, url)
+                                    Log.d("TerminalScreen", "WebView page finished: $url")
+                                    pageReady = true
+                                }
+
+                                override fun onReceivedError(
+                                    view: WebView,
+                                    request: WebResourceRequest,
+                                    error: android.webkit.WebResourceError
+                                ) {
+                                    super.onReceivedError(view, request, error)
+                                    Log.e("TerminalScreen", "WebView error: ${error.description} url=${request.url}")
+                                }
+
+                                override fun onReceivedHttpError(
+                                    view: WebView,
+                                    request: WebResourceRequest,
+                                    errorResponse: WebResourceResponse
+                                ) {
+                                    super.onReceivedHttpError(view, request, errorResponse)
+                                    Log.e("TerminalScreen", "HTTP error: ${errorResponse.statusCode} ${errorResponse.reasonPhrase} url=${request.url}")
+                                }
+                            }
+
+                            loadUrl("https://appassets.androidplatform.net/assets/terminal/index.html")
                             webViewRef.value = this
                         }
                     },
