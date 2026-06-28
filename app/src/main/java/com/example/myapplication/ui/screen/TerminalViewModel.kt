@@ -164,12 +164,27 @@ class TerminalViewModel(application: Application) : AndroidViewModel(application
                 }
 
                 pb.redirectErrorStream(true)
-                // PRoot 需要一个可写的临时目录来创建 "glue rootfs"。
-                // 使用 rootfs 内部的 tmp/ 目录（HOST 绝对路径），这样 PRoot 通过自身的
-                // 路径映射（-r rootfsDir → /）可以正确解析该路径，不会出现 chmod 失败。
+                // PRoot tmp 目录（用于 glue rootfs 临时文件）
                 val prootTmpDir = File(rootfsDir, "tmp").also { it.mkdirs() }
                 val env = pb.environment()
                 env["PROOT_TMP_DIR"] = prootTmpDir.absolutePath
+
+                // ── Samsung Knox / Android noexec 关键修复 ──────────────────────────────
+                // Samsung 等设备将 /data/data/ 挂载为 noexec，导致 PRoot 无法通过
+                // 内核 execve() 执行 rootfs 内的任何 ELF 二进制文件（Permission denied）。
+                // Termux 版 PRoot 支持 PROOT_LOADER：将真正的 execve 代理到一个位于
+                // nativeLibraryDir（/data/app/…，可执行分区）的 loader 二进制，
+                // 由 loader 在用户空间完成 ELF 加载，彻底绕过内核 noexec 限制。
+                val nativeDir = context.applicationInfo.nativeLibraryDir
+                val loaderFile = File(nativeDir, "libproot-loader.so")
+                if (loaderFile.exists()) {
+                    if (!loaderFile.canExecute()) {
+                        try { loaderFile.setExecutable(true, false) } catch (_: Exception) {}
+                    }
+                    env["PROOT_LOADER"] = loaderFile.absolutePath
+                }
+                // ────────────────────────────────────────────────────────────────────────
+
                 env["PATH"] =
                     "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/system/bin:/system/xbin"
                 env["HOME"] = "/root"
