@@ -10,6 +10,8 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
@@ -72,14 +74,37 @@ fun TerminalScreen(
     // ── 纯 UI 状态（切 Tab 可以重置，不需要保活）──
     val isKeyboardVisible = WindowInsets.isImeVisible
     val focusRequester = remember { FocusRequester() }
+    val coroutineScope = rememberCoroutineScope()
     var historyIndex by remember { mutableIntStateOf(-1) }
     var currentInput by remember { mutableStateOf(TextFieldValue("")) }
     var isCtrlPressed by remember { mutableStateOf(false) }
     var showSecondaryPanel by remember { mutableStateOf(false) }
+    // 防止 IME 重复触发回车事件导致命令发送两次
+    var enterGuard by remember { mutableStateOf(false) }
 
     // ── Termius 主题配色 ──
     val terminalBackground = Color(0xFF111625)
     val terminalTextColor = Color(0xFFE2E8F0)
+
+    // ── 发送当前输入框命令（工具栏 Enter 按钮 / onValueChange 换行检测共用）──
+    fun sendCurrentInput(rawText: String) {
+        if (enterGuard) return
+        val cmd = rawText.replace("\n", "").trim()
+        currentInput = TextFieldValue("")
+        if (cmd.isBlank()) return
+        enterGuard = true
+        terminalLines.add("[sandbox@debian:~]$ $cmd")
+        if (commandHistory.isEmpty() || commandHistory.last() != cmd) {
+            commandHistory.add(cmd)
+        }
+        historyIndex = -1
+        if (cmd == "clear") terminalLines.clear()
+        else vm.sendCommand(cmd)
+        coroutineScope.launch {
+            delay(300)
+            enterGuard = false
+        }
+    }
 
     // ── 工具栏按键处理（纯 UI 操作，不涉及 Shell 进程）──
     fun handleToolbarKeyPress(key: String) {
@@ -219,24 +244,9 @@ fun TerminalScreen(
                                         currentInput = TextFieldValue("")
                                         vm.restartShell()
                                     }
-                                    // 回车拦截：文本中出现换行符时触发命令发送，
-                                    // 不依赖 ImeAction，键盘不会收起
-                                    newVal.text.contains('\n') -> {
-                                        val cmd = newVal.text.replace("\n", "").trim()
-                                        if (cmd.isNotBlank()) {
-                                            terminalLines.add("[sandbox@debian:~]$ $cmd")
-                                            if (commandHistory.isEmpty() || commandHistory.last() != cmd) {
-                                                commandHistory.add(cmd)
-                                            }
-                                            historyIndex = -1
-                                            if (cmd == "clear") {
-                                                terminalLines.clear()
-                                            } else {
-                                                vm.sendCommand(cmd)
-                                            }
-                                        }
-                                        currentInput = TextFieldValue("")
-                                    }
+                                    // 换行符拦截：兜底处理（某些键盘会直接插入 \n）
+                                    // 主要发送路径是工具栏 ↵ 按钮，防重复守卫在 sendCurrentInput 内
+                                    newVal.text.contains('\n') -> sendCurrentInput(newVal.text)
                                     else -> currentInput = newVal
                                 }
                             },
@@ -279,6 +289,11 @@ fun TerminalScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         TerminalKeyButton(icon = Icons.Default.TouchApp) { }
+                        TerminalKeyDivider()
+                        TerminalKeyButton(
+                            text = "↵",
+                            accentColor = Color(0xFF4ADE80)
+                        ) { sendCurrentInput(currentInput.text) }
                         TerminalKeyDivider()
                         TerminalKeyButton(text = "Esc") { handleToolbarKeyPress("Esc") }
                         TerminalKeyDivider()
