@@ -290,11 +290,6 @@ fun TerminalScreen(
                     ) {
                         TerminalKeyButton(icon = Icons.Default.TouchApp) { }
                         TerminalKeyDivider()
-                        TerminalKeyButton(
-                            text = "↵",
-                            accentColor = Color(0xFF4ADE80)
-                        ) { sendCurrentInput(currentInput.text) }
-                        TerminalKeyDivider()
                         TerminalKeyButton(text = "Esc") { handleToolbarKeyPress("Esc") }
                         TerminalKeyDivider()
                         TerminalKeyButton(
