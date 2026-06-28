@@ -164,9 +164,10 @@ class TerminalViewModel(application: Application) : AndroidViewModel(application
                 }
 
                 pb.redirectErrorStream(true)
-                // PRoot 需要一个可写的临时目录。Android 上 HOST /tmp 不存在，
-                // 必须用 PROOT_TMP_DIR 指定到 app 的 cacheDir，否则 PRoot 直接崩溃。
-                val prootTmpDir = File(context.cacheDir, "proot_tmp").also { it.mkdirs() }
+                // PRoot 需要一个可写的临时目录来创建 "glue rootfs"。
+                // 使用 rootfs 内部的 tmp/ 目录（HOST 绝对路径），这样 PRoot 通过自身的
+                // 路径映射（-r rootfsDir → /）可以正确解析该路径，不会出现 chmod 失败。
+                val prootTmpDir = File(rootfsDir, "tmp").also { it.mkdirs() }
                 val env = pb.environment()
                 env["PROOT_TMP_DIR"] = prootTmpDir.absolutePath
                 env["PATH"] =
@@ -271,95 +272,91 @@ class TerminalViewModel(application: Application) : AndroidViewModel(application
         onStatusChanged: suspend (String) -> Unit
     ) = withContext(Dispatchers.IO) {
 
-        // 1. /etc/apt/sources.list — 中科大 USTC 镜像（国内最快之一）
-        onStatusChanged("正在配置 APT 软件源（USTC 镜像）…")
-        File(rootfsDir, "etc/apt/sources.list").apply {
-            parentFile?.mkdirs()
-            writeText(
-                """
-                # Debian trixie — USTC Mirror (中科大镜像，适合中国大陆网络)
-                deb https://mirrors.ustc.edu.cn/debian/ trixie main contrib non-free non-free-firmware
-                deb https://mirrors.ustc.edu.cn/debian/ trixie-updates main contrib non-free non-free-firmware
-                deb https://mirrors.ustc.edu.cn/debian-security/ trixie-security main contrib non-free non-free-firmware
-                """.trimIndent() + "\n"
-            )
+        // 辅助函数：先删除（处理悬空符号链接），再写文件，再 chmod
+        fun safeWrite(relPath: String, content: String, mode: Int = 0x1A4 /* 0644 */) {
+            val f = File(rootfsDir, relPath)
+            // 确保父目录存在且可写
+            f.parentFile?.let { parent ->
+                parent.mkdirs()
+                try { Os.chmod(parent.absolutePath, 0x1ED) } catch (_: Exception) {}
+            }
+            // 删除原文件或悬空符号链接（Debian 的 /etc/resolv.conf 是指向 /run/... 的软链接）
+            try { Os.unlink(f.absolutePath) } catch (_: Exception) {}
+            f.writeText(content)
+            try { Os.chmod(f.absolutePath, mode) } catch (_: Exception) {}
         }
 
-        // 2. /etc/resolv.conf — DNS（阿里 + 腾讯公共 DNS，避免 apt update 域名解析失败）
+        // 1. /etc/apt/sources.list — 中科大 USTC 镜像（国内最快之一）
+        onStatusChanged("正在配置 APT 软件源（USTC 镜像）…")
+        safeWrite(
+            "etc/apt/sources.list",
+            "# Debian trixie — USTC Mirror\n" +
+            "deb https://mirrors.ustc.edu.cn/debian/ trixie main contrib non-free non-free-firmware\n" +
+            "deb https://mirrors.ustc.edu.cn/debian/ trixie-updates main contrib non-free non-free-firmware\n" +
+            "deb https://mirrors.ustc.edu.cn/debian-security/ trixie-security main contrib non-free non-free-firmware\n"
+        )
+
+        // 2. /etc/resolv.conf — DNS（阿里 + 腾讯公共 DNS）
+        // 注意：Debian 中此文件常为指向 /run/systemd/resolve/stub-resolv.conf 的悬空符号链接，
+        //       必须先 unlink 再写普通文件，否则 FileNotFoundException: ENOENT。
         onStatusChanged("正在配置 DNS 解析…")
-        File(rootfsDir, "etc/resolv.conf").apply {
-            parentFile?.mkdirs()
-            writeText(
-                "nameserver 223.5.5.5\nnameserver 119.29.29.29\nnameserver 8.8.8.8\n"
-            )
-        }
+        safeWrite(
+            "etc/resolv.conf",
+            "nameserver 223.5.5.5\nnameserver 119.29.29.29\nnameserver 8.8.8.8\n"
+        )
 
         // 3. /etc/hosts — 基础主机名解析
         onStatusChanged("正在配置主机名解析…")
-        File(rootfsDir, "etc/hosts").apply {
-            if (!exists() || length() < 10L) {
-                parentFile?.mkdirs()
-                writeText(
-                    "127.0.0.1   localhost\n::1         localhost ip6-localhost ip6-loopback\n"
-                )
-            }
-        }
+        safeWrite(
+            "etc/hosts",
+            "127.0.0.1   localhost\n::1         localhost ip6-localhost ip6-loopback\n"
+        )
 
         // 4. /etc/hostname
-        File(rootfsDir, "etc/hostname").apply {
-            parentFile?.mkdirs()
-            if (!exists()) writeText("debian\n")
-        }
+        safeWrite("etc/hostname", "debian\n")
 
         // 5. /proc /sys /dev 占位目录（防止 PRoot 绑定时报 "not a directory"）
-        listOf("proc", "sys", "dev", "dev/pts", "tmp", "run").forEach { dir ->
+        listOf("proc", "sys", "dev", "dev/pts", "tmp", "run", "run/systemd/resolve").forEach { dir ->
             File(rootfsDir, dir).mkdirs()
         }
+        // 在 /run/systemd/resolve/ 放一个空的 stub-resolv.conf 占位，
+        // 防止其他程序通过原来的符号链接路径找不到文件
+        safeWrite("run/systemd/resolve/stub-resolv.conf",
+            "nameserver 223.5.5.5\nnameserver 119.29.29.29\n")
 
         // 6. /root/.bashrc — 友好的交互提示符 + 常用别名
         onStatusChanged("正在配置 Shell 环境…")
-        File(rootfsDir, "root/.bashrc").apply {
-            parentFile?.mkdirs()
-            writeText(
-                """
-                # ~/.bashrc — PRoot Debian (auto-generated by app)
-                export TERM=xterm-256color
-                export LANG=C.UTF-8
-                export LC_ALL=C.UTF-8
-                export PS1='\[\e[1;32m\]root@debian\[\e[0m\]:\[\e[1;34m\]\w\[\e[0m\]\$ '
-                alias ll='ls -alF --color=auto'
-                alias la='ls -A --color=auto'
-                alias l='ls -CF --color=auto'
-                alias apt='apt -o APT::Sandbox::User=root'
-                # 自动修复 dpkg 权限问题
-                export DEBIAN_FRONTEND=noninteractive
-                """.trimIndent() + "\n"
-            )
-        }
+        safeWrite(
+            "root/.bashrc",
+            "# ~/.bashrc — PRoot Debian (auto-generated by app)\n" +
+            "export TERM=xterm-256color\n" +
+            "export LANG=C.UTF-8\n" +
+            "export LC_ALL=C.UTF-8\n" +
+            "export PS1='\\[\\e[1;32m\\]root@debian\\[\\e[0m\\]:\\[\\e[1;34m\\]\\w\\[\\e[0m\\]\\$ '\n" +
+            "alias ll='ls -alF --color=auto'\n" +
+            "alias la='ls -A --color=auto'\n" +
+            "alias l='ls -CF --color=auto'\n" +
+            "alias apt='apt -o APT::Sandbox::User=root'\n" +
+            "export DEBIAN_FRONTEND=noninteractive\n"
+        )
 
         // 7. /root/.profile
-        File(rootfsDir, "root/.profile").apply {
-            parentFile?.mkdirs()
-            if (!exists()) {
-                writeText("[ -f ~/.bashrc ] && . ~/.bashrc\n")
-            }
+        File(rootfsDir, "root/.profile").let { f ->
+            if (!f.exists()) safeWrite("root/.profile", "[ -f ~/.bashrc ] && . ~/.bashrc\n")
         }
 
         // 8. /etc/apt/apt.conf.d/99norecommends — 不安装推荐包，节省空间
-        File(rootfsDir, "etc/apt/apt.conf.d/99norecommends").apply {
-            parentFile?.mkdirs()
-            writeText(
-                "APT::Install-Recommends \"false\";\nAPT::Install-Suggests \"false\";\n"
-            )
+        safeWrite(
+            "etc/apt/apt.conf.d/99norecommends",
+            "APT::Install-Recommends \"false\";\nAPT::Install-Suggests \"false\";\n"
+        )
         }
 
         // 9. /etc/apt/apt.conf.d/99timeout — 防止 apt 在无网络时长时间卡住
-        File(rootfsDir, "etc/apt/apt.conf.d/99timeout").apply {
-            parentFile?.mkdirs()
-            writeText(
-                "Acquire::http::Timeout \"15\";\nAcquire::https::Timeout \"15\";\n"
-            )
-        }
+        safeWrite(
+            "etc/apt/apt.conf.d/99timeout",
+            "Acquire::http::Timeout \"15\";\nAcquire::https::Timeout \"15\";\n"
+        )
 
         onStatusChanged("环境初始化完成！")
     }
@@ -534,7 +531,12 @@ class TerminalViewModel(application: Application) : AndroidViewModel(application
                     entry = tarIn.nextEntry; continue
                 }
                 when {
-                    entry.isDirectory -> targetFile.mkdirs()
+                    entry.isDirectory -> {
+                        targetFile.mkdirs()
+                        // 保留 tar 中目录的原始权限（至少保证 rwx------）
+                        val dirMode = (entry.mode and 0x1FF).let { if (it == 0) 0x1C0 else it }
+                        try { Os.chmod(targetFile.absolutePath, dirMode) } catch (_: Exception) {}
+                    }
                     entry.isSymbolicLink -> {
                         safeCreateParentDirs(targetFile, destinationDir)
                         targetFile.delete()
@@ -558,10 +560,19 @@ class TerminalViewModel(application: Application) : AndroidViewModel(application
                             while (tarIn.read(buffer).also { len = it } != -1) fos.write(buffer, 0, len)
                             fos.flush()
                         }
-                        if (entry.mode and 0x40 != 0 || entry.name.contains("bin/")) {
-                            targetFile.setExecutable(true, false)
+                        // 用 POSIX Os.chmod() 直接设置 tar 原始权限，比 setExecutable() 更可靠。
+                        // 对 bin/sbin 目录下的文件以及 owner-execute 位已置位的文件确保可执行。
+                        val fileMode = entry.mode and 0x1FF
+                        val finalMode = when {
+                            fileMode != 0 -> fileMode
+                            entry.name.contains("bin/") || entry.name.contains("sbin/") -> 0x1ED // 0755
+                            else -> 0x1A4 // 0644
                         }
-                        targetFile.setReadable(true, false)
+                        try { Os.chmod(targetFile.absolutePath, finalMode) } catch (_: Exception) {
+                            // fallback: Java API
+                            if (finalMode and 0x49 != 0) targetFile.setExecutable(true, false)
+                            targetFile.setReadable(true, false)
+                        }
                     }
                 }
                 fileCount++
