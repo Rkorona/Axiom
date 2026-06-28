@@ -281,7 +281,8 @@ class TerminalViewModel(application: Application) : AndroidViewModel(application
                 try { Os.chmod(parent.absolutePath, 0x1ED) } catch (_: Exception) {}
             }
             // 删除原文件或悬空符号链接（Debian 的 /etc/resolv.conf 是指向 /run/... 的软链接）
-            try { Os.unlink(f.absolutePath) } catch (_: Exception) {}
+            // File.delete() 在底层调用 unlink()，能正确移除符号链接本身（不跟随链接）
+            f.delete()
             f.writeText(content)
             try { Os.chmod(f.absolutePath, mode) } catch (_: Exception) {}
         }
@@ -350,7 +351,6 @@ class TerminalViewModel(application: Application) : AndroidViewModel(application
             "etc/apt/apt.conf.d/99norecommends",
             "APT::Install-Recommends \"false\";\nAPT::Install-Suggests \"false\";\n"
         )
-        }
 
         // 9. /etc/apt/apt.conf.d/99timeout — 防止 apt 在无网络时长时间卡住
         safeWrite(
