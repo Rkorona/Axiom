@@ -175,8 +175,8 @@ class TerminalViewModel(application: Application) : AndroidViewModel(application
                 // Termux 版 PRoot 支持 PROOT_LOADER：将真正的 execve 代理到一个位于
                 // nativeLibraryDir（/data/app/…，可执行分区）的 loader 二进制，
                 // 由 loader 在用户空间完成 ELF 加载，彻底绕过内核 noexec 限制。
-                val nativeDir = context.applicationInfo.nativeLibraryDir
-                val loaderFile = File(nativeDir, "libproot-loader.so")
+                val nativeDirPath = context.applicationInfo.nativeLibraryDir
+                val loaderFile = File(nativeDirPath, "libproot-loader.so")
                 if (loaderFile.exists()) {
                     if (!loaderFile.canExecute()) {
                         try { loaderFile.setExecutable(true, false) } catch (_: Exception) {}
