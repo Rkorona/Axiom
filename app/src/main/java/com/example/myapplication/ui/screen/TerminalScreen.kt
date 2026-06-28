@@ -5,6 +5,7 @@ import android.os.Build
 import android.system.Os
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -20,6 +21,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
@@ -74,8 +77,9 @@ fun TerminalScreen(
     var downloadProgress by remember { mutableFloatStateOf(0f) }
     var currentStatusMessage by remember { mutableStateOf("正在等待指令…") }
 
-    // ── 键盘动态探测 ──
+    // ── 键盘及焦点探测 ──
     val isKeyboardVisible = WindowInsets.isImeVisible
+    val focusRequester = remember { FocusRequester() }
 
     // ── 终端历史纪录缓冲区 ──
     val commandHistory = remember { mutableStateListOf<String>() }
@@ -110,12 +114,10 @@ fun TerminalScreen(
         
         coroutineScope.launch(Dispatchers.IO) {
             try {
-                // 开启 Android 底层系统的真实 POSIX Shell (sh)
                 val pb = ProcessBuilder("/system/bin/sh")
                     .directory(rootfsDir) // 设置初始工作路径为 debian_rootfs 内部
                     .redirectErrorStream(true) // 合并标准错误输出流到标准输出
 
-                // 预注入标准 Linux 环境变量，确保工具查找顺畅
                 val env = pb.environment()
                 env["PATH"] = "/sbin:/bin:/usr/sbin:/usr/bin:/system/bin:/system/xbin"
                 env["HOME"] = "/root"
@@ -133,9 +135,6 @@ fun TerminalScreen(
                     val finalLine = line
                     withContext(Dispatchers.Main) {
                         terminalLines.add(finalLine)
-                        if (terminalLines.size > 0) {
-                            listState.animateScrollToItem(terminalLines.size - 1)
-                        }
                     }
                     line = reader.readLine()
                 }
@@ -154,20 +153,16 @@ fun TerminalScreen(
 
         when (key) {
             "Esc" -> {
-                // 清空当前行输入
                 currentInput = TextFieldValue("")
             }
             "Ctrl" -> {
-                // 切换 Ctrl 挂载激活状态
                 isCtrlPressed = !isCtrlPressed
             }
             "Tab" -> {
-                // 在光标处强行插入 Tab 制表符
                 val newText = text.substring(0, selection.start) + "\t" + text.substring(selection.end)
                 currentInput = TextFieldValue(newText, TextRange(selection.start + 1))
             }
             "↑" -> {
-                // 向前轮询历史命令
                 if (commandHistory.isNotEmpty()) {
                     if (historyIndex == -1) {
                         historyIndex = commandHistory.size - 1
@@ -179,7 +174,6 @@ fun TerminalScreen(
                 }
             }
             "↓" -> {
-                // 向后轮询历史命令
                 if (commandHistory.isNotEmpty()) {
                     if (historyIndex != -1) {
                         if (historyIndex < commandHistory.size - 1) {
@@ -194,27 +188,22 @@ fun TerminalScreen(
                 }
             }
             "←" -> {
-                // 真实操控物理光标向左退格
                 if (selection.start > 0) {
                     currentInput = currentInput.copy(selection = TextRange(selection.start - 1))
                 }
             }
             "→" -> {
-                // 真实操控物理光标向右进格
                 if (selection.end < text.length) {
                     currentInput = currentInput.copy(selection = TextRange(selection.end + 1))
                 }
             }
             "Home" -> {
-                // 瞬间将光标扔到输入框最前列
                 currentInput = currentInput.copy(selection = TextRange(0))
             }
             "End" -> {
-                // 瞬间将光标扔到输入框最后列
                 currentInput = currentInput.copy(selection = TextRange(text.length))
             }
             "{ }", "[ ]", "( )" -> {
-                // 智能成对闭合符号插入，并将光标停留在括号最正中
                 val symbolToInsert = when (key) {
                     "{ }" -> "{}"
                     "[ ]" -> "[]"
@@ -225,7 +214,6 @@ fun TerminalScreen(
                 currentInput = TextFieldValue(newText, TextRange(selection.start + 1))
             }
             else -> {
-                // 常规符号/F功能键直接写入光标所在位置
                 val newText = text.substring(0, selection.start) + key + text.substring(selection.end)
                 currentInput = TextFieldValue(newText, TextRange(selection.start + key.length))
             }
@@ -252,10 +240,25 @@ fun TerminalScreen(
         }
     }
 
-    // ── 当环境就绪时，拉起 Shell 执行引擎 ──
+    // ── 当环境就绪时，拉起 Shell 执行并尝试自动请求输入框焦点 ──
     LaunchedEffect(envState) {
         if (envState == EnvironmentState.Ready) {
             startNewShell()
+            try {
+                focusRequester.requestFocus()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    // ── 智能随动滚动：每当日志更新或者键盘弹起，强制将视口对齐最底部的输入框 ──
+    LaunchedEffect(terminalLines.size, isKeyboardVisible) {
+        if (envState == EnvironmentState.Ready) {
+            coroutineScope.launch {
+                // 列表中的最后项索引刚好是 terminalLines.size（即输入框 item）
+                listState.animateScrollToItem(terminalLines.size)
+            }
         }
     }
 
@@ -266,33 +269,40 @@ fun TerminalScreen(
         }
     }
 
+    // ── 全屏点击监听介质：点击屏幕空白处立即聚焦输入框 ──
+    val screenClickInteractionSource = remember { MutableInteractionSource() }
+
     Box(
         modifier = modifier
             .fillMaxSize()
-            .imePadding() // 使终端内容高度自适应键盘高度，防止输入法遮挡
+            .imePadding() // 使终端内容高度自适应键盘高度
     ) {
-        // ─────────────────────────────────────────────
-        // 1. 标准控制台内核层 UI（整体容器）
-        // ─────────────────────────────────────────────
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .background(terminalBackground)
+                .clickable(
+                    interactionSource = screenClickInteractionSource,
+                    indication = null
+                ) {
+                    focusRequester.requestFocus()
+                }
         ) {
-            // A. 历史终端日志渲染区
+            // A. 数据流交互滚动区（包含日志与随流输入框）
             LazyColumn(
                 state = listState,
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                    .padding(horizontal = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
+                // 1. 历史日志组
                 items(terminalLines) { line ->
                     val textColor = when {
                         line.startsWith("❌") || line.contains("Error") -> Color(0xFFEF4444) // 警示红
                         line.startsWith("[sandbox@debian") -> Color(0xFF38BDF8) // 命令行输入回显天蓝
-                        line.startsWith("Welcome") || line.startsWith("Type") || line.contains("successfully") -> Color(0xFF22C55E) // 活力翠绿
+                        line.startsWith("Welcome") || line.startsWith("Type") || line.contains("successfully") -> Color(0xFF22C55E) // Fish Shell 翠绿
                         else -> terminalTextColor
                     }
                     Text(
@@ -305,139 +315,90 @@ fun TerminalScreen(
                         )
                     )
                 }
-            }
 
-            // B. 真实的双向交互终端命令行输入区域（已调整至工具栏上方！）
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .wrapContentHeight()
-                    .background(terminalBackground)
-                    .padding(horizontal = 8.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "[",
-                    style = TextStyle(
-                        color = Color(0xFF00D2D7),
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                )
-                Text(
-                    text = "sandbox@debian",
-                    style = TextStyle(
-                        color = Color(0xFF38BDF8),
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                )
-                Text(
-                    text = ":",
-                    style = TextStyle(
-                        color = Color(0xFF94A3B8),
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                )
-                Text(
-                    text = "~",
-                    style = TextStyle(
-                        color = Color(0xFF22C55E),
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                )
-                Text(
-                    text = "]$ ",
-                    style = TextStyle(
-                        color = Color(0xFF00D2D7),
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                )
+                // 2. 随流命令输入行（作为滚动序列的最后一行，完美还原真实物理终端交互逻辑！）
+                item {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        PromptPrefix()
 
-                BasicTextField(
-                    value = currentInput,
-                    onValueChange = { newVal ->
-                        if (isCtrlPressed && newVal.text.lowercase().endsWith("c")) {
-                            terminalLines.add("[sandbox@debian:~]$ ^C")
-                            terminalLines.add("❌ Process Interrupted (Ctrl+C)")
-                            startNewShell() 
-                            currentInput = TextFieldValue("")
-                        } else {
-                            currentInput = newVal
-                        }
-                    },
-                    modifier = Modifier.weight(1f),
-                    enabled = envState == EnvironmentState.Ready,
-                    textStyle = TextStyle(
-                        color = Color.White,
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 13.sp
-                    ),
-                    cursorBrush = SolidColor(Color.White),
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                    keyboardActions = KeyboardActions(
-                        onSend = {
-                            val cmd = currentInput.text.trim()
-                            if (cmd.isNotBlank()) {
-                                val promptHeader = "[sandbox@debian:~]$ $cmd"
-                                terminalLines.add(promptHeader)
-
-                                if (commandHistory.isEmpty() || commandHistory.last() != cmd) {
-                                    commandHistory.add(cmd)
-                                }
-                                historyIndex = -1 
-
-                                if (cmd == "clear") {
-                                    terminalLines.clear()
+                        BasicTextField(
+                            value = currentInput,
+                            onValueChange = { newVal ->
+                                if (isCtrlPressed && newVal.text.lowercase().endsWith("c")) {
+                                    terminalLines.add("[sandbox@debian:~]$ ^C")
+                                    terminalLines.add("❌ Process Interrupted (Ctrl+C)")
+                                    startNewShell() 
+                                    currentInput = TextFieldValue("")
                                 } else {
-                                    coroutineScope.launch(Dispatchers.IO) {
-                                        try {
-                                            shellWriter?.let { writer ->
-                                                writer.write(cmd + "\n")
-                                                writer.flush()
-                                            }
-                                        } catch (e: Exception) {
-                                            withContext(Dispatchers.Main) {
-                                                terminalLines.add("❌ 命令发送失败: ${e.localizedMessage}")
+                                    currentInput = newVal
+                                }
+                            },
+                            modifier = Modifier
+                                .weight(1f)
+                                .focusRequester(focusRequester),
+                            enabled = envState == EnvironmentState.Ready,
+                            textStyle = TextStyle(
+                                color = Color.White,
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 13.sp
+                            ),
+                            cursorBrush = SolidColor(Color.White),
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                            keyboardActions = KeyboardActions(
+                                onSend = {
+                                    val cmd = currentInput.text.trim()
+                                    if (cmd.isNotBlank()) {
+                                        val promptHeader = "[sandbox@debian:~]$ $cmd"
+                                        terminalLines.add(promptHeader)
+
+                                        if (commandHistory.isEmpty() || commandHistory.last() != cmd) {
+                                            commandHistory.add(cmd)
+                                        }
+                                        historyIndex = -1 
+
+                                        if (cmd == "clear") {
+                                            terminalLines.clear()
+                                        } else {
+                                            coroutineScope.launch(Dispatchers.IO) {
+                                                try {
+                                                    shellWriter?.let { writer ->
+                                                        writer.write(cmd + "\n")
+                                                        writer.flush()
+                                                    }
+                                                } catch (e: Exception) {
+                                                    withContext(Dispatchers.Main) {
+                                                        terminalLines.add("❌ 命令发送失败: ${e.localizedMessage}")
+                                                    }
+                                                }
                                             }
                                         }
+                                        currentInput = TextFieldValue("") 
                                     }
                                 }
-                                currentInput = TextFieldValue("") 
-                                coroutineScope.launch {
-                                    if (terminalLines.size > 0) {
-                                        listState.animateScrollToItem(terminalLines.size - 1)
-                                    }
-                                }
-                            }
-                        }
-                    )
-                )
+                            )
+                        )
+                    }
+                }
             }
 
-            // C. Termius 经典扁平化、等宽无缝工具栏（仅在键盘弹起时出现，紧贴键盘顶部）
+            // B. Termius 级等宽极简辅助工具栏（只在输入法弹起时贴附在键盘顶部）
             if (isKeyboardVisible && envState == EnvironmentState.Ready) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(Color(0xFF1C2330)) // 一体化深 slate 蓝
+                        .background(Color(0xFF1C2330)) 
                 ) {
-                    // 主键盘辅助栏：绘制极细顶部微光线与等宽分隔符
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(44.dp)
                             .drawBehind {
-                                // 绘制顶部超细灰色分割线
                                 drawLine(
                                     color = Color(0xFF2E384D),
                                     start = Offset(0f, 0f),
@@ -447,7 +408,7 @@ fun TerminalScreen(
                             },
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        TerminalKeyButton(text = "👆") { /* 模拟触控流 */ }
+                        TerminalKeyButton(text = "👆") { /* 触控模式切换 */ }
                         TerminalKeyDivider()
                         TerminalKeyButton(text = "Esc") { handleToolbarKeyPress("Esc") }
                         TerminalKeyDivider()
@@ -479,7 +440,6 @@ fun TerminalScreen(
                         }
                     }
 
-                    // 二级展开横滑辅助面板（采用稍深的底色形成视觉递进）
                     if (showSecondaryPanel) {
                         LazyRow(
                             modifier = Modifier
@@ -518,7 +478,6 @@ fun TerminalScreen(
                                         )
                                     )
                                 }
-                                // 二级面板垂直细分线
                                 Spacer(
                                     modifier = Modifier
                                         .width(1.dp)
@@ -722,13 +681,65 @@ fun TerminalKeyDivider() {
     Spacer(
         modifier = Modifier
             .width(1.dp)
-            .fillMaxHeight(0.55f) // 分割线仅占用 55% 的高度并垂直居中，高级感的核心
+            .fillMaxHeight(0.55f) // 分割线仅占用 55% 的高度并垂直居中
             .background(Color(0xFF2E384D))
     )
 }
 
 // ─────────────────────────────────────────────
-// 健全的环境存在性检测函数（防止软链接解析失败导致的误判）
+// 封装：命令行提示符前缀
+// ─────────────────────────────────────────────
+@Composable
+fun PromptPrefix() {
+    Text(
+        text = "[",
+        style = TextStyle(
+            color = Color(0xFF00D2D7),
+            fontFamily = FontFamily.Monospace,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Bold
+        )
+    )
+    Text(
+        text = "sandbox@debian",
+        style = TextStyle(
+            color = Color(0xFF38BDF8),
+            fontFamily = FontFamily.Monospace,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Bold
+        )
+    )
+    Text(
+        text = ":",
+        style = TextStyle(
+            color = Color(0xFF94A3B8),
+            fontFamily = FontFamily.Monospace,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Bold
+        )
+    )
+    Text(
+        text = "~",
+        style = TextStyle(
+            color = Color(0xFF22C55E),
+            fontFamily = FontFamily.Monospace,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Bold
+        )
+    )
+    Text(
+        text = "]$ ",
+        style = TextStyle(
+            color = Color(0xFF00D2D7),
+            fontFamily = FontFamily.Monospace,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Bold
+        )
+    )
+}
+
+// ─────────────────────────────────────────────
+// 健全的环境存在性检测函数
 // ─────────────────────────────────────────────
 private fun isDebianInstalled(rootfsDir: File): Boolean {
     if (!rootfsDir.exists() || !rootfsDir.isDirectory) return false
