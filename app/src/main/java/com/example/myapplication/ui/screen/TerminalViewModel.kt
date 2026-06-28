@@ -117,15 +117,23 @@ class TerminalViewModel(application: Application) : AndroidViewModel(application
                 }
 
                 val pb = if (prootFile != null && prootFile.exists()) {
+                    // Debian trixie 使用 UsrMerge：/bin 是 usr/bin 的符号链接
+                    // PRoot 有时无法跟踪相对符号链接，需要检测真实路径
+                    val shellPath = listOf("/usr/bin/bash", "/bin/bash", "/usr/bin/sh", "/bin/sh")
+                        .firstOrNull { File(rootfsDir, it.removePrefix("/")).let { f -> f.exists() || f.length() > 0 } }
+                        ?: "/bin/sh"
+
                     val cmd = listOf(
                         prootFile.absolutePath,
+                        "--link2symlink",   // 正确处理 UsrMerge 符号链接（如 /bin -> usr/bin）
                         "-r", rootfsDir.absolutePath,
                         "-0",
                         "-w", "/root",
                         "-b", "/dev",
                         "-b", "/proc",
                         "-b", "/sys",
-                        "/bin/bash"
+                        "-b", "/dev/urandom",  // 某些 apt 操作需要随机数源
+                        shellPath
                     )
                     ProcessBuilder(cmd)
                 } else {
