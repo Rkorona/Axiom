@@ -164,13 +164,20 @@ class TerminalViewModel(application: Application) : AndroidViewModel(application
                 }
 
                 pb.redirectErrorStream(true)
+                // PRoot 需要一个可写的临时目录。Android 上 HOST /tmp 不存在，
+                // 必须用 PROOT_TMP_DIR 指定到 app 的 cacheDir，否则 PRoot 直接崩溃。
+                val prootTmpDir = File(context.cacheDir, "proot_tmp").also { it.mkdirs() }
                 val env = pb.environment()
+                env["PROOT_TMP_DIR"] = prootTmpDir.absolutePath
                 env["PATH"] =
                     "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/system/bin:/system/xbin"
                 env["HOME"] = "/root"
                 env["TERM"] = "xterm-256color"
                 env["LANG"] = "C.UTF-8"
+                env["LC_ALL"] = "C.UTF-8"
                 env["USER"] = "root"
+                env["SHELL"] = "/bin/bash"
+                env["DEBIAN_FRONTEND"] = "noninteractive"
 
                 val process = pb.start()
                 shellProcess = process
@@ -372,23 +379,37 @@ class TerminalViewModel(application: Application) : AndroidViewModel(application
 
     private fun isDebianInstalled(rootfsDir: File): Boolean {
         if (!rootfsDir.exists() || !rootfsDir.isDirectory) return false
-        val etcDir = File(rootfsDir, "etc")
-        val usrDir = File(rootfsDir, "usr")
-        val hasEtcPasswd = File(etcDir, "passwd").exists()
-        val hasUsrBin =
-            File(usrDir, "bin").exists() && File(usrDir, "bin").isDirectory
-        val shFile = File(rootfsDir, "bin/sh")
-        val hasShSymlink = try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                Files.exists(shFile.toPath(), LinkOption.NOFOLLOW_LINKS)
-            } else {
-                shFile.exists() || shFile.length() > 0 ||
-                        shFile.parentFile?.exists() == true
-            }
-        } catch (e: Exception) {
-            false
+
+        // 1. 必须有 /etc/passwd（说明基础系统包已解压）
+        val hasEtcPasswd = File(rootfsDir, "etc/passwd").let {
+            it.exists() && it.length() > 0
         }
-        return (hasUsrBin && hasEtcPasswd) || (hasShSymlink && hasUsrBin)
+        if (!hasEtcPasswd) return false
+
+        // 2. 核心 shell 二进制必须实际存在（非目录），防止解压中断后误判为已安装
+        val shellCandidates = listOf(
+            "usr/bin/bash", "usr/bin/sh", "usr/bin/dash",
+            "bin/bash", "bin/sh", "bin/dash"
+        )
+        val hasShell = shellCandidates.any { rel ->
+            val f = File(rootfsDir, rel)
+            try {
+                // 用 NOFOLLOW_LINKS 检测路径存在（包括符号链接指向）
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    Files.exists(f.toPath(), LinkOption.NOFOLLOW_LINKS) && !f.isDirectory
+                } else {
+                    f.exists() && !f.isDirectory
+                }
+            } catch (e: Exception) { false }
+        }
+        if (!hasShell) return false
+
+        // 3. /usr/lib 必须存在且不为空（ELF 动态链接器所在），
+        //    这是区分「下载完未解压」和「解压完整」的关键检测
+        val usrLib = File(rootfsDir, "usr/lib")
+        val hasLibs = usrLib.isDirectory && (usrLib.list()?.size ?: 0) > 2
+
+        return hasLibs
     }
 
     private fun safeCreateParentDirs(file: File, rootfsDir: File) {
