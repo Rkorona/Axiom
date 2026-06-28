@@ -9,7 +9,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
@@ -39,7 +38,6 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -74,7 +72,6 @@ fun TerminalScreen(
     // ── 纯 UI 状态（切 Tab 可以重置，不需要保活）──
     val isKeyboardVisible = WindowInsets.isImeVisible
     val focusRequester = remember { FocusRequester() }
-    val keyboardController = LocalSoftwareKeyboardController.current
     var historyIndex by remember { mutableIntStateOf(-1) }
     var currentInput by remember { mutableStateOf(TextFieldValue("")) }
     var isCtrlPressed by remember { mutableStateOf(false) }
@@ -213,14 +210,34 @@ fun TerminalScreen(
                         BasicTextField(
                             value = currentInput,
                             onValueChange = { newVal ->
-                                if (isCtrlPressed && newVal.text.lowercase().endsWith("c")) {
-                                    terminalLines.add("[sandbox@debian:~]$ ^C")
-                                    terminalLines.add("❌ Process Interrupted (Ctrl+C)")
-                                    isCtrlPressed = false
-                                    currentInput = TextFieldValue("")
-                                    vm.restartShell()
-                                } else {
-                                    currentInput = newVal
+                                when {
+                                    // Ctrl+C 拦截
+                                    isCtrlPressed && newVal.text.lowercase().endsWith("c") -> {
+                                        terminalLines.add("[sandbox@debian:~]$ ^C")
+                                        terminalLines.add("❌ Process Interrupted (Ctrl+C)")
+                                        isCtrlPressed = false
+                                        currentInput = TextFieldValue("")
+                                        vm.restartShell()
+                                    }
+                                    // 回车拦截：文本中出现换行符时触发命令发送，
+                                    // 不依赖 ImeAction，键盘不会收起
+                                    newVal.text.contains('\n') -> {
+                                        val cmd = newVal.text.replace("\n", "").trim()
+                                        if (cmd.isNotBlank()) {
+                                            terminalLines.add("[sandbox@debian:~]$ $cmd")
+                                            if (commandHistory.isEmpty() || commandHistory.last() != cmd) {
+                                                commandHistory.add(cmd)
+                                            }
+                                            historyIndex = -1
+                                            if (cmd == "clear") {
+                                                terminalLines.clear()
+                                            } else {
+                                                vm.sendCommand(cmd)
+                                            }
+                                        }
+                                        currentInput = TextFieldValue("")
+                                    }
+                                    else -> currentInput = newVal
                                 }
                             },
                             modifier = Modifier
@@ -233,28 +250,8 @@ fun TerminalScreen(
                                 fontSize = 13.sp
                             ),
                             cursorBrush = SolidColor(Color.White),
-                            singleLine = true,
-                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                            keyboardActions = KeyboardActions(
-                                onSend = {
-                                    val cmd = currentInput.text.trim()
-                                    if (cmd.isNotBlank()) {
-                                        terminalLines.add("[sandbox@debian:~]$ $cmd")
-                                        if (commandHistory.isEmpty() || commandHistory.last() != cmd) {
-                                            commandHistory.add(cmd)
-                                        }
-                                        historyIndex = -1
-                                        if (cmd == "clear") {
-                                            terminalLines.clear()
-                                        } else {
-                                            vm.sendCommand(cmd)
-                                        }
-                                        currentInput = TextFieldValue("")
-                                    }
-                                    // 发送后保持键盘展开，不让 IME 自动收起
-                                    keyboardController?.show()
-                                }
-                            )
+                            maxLines = 1,
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.None)
                         )
                     }
                 }
