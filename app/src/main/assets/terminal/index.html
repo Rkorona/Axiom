@@ -110,6 +110,12 @@
             preview += ('0' + (bytes[i] & 0xFF).toString(16)).slice(-2) + ' ';
           }
           console.log('writeOutput preview hex:', preview);
+          try {
+            var decoded = __utf8decoder.decode(bytes);
+            console.log('writeOutput decoded preview:', JSON.stringify(decoded.slice(0,200)));
+          } catch(_e) {
+            console.log('writeOutput decoded preview: <decode error>');
+          }
         } catch(_e) {}
         try {
           term.write(__utf8decoder.decode(bytes));
