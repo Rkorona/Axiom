@@ -6,7 +6,6 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import com.example.myapplication.data.ProjectRepository
 import com.example.myapplication.ui.component.NewLocalProjectDialog
@@ -23,17 +22,6 @@ sealed class Screen {
     object Home : Screen()
     data class Editor(val filePath: String) : Screen()
 }
-
-private val localProjectIconColors = listOf(
-    Color(0xFFE53935), // 红
-    Color(0xFF1565C0), // 深蓝
-    Color(0xFF2E7D32), // 绿
-    Color(0xFF6A1B9A), // 紫
-    Color(0xFFE65100), // 橙
-    Color(0xFF00838F), // 青
-    Color(0xFF558B2F), // 草绿
-    Color(0xFF4527A0), // 靛蓝
-)
 
 // ─────────────────────────────────────────────
 // 导航状态机
@@ -52,11 +40,6 @@ fun AppNavigation() {
 
     // 弹窗状态
     var showNewLocalDialog by remember { mutableStateOf(false) }
-
-    fun nextLocalColor(): Color {
-        val localCount = projects.count { it.type == ProjectType.LOCAL }
-        return localProjectIconColors[localCount % localProjectIconColors.size]
-    }
 
     // ── 文件夹选择器（导入已有本地项目）──────────────────
     val importFolderLauncher = rememberLauncherForActivityResult(
@@ -88,8 +71,7 @@ fun AppNavigation() {
             name = folderName,
             description = readablePath,
             type = ProjectType.LOCAL,
-            lastModified = "刚刚",
-            iconColor = nextLocalColor(),
+            lastModified = System.currentTimeMillis(),
             isActive = false,
             localPath = uri.toString()
         )
@@ -153,8 +135,7 @@ fun AppNavigation() {
                     name = name,
                     description = "本地项目",
                     type = ProjectType.LOCAL,
-                    lastModified = "刚刚",
-                    iconColor = nextLocalColor(),
+                    lastModified = System.currentTimeMillis(),
                     isActive = false,
                     localPath = localPath
                 )
