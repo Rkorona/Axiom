@@ -34,6 +34,7 @@ import kotlinx.coroutines.withContext
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream
 import org.tukaani.xz.XZInputStream
 import java.io.BufferedInputStream
+import java.io.BufferedWriter
 import java.io.File
 import java.io.FileOutputStream
 import java.net.HttpURLConnection
@@ -52,6 +53,7 @@ enum class EnvironmentState {
     Ready           // 环境就绪，可以运行
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun TerminalScreen(
     modifier: Modifier = Modifier
@@ -69,6 +71,10 @@ fun TerminalScreen(
     val terminalLines = remember { mutableStateListOf<String>() }
     var currentInput by remember { mutableStateOf("") }
 
+    // ── 真实交互进程控制 ──
+    var shellProcess by remember { mutableStateOf<Process?>(null) }
+    var shellWriter by remember { mutableStateOf<BufferedWriter?>(null) }
+
     // ── 核心路径定义 ──
     val rootfsDir = remember { File(context.filesDir, "debian_rootfs") }
     val tarXzFile = remember { File(context.cacheDir, "rootfs.tar.xz") }
@@ -78,6 +84,49 @@ fun TerminalScreen(
     // ── 终端样式配置 ──
     val terminalBackground = Color(0xFF000000)
     val terminalTextColor = Color(0xFF00FF00)
+
+    // ── 封装：安全初始化与启动全新 Shell 进程 ──
+    fun startNewShell() {
+        shellProcess?.destroy() // 先销毁可能残留的旧进程
+        
+        coroutineScope.launch(Dispatchers.IO) {
+            try {
+                // 开启 Android 底层系统的真实 POSIX Shell (sh)
+                val pb = ProcessBuilder("/system/bin/sh")
+                    .directory(rootfsDir) // 设置初始工作路径为 debian_rootfs 内部
+                    .redirectErrorStream(true) // 合并标准错误输出流到标准输出
+
+                // 预注入标准 Linux 环境变量，确保工具查找顺畅
+                val env = pb.environment()
+                env["PATH"] = "/sbin:/bin:/usr/sbin:/usr/bin:/system/bin:/system/xbin"
+                env["HOME"] = "/root"
+                env["TERM"] = "xterm-256color"
+
+                val process = pb.start()
+                shellProcess = process
+                shellWriter = process.outputStream.bufferedWriter()
+
+                val reader = process.inputStream.bufferedReader()
+                
+                // 持续行式读取后台进程的流输出，并推入 UI
+                var line = reader.readLine()
+                while (line != null) {
+                    val finalLine = line
+                    withContext(Dispatchers.Main) {
+                        terminalLines.add(finalLine)
+                        if (terminalLines.size > 0) {
+                            listState.animateScrollToItem(terminalLines.size - 1)
+                        }
+                    }
+                    line = reader.readLine()
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    terminalLines.add("❌ 启动本地进程桥接失败: ${e.localizedMessage}")
+                }
+            }
+        }
+    }
 
     // ── 自动检测现存 Debian 环境是否健全 ──
     LaunchedEffect(Unit) {
@@ -99,10 +148,24 @@ fun TerminalScreen(
         }
     }
 
+    // ── 当环境就绪时，拉起 Shell 执行引擎 ──
+    LaunchedEffect(envState) {
+        if (envState == EnvironmentState.Ready) {
+            startNewShell()
+        }
+    }
+
+    // ── 页面销毁（Dispose）时彻底清理后台进程，防止进程泄露 ──
+    DisposableEffect(Unit) {
+        onDispose {
+            shellProcess?.destroy()
+        }
+    }
+
     Box(
         modifier = modifier
             .fillMaxSize()
-            .imePadding() // 核心改动：使终端内容高度自适应键盘高度，防止输入法遮挡
+            .imePadding() // 使终端内容高度自适应键盘高度，防止输入法遮挡
     ) {
         // ─────────────────────────────────────────────
         // 1. 标准控制台内核层 UI
@@ -129,6 +192,44 @@ fun TerminalScreen(
                             fontSize = 13.sp,
                             lineHeight = 16.sp
                         )
+                    )
+                }
+            }
+
+            // ── 触屏快速输入辅助栏 ──
+            if (envState == EnvironmentState.Ready) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 2.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    AssistChip(
+                        onClick = { terminalLines.clear() },
+                        label = { Text("Clear", fontSize = 11.sp, color = Color.White) },
+                        colors = AssistChipDefaults.assistChipColors(containerColor = Color(0xFF222222)),
+                        border = null
+                    )
+                    AssistChip(
+                        onClick = {
+                            terminalLines.add("❌ Process Interrupted (Ctrl+C)")
+                            startNewShell() // 通过重置 Shell 的方式模拟 Ctrl+C 中断挂起任务
+                        },
+                        label = { Text("Ctrl+C", fontSize = 11.sp, color = Color.White) },
+                        colors = AssistChipDefaults.assistChipColors(containerColor = Color(0xFF222222)),
+                        border = null
+                    )
+                    AssistChip(
+                        onClick = { currentInput = "ls" },
+                        label = { Text("ls", fontSize = 11.sp, color = Color.White) },
+                        colors = AssistChipDefaults.assistChipColors(containerColor = Color(0xFF222222)),
+                        border = null
+                    )
+                    AssistChip(
+                        onClick = { currentInput = "cd home" },
+                        label = { Text("cd home", fontSize = 11.sp, color = Color.White) },
+                        colors = AssistChipDefaults.assistChipColors(containerColor = Color(0xFF222222)),
+                        border = null
                     )
                 }
             }
@@ -165,21 +266,29 @@ fun TerminalScreen(
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                     keyboardActions = KeyboardActions(
                         onSend = {
-                            if (currentInput.isNotBlank()) {
-                                val cmd = currentInput.trim()
+                            val cmd = currentInput.trim()
+                            if (cmd.isNotBlank()) {
+                                // 1. 本地立刻显示回显
                                 terminalLines.add("sandbox@debian:~$ $cmd")
-
-                                when {
-                                    cmd == "clear" -> terminalLines.clear()
-                                    cmd == "ls" -> terminalLines.add("home/  var/  etc/  root/  workspace/  bin/  sbin/")
-                                    cmd.startsWith("apt") -> {
-                                        terminalLines.add("Reading package lists... Done")
-                                        terminalLines.add("Building dependency tree... Done")
-                                        terminalLines.add("❌ Error: PRoot native system call bridge connection pending.")
+                                
+                                // 2. 处理清除清屏
+                                if (cmd == "clear") {
+                                    terminalLines.clear()
+                                } else {
+                                    // 3. 将命令推入真实进程的管道中执行
+                                    coroutineScope.launch(Dispatchers.IO) {
+                                        try {
+                                            shellWriter?.let { writer ->
+                                                writer.write(cmd + "\n")
+                                                writer.flush()
+                                            }
+                                        } catch (e: Exception) {
+                                            withContext(Dispatchers.Main) {
+                                                terminalLines.add("❌ 命令发送失败: ${e.localizedMessage}")
+                                            }
+                                        }
                                     }
-                                    else -> terminalLines.add("bash: $cmd: command not found (PRoot native process bridge pending)")
                                 }
-
                                 currentInput = ""
                                 coroutineScope.launch {
                                     if (terminalLines.size > 0) {
