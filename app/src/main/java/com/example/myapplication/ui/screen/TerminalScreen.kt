@@ -40,7 +40,6 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.webkit.WebViewAssetLoader
 
 // ─────────────────────────────────────────────
 // JavaScript ↔ Kotlin 桥接
@@ -78,6 +77,7 @@ fun TerminalScreen(
     // Ctrl 键工具栏状态
     var isCtrlPressed      by remember { mutableStateOf(false) }
     var showSecondaryPanel by remember { mutableStateOf(false) }
+    val terminalLines = vm.terminalLines
 
     // WebView 引用（用于向 xterm.js 写入 PTY 输出）
     val webViewRef = remember { mutableStateOf<WebView?>(null) }
