@@ -199,13 +199,16 @@ class TerminalViewModel(application: Application) : AndroidViewModel(application
                         tallocDest.setReadable(true, false)
                     } catch (_: Exception) {}
                 }
-                if (libDir.exists()) {
-                    val existingLdPath = env["LD_LIBRARY_PATH"]
-                    env["LD_LIBRARY_PATH"] = if (existingLdPath.isNullOrEmpty())
-                        libDir.absolutePath
-                    else
-                        "${libDir.absolutePath}:$existingLdPath"
+                // LD_LIBRARY_PATH 同时包含：
+                // 1. filesDir/lib —— 存放版本后缀库（如 libtalloc.so.2）
+                // 2. nativeLibraryDir —— 存放标准命名库（如 libandroid-shmem.so）
+                val existingLdPath = env["LD_LIBRARY_PATH"]
+                val ldParts = buildList {
+                    if (libDir.exists()) add(libDir.absolutePath)
+                    add(nativeDirPath)
+                    if (!existingLdPath.isNullOrEmpty()) add(existingLdPath)
                 }
+                env["LD_LIBRARY_PATH"] = ldParts.joinToString(":")
                 // ────────────────────────────────────────────────────────────────────────
 
                 env["PATH"] =
