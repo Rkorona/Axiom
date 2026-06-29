@@ -29,6 +29,8 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun setAutoSave(v: Boolean)              = update(settings.copy(autoSave = v))
     fun setAutoSaveInterval(v: AutoSaveMode) = update(settings.copy(autoSaveInterval = v))
     fun setFileEncoding(v: EncodingMode)     = update(settings.copy(fileEncoding = v))
+    fun setEnableFileTabs(v: Boolean)        = update(settings.copy(enableFileTabs = v))
+    fun setEditorFontWeight(v: FontWeightMode) = update(settings.copy(editorFontWeight = v))
     fun setTerminalFontSize(v: Float)        = update(settings.copy(terminalFontSize = v))
     fun setTerminalFont(uri: String, name: String) = update(settings.copy(terminalFontUri = uri, terminalFontName = name))
     fun clearTerminalFont()                  = update(settings.copy(terminalFontUri = "", terminalFontName = ""))

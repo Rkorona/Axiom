@@ -35,6 +35,13 @@ sealed class Screen {
     ) : Screen()
 }
 
+// 编辑器选项卡数据
+data class EditorTab(
+    val filePath: String,
+    val projectId: String,
+    val projectName: String,
+    val projectLocalPath: String?
+)
 
 // ─────────────────────────────────────────────
 // 导航状态机
@@ -46,6 +53,10 @@ fun AppNavigation(settingsViewModel: SettingsViewModel = viewModel()) {
 
     var currentScreen by remember { mutableStateOf<Screen>(Screen.Home) }
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
+
+    // 文件选项卡状态
+    var editorTabs by remember { mutableStateOf<List<EditorTab>>(emptyList()) }
+    var activeTabIndex by remember { mutableIntStateOf(0) }
 
     // 通过 Repository 从数据库加载项目列表
     val repository = remember { ProjectRepository(context) }
@@ -115,6 +126,37 @@ fun AppNavigation(settingsViewModel: SettingsViewModel = viewModel()) {
     var selectedProject by remember { mutableStateOf<Project?>(null) }
     val settings = settingsViewModel.settings
 
+    // ── 打开文件：创建或复用选项卡 ──────────────────────────
+    fun openFileInTab(
+        filePath: String,
+        projectId: String,
+        projectName: String,
+        projectLocalPath: String?
+    ) {
+        val enableTabs = settingsViewModel.settings.enableFileTabs
+        if (!enableTabs || editorTabs.isEmpty()) {
+            // 无选项卡模式或首次打开：直接替换
+            val tab = EditorTab(filePath, projectId, projectName, projectLocalPath)
+            editorTabs = listOf(tab)
+            activeTabIndex = 0
+        } else {
+            // 查找是否已有此文件的选项卡
+            val existingIndex = editorTabs.indexOfFirst { it.filePath == filePath }
+            if (existingIndex >= 0) {
+                activeTabIndex = existingIndex
+            } else {
+                editorTabs = editorTabs + EditorTab(filePath, projectId, projectName, projectLocalPath)
+                activeTabIndex = editorTabs.size - 1
+            }
+        }
+        currentScreen = Screen.Editor(
+            filePath = filePath,
+            projectId = projectId,
+            projectName = projectName,
+            projectLocalPath = projectLocalPath
+        )
+    }
+
     when (val screen = currentScreen) {
         is Screen.Home -> {
             HomeScreen(
@@ -132,7 +174,9 @@ fun AppNavigation(settingsViewModel: SettingsViewModel = viewModel()) {
                 onOpenFile = { filePath ->
                     val proj = selectedProject
                     selectedProject = null
-                    currentScreen = Screen.Editor(
+                    // 从首页进入时，清空选项卡状态并重新开始
+                    editorTabs = emptyList()
+                    openFileInTab(
                         filePath = filePath,
                         projectId = proj?.id ?: "",
                         projectName = proj?.name ?: "",
@@ -165,17 +209,44 @@ fun AppNavigation(settingsViewModel: SettingsViewModel = viewModel()) {
         }
 
         is Screen.Editor -> {
+            val activeTab = editorTabs.getOrNull(activeTabIndex)
             EditorScreen(
-                filePath = screen.filePath,
-                onNavigateBack = { currentScreen = Screen.Home },
+                filePath = activeTab?.filePath ?: screen.filePath,
+                onNavigateBack = { currentScreen = Screen.Home; editorTabs = emptyList() },
                 onFileSaved = {
-                    if (screen.projectId.isNotEmpty()) {
-                        scope.launch { repository.updateLastModified(screen.projectId) }
+                    val pid = activeTab?.projectId ?: screen.projectId
+                    if (pid.isNotEmpty()) {
+                        scope.launch { repository.updateLastModified(pid) }
                     }
                 },
                 settings = settings,
-                projectName = screen.projectName,
-                projectLocalPath = screen.projectLocalPath
+                projectName = activeTab?.projectName ?: screen.projectName,
+                projectLocalPath = activeTab?.projectLocalPath ?: screen.projectLocalPath,
+                // 选项卡相关
+                tabFilePaths = editorTabs.map { it.filePath },
+                activeTabIndex = activeTabIndex,
+                onTabSelected = { index ->
+                    activeTabIndex = index
+                },
+                onTabClose = { index ->
+                    if (editorTabs.size == 1) {
+                        currentScreen = Screen.Home
+                        editorTabs = emptyList()
+                    } else {
+                        val newTabs = editorTabs.toMutableList().also { it.removeAt(index) }
+                        editorTabs = newTabs
+                        activeTabIndex = (activeTabIndex).coerceAtMost(newTabs.size - 1)
+                    }
+                },
+                onOpenNewTab = { newFilePath ->
+                    val currentTab = editorTabs.getOrNull(activeTabIndex)
+                    openFileInTab(
+                        filePath = newFilePath,
+                        projectId = currentTab?.projectId ?: screen.projectId,
+                        projectName = currentTab?.projectName ?: screen.projectName,
+                        projectLocalPath = currentTab?.projectLocalPath ?: screen.projectLocalPath
+                    )
+                }
             )
         }
     }

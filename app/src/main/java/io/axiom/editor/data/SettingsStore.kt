@@ -12,6 +12,7 @@ class SettingsStore(context: Context) {
         editorFontSize     = prefs.getFloat("editorFontSize", 14f),
         editorFontUri      = prefs.getString("editorFontUri", "") ?: "",
         editorFontName     = prefs.getString("editorFontName", "") ?: "",
+        editorFontWeight   = FontWeightMode.entries.getOrElse(prefs.getInt("editorFontWeight", 1)) { FontWeightMode.NORMAL },
         autoComplete       = prefs.getBoolean("autoComplete", true),
         showLineNumbers    = prefs.getBoolean("showLineNumbers", true),
         wordWrap           = prefs.getBoolean("wordWrap", false),
@@ -19,6 +20,7 @@ class SettingsStore(context: Context) {
         autoSave           = prefs.getBoolean("autoSave", false),
         autoSaveInterval   = AutoSaveMode.entries.getOrElse(prefs.getInt("autoSaveInterval", 1)) { AutoSaveMode.MIN1 },
         fileEncoding       = EncodingMode.entries.getOrElse(prefs.getInt("fileEncoding", 0)) { EncodingMode.AUTO },
+        enableFileTabs     = prefs.getBoolean("enableFileTabs", true),
         terminalFontSize   = prefs.getFloat("terminalFontSize", 13f),
         terminalFontUri    = prefs.getString("terminalFontUri", "") ?: "",
         terminalFontName   = prefs.getString("terminalFontName", "") ?: "",
@@ -30,24 +32,26 @@ class SettingsStore(context: Context) {
 
     fun save(s: AppSettings) {
         prefs.edit().apply {
-            putInt("themeOption",       s.themeOption.ordinal)
-            putFloat("editorFontSize",  s.editorFontSize)
-            putString("editorFontUri",  s.editorFontUri)
-            putString("editorFontName", s.editorFontName)
-            putBoolean("autoComplete",  s.autoComplete)
+            putInt("themeOption",        s.themeOption.ordinal)
+            putFloat("editorFontSize",   s.editorFontSize)
+            putString("editorFontUri",   s.editorFontUri)
+            putString("editorFontName",  s.editorFontName)
+            putInt("editorFontWeight",   s.editorFontWeight.ordinal)
+            putBoolean("autoComplete",   s.autoComplete)
             putBoolean("showLineNumbers", s.showLineNumbers)
-            putBoolean("wordWrap",      s.wordWrap)
-            putInt("tabWidth",          s.tabWidth.ordinal)
-            putBoolean("autoSave",      s.autoSave)
-            putInt("autoSaveInterval",  s.autoSaveInterval.ordinal)
-            putInt("fileEncoding",      s.fileEncoding.ordinal)
+            putBoolean("wordWrap",       s.wordWrap)
+            putInt("tabWidth",           s.tabWidth.ordinal)
+            putBoolean("autoSave",       s.autoSave)
+            putInt("autoSaveInterval",   s.autoSaveInterval.ordinal)
+            putInt("fileEncoding",       s.fileEncoding.ordinal)
+            putBoolean("enableFileTabs", s.enableFileTabs)
             putFloat("terminalFontSize", s.terminalFontSize)
             putString("terminalFontUri",  s.terminalFontUri)
             putString("terminalFontName", s.terminalFontName)
-            putInt("terminalTheme",     s.terminalTheme.ordinal)
-            putBoolean("keepScreenOn",  s.keepScreenOn)
-            putInt("defaultSort",       s.defaultSort.ordinal)
-            putBoolean("confirmDelete", s.confirmDelete)
+            putInt("terminalTheme",      s.terminalTheme.ordinal)
+            putBoolean("keepScreenOn",   s.keepScreenOn)
+            putInt("defaultSort",        s.defaultSort.ordinal)
+            putBoolean("confirmDelete",  s.confirmDelete)
         }.apply()
     }
 }

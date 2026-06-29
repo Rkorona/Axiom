@@ -21,6 +21,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.NoteAdd
@@ -174,8 +175,16 @@ fun HomeScreen(
     var isSearchActive by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
 
-    // ── 排序状态 ──
-    var sortOrder by remember { mutableStateOf(ProjectSortOrder.DEFAULT) }
+    // ── 排序状态（从设置读取初始值）──
+    val initialSortOrder = remember(settingsViewModel) {
+        when (settingsViewModel?.settings?.defaultSort) {
+            io.axiom.editor.data.SortMode.NAME_ASC  -> ProjectSortOrder.NAME_ASC
+            io.axiom.editor.data.SortMode.NAME_DESC -> ProjectSortOrder.NAME_DESC
+            io.axiom.editor.data.SortMode.TYPE       -> ProjectSortOrder.TYPE_LOCAL_FIRST
+            else                                      -> ProjectSortOrder.DEFAULT
+        }
+    }
+    var sortOrder by remember { mutableStateOf(initialSortOrder) }
 
     // ── AddProject sheet 状态 ──
     var showAddSheet by remember { mutableStateOf(false) }
@@ -185,6 +194,9 @@ fun HomeScreen(
 
     // ── 编辑对话框状态 ──
     var editingProject by remember { mutableStateOf<Project?>(null) }
+
+    // ── 删除前确认对话框状态 ──
+    var pendingDeleteProjects by remember { mutableStateOf<List<Project>>(emptyList()) }
 
     // ── 滚动状态（各 Tab 独立追踪，用于顶栏背景变化）──
     val listState = rememberLazyListState()
@@ -236,8 +248,14 @@ fun HomeScreen(
                             selectedProjects.forEach { onCopyProject(it) }
                         },
                         onDeleteClick = {
-                            selectedProjectIds = emptySet()
-                            selectedProjects.forEach { onDeleteProject(it) }
+                            val confirmDelete = settingsViewModel?.settings?.confirmDelete ?: true
+                            if (confirmDelete) {
+                                pendingDeleteProjects = selectedProjects
+                                selectedProjectIds = emptySet()
+                            } else {
+                                selectedProjectIds = emptySet()
+                                selectedProjects.forEach { onDeleteProject(it) }
+                            }
                         }
                     )
                 } else {
@@ -358,6 +376,27 @@ fun HomeScreen(
             project = selectedProject,
             onDismiss = onProjectSheetDismiss,
             onOpenFile = onOpenFile
+        )
+    }
+
+    // ── 删除前确认对话框 ─────────────────────────────────
+    if (pendingDeleteProjects.isNotEmpty()) {
+        val count = pendingDeleteProjects.size
+        val desc = if (count == 1) "「${pendingDeleteProjects.first().name}」" else "$count 个项目"
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { pendingDeleteProjects = emptyList() },
+            icon = { androidx.compose.material3.Icon(Icons.Filled.DeleteForever, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
+            title = { Text("确认删除") },
+            text = { Text("将删除 $desc，此操作不可撤销。") },
+            confirmButton = {
+                androidx.compose.material3.TextButton(onClick = {
+                    pendingDeleteProjects.forEach { onDeleteProject(it) }
+                    pendingDeleteProjects = emptyList()
+                }) { Text("删除", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = {
+                androidx.compose.material3.TextButton(onClick = { pendingDeleteProjects = emptyList() }) { Text("取消") }
+            }
         )
     }
 }

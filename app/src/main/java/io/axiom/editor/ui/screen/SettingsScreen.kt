@@ -77,6 +77,7 @@ private fun SettingsContent(
     var showEncodingDialog      by remember { mutableStateOf(false) }
     var showTerminalThemeDialog by remember { mutableStateOf(false) }
     var showDefaultSortDialog   by remember { mutableStateOf(false) }
+    var showFontWeightDialog    by remember { mutableStateOf(false) }
     var showClearCacheDialog    by remember { mutableStateOf(false) }
     var showCacheClearedDialog  by remember { mutableStateOf(false) }
     var showUpdateDialog        by remember { mutableStateOf(false) }
@@ -176,6 +177,23 @@ private fun SettingsContent(
                     title = "文件编码",
                     value = s.fileEncoding.label,
                     onClick = { showEncodingDialog = true }
+                )
+                CardDivider()
+                CardRowClickable(
+                    icon = Icons.Filled.FormatBold,
+                    iconBg = IconBgDefault,
+                    title = "字体粗细",
+                    value = s.editorFontWeight.label,
+                    onClick = { showFontWeightDialog = true }
+                )
+                CardDivider()
+                CardRowSwitch(
+                    icon = Icons.Filled.Tab,
+                    iconBg = IconBgDefault,
+                    title = "文件选项卡",
+                    subtitle = "在文件树中点击文件时以新选项卡打开",
+                    checked = s.enableFileTabs,
+                    onCheckedChange = { viewModel.setEnableFileTabs(it) }
                 )
                 CardDivider()
                 CardRowSwitch(
@@ -481,6 +499,16 @@ private fun SettingsContent(
             selectedIndex = SortMode.entries.indexOf(s.defaultSort),
             onSelect = { viewModel.setDefaultSort(SortMode.entries[it]) },
             onDismiss = { showDefaultSortDialog = false }
+        )
+    }
+
+    if (showFontWeightDialog) {
+        SingleChoiceDialog(
+            title = "字体粗细",
+            options = io.axiom.editor.data.FontWeightMode.entries.map { it.label },
+            selectedIndex = io.axiom.editor.data.FontWeightMode.entries.indexOf(s.editorFontWeight),
+            onSelect = { viewModel.setEditorFontWeight(io.axiom.editor.data.FontWeightMode.entries[it]) },
+            onDismiss = { showFontWeightDialog = false }
         )
     }
 

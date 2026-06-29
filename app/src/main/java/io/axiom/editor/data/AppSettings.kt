@@ -6,6 +6,7 @@ data class AppSettings(
     val editorFontSize: Float = 14f,
     val editorFontUri: String = "",
     val editorFontName: String = "",
+    val editorFontWeight: FontWeightMode = FontWeightMode.NORMAL,
     val autoComplete: Boolean = true,
     val showLineNumbers: Boolean = true,
     val wordWrap: Boolean = false,
@@ -13,6 +14,7 @@ data class AppSettings(
     val autoSave: Boolean = false,
     val autoSaveInterval: AutoSaveMode = AutoSaveMode.MIN1,
     val fileEncoding: EncodingMode = EncodingMode.AUTO,
+    val enableFileTabs: Boolean = true,
     // 终端
     val terminalFontSize: Float = 13f,
     val terminalFontUri: String = "",
@@ -55,4 +57,12 @@ enum class TerminalThemeMode(
 
 enum class SortMode(val label: String) {
     DEFAULT("默认"), NAME_ASC("名称 A→Z"), NAME_DESC("名称 Z→A"), TYPE("按类型")
+}
+
+enum class FontWeightMode(val label: String, val cssValue: Int) {
+    LIGHT("细", 300),
+    NORMAL("默认", 400),
+    BOLD("粗", 600),
+    MEDIUM("中粗", 500),
+    EXTRABOLD("特粗", 700),
 }

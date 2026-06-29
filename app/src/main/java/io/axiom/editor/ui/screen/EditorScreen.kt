@@ -2,6 +2,8 @@ package io.axiom.editor.ui.screen
 
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.border
 import android.view.MotionEvent
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
@@ -170,7 +172,13 @@ fun EditorScreen(
     settings: AppSettings = AppSettings(),
     modifier: Modifier = Modifier,
     projectName: String = "",
-    projectLocalPath: String? = null
+    projectLocalPath: String? = null,
+    // 文件选项卡
+    tabFilePaths: List<String> = emptyList(),
+    activeTabIndex: Int = 0,
+    onTabSelected: (Int) -> Unit = {},
+    onTabClose: (Int) -> Unit = {},
+    onOpenNewTab: ((String) -> Unit)? = null
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -200,10 +208,12 @@ fun EditorScreen(
         val showGutter = settings.showLineNumbers
         val wrap = settings.wordWrap
         val autocomplete = settings.autoComplete
+        val fw = settings.editorFontWeight.cssValue
 
-        // 注入或更新自定义样式块（字号、行号、自动补全）
+        // 注入或更新自定义样式块（字号、行号、自动补全、字体粗细）
         val css = buildString {
             append(".cm-content,.cm-gutters{font-size:${fs}px!important}")
+            append(".cm-content{font-weight:${fw}!important}")
             // 收紧行号列内边距，避免默认过宽
             append(".cm-lineNumbers .cm-gutterElement{padding:0 6px 0 2px!important}")
             append(".cm-lineNumbers{min-width:0!important}")
@@ -471,10 +481,13 @@ fun EditorScreen(
     // ─────────────────────────────────────────────────────────
     // 8. 页面 UI 布局构建
     // ─────────────────────────────────────────────────────────
+    val showTabStrip = settings.enableFileTabs && tabFilePaths.size >= 1
+
     Scaffold(
         modifier = Modifier.imePadding(),
         topBar = {
-            TopAppBar(
+            Column {
+                TopAppBar(
                 title = {
                     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         // 文件名 + 语言类型徽章
@@ -539,7 +552,17 @@ fun EditorScreen(
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(3.dp)
                 )
-            )
+                )
+                // ── 文件选项卡栏 ──────────────────────────────────
+                if (showTabStrip) {
+                    EditorTabStrip(
+                        tabFilePaths = tabFilePaths,
+                        activeTabIndex = activeTabIndex,
+                        onTabSelected = onTabSelected,
+                        onTabClose = onTabClose
+                    )
+                }
+            }
         },
         bottomBar = {
             val isImeVisible = WindowInsets.isImeVisible
@@ -832,16 +855,103 @@ fun EditorScreen(
             onDismiss = { showFileTree = false },
             onOpenFile = { newFilePath ->
                 showFileTree = false
-                // 切换到同项目内其他文件：通过返回键退出当前编辑器
-                // 并利用 LaunchedEffect 在 AppNavigation 重新打开新路径
-                // 这里采用最简单且无副作用的方式：直接替换编辑器内容
-                // 如需跨文件切换请通过 onNavigateBack + 重新点击文件实现
-                // 目前：仅当选中了不同文件时才触发
                 if (newFilePath != filePath) {
-                    onNavigateBack()
+                    if (settings.enableFileTabs && onOpenNewTab != null) {
+                        onOpenNewTab(newFilePath)
+                    } else {
+                        onNavigateBack()
+                    }
                 }
             }
         )
+    }
+}
+
+// ═════════════════════════════════════════════════════════════
+// 文件选项卡栏
+// ═════════════════════════════════════════════════════════════
+@Composable
+private fun EditorTabStrip(
+    tabFilePaths: List<String>,
+    activeTabIndex: Int,
+    onTabSelected: (Int) -> Unit,
+    onTabClose: (Int) -> Unit
+) {
+    val scrollState = rememberScrollState()
+    val tabBarBg = MaterialTheme.colorScheme.surfaceColorAtElevation(2.dp)
+    val activeTabBg = MaterialTheme.colorScheme.surfaceColorAtElevation(8.dp)
+    val activeBorderColor = MaterialTheme.colorScheme.primary
+
+    Surface(
+        color = tabBarBg,
+        tonalElevation = 0.dp,
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(36.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxHeight()
+                .horizontalScroll(scrollState),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            tabFilePaths.forEachIndexed { index, path ->
+                val isActive = index == activeTabIndex
+                val tabName = path.substringAfterLast('/').substringAfterLast(':').ifBlank { "untitled" }
+                val tabBg = if (isActive) activeTabBg else tabBarBg
+                val textColor = if (isActive) MaterialTheme.colorScheme.onSurface
+                               else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .then(
+                            if (isActive) Modifier.border(
+                                BorderStroke(1.5.dp, activeBorderColor),
+                                shape = RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp)
+                            ) else Modifier
+                        )
+                        .clip(RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp))
+                        .background(tabBg)
+                        .clickable { onTabSelected(index) }
+                        .padding(horizontal = 10.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.align(Alignment.Center),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            text = tabName,
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = if (isActive) FontWeight.SemiBold else FontWeight.Normal,
+                                fontSize = 11.sp
+                            ),
+                            color = textColor,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.widthIn(max = 120.dp)
+                        )
+                        Box(
+                            modifier = Modifier
+                                .size(16.dp)
+                                .clip(RoundedCornerShape(4.dp))
+                                .clickable { onTabClose(index) },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "关闭选项卡",
+                                modifier = Modifier.size(10.dp),
+                                tint = if (isActive) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                                       else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+                            )
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
