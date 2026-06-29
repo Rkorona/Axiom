@@ -557,7 +557,11 @@ fun FileExplorerSheet(
                         }
                         DropdownMenu(
                             expanded = showActionsMenu,
-                            onDismissRequest = { showActionsMenu = false }
+                            onDismissRequest = { showActionsMenu = false },
+                            shape = RoundedCornerShape(14.dp),
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            shadowElevation = 4.dp,
+                            tonalElevation = 0.dp
                         ) {
                             DropdownMenuItem(
                                 text = { Text("新建文件") },
