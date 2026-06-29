@@ -125,8 +125,12 @@
       term.scrollToBottom();
       clearTimeout(window._scrollTimer1);
       clearTimeout(window._scrollTimer2);
+      clearTimeout(window._scrollTimer3);
+      clearTimeout(window._scrollTimer4);
       window._scrollTimer1 = setTimeout(function() { term.scrollToBottom(); }, 80);
-      window._scrollTimer2 = setTimeout(function() { term.scrollToBottom(); }, 200);
+      window._scrollTimer2 = setTimeout(function() { term.scrollToBottom(); }, 250);
+      window._scrollTimer3 = setTimeout(function() { term.scrollToBottom(); }, 450);
+      window._scrollTimer4 = setTimeout(function() { term.scrollToBottom(); }, 700);
     }
 
     // Exposed for Kotlin to call after setViewportSize
@@ -180,6 +184,16 @@
       clearTimeout(window._fitTimer);
       window._fitTimer = setTimeout(doFit, 80);
     });
+
+    // visualViewport fires when the keyboard fully settles — more reliable than 'resize'
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', function() {
+        clearTimeout(window._vpTimer);
+        window._vpTimer = setTimeout(function() {
+          scheduleScrollToBottom();
+        }, 100);
+      });
+    }
 
     if (window.ResizeObserver) {
       var ro = new ResizeObserver(function() {
