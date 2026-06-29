@@ -54,6 +54,9 @@ import java.io.File
 import io.axiom.editor.data.AppSettings
 import io.axiom.editor.data.EncodingMode
 import io.axiom.editor.data.ThemeMode
+import io.axiom.editor.ui.model.Project
+import io.axiom.editor.ui.model.ProjectLanguage
+import io.axiom.editor.ui.model.ProjectType
 
 // ═════════════════════════════════════════════════════════════
 // 安全编解码工具函数与双通道编码自动检测
@@ -165,7 +168,9 @@ fun EditorScreen(
     onNavigateBack: () -> Unit,
     onFileSaved: (() -> Unit)? = null,
     settings: AppSettings = AppSettings(),
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    projectName: String = "",
+    projectLocalPath: String? = null
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -309,6 +314,22 @@ fun EditorScreen(
         ThemeMode.DARK   -> true
     }
     var isKeyboardEnabled by rememberSaveable { mutableStateOf(false) }
+
+    // 文件树底部抽屉状态
+    var showFileTree by remember { mutableStateOf(false) }
+    val treeProject = remember(projectName, projectLocalPath) {
+        if (projectLocalPath != null) {
+            Project(
+                id = "editor_tree",
+                name = projectName.ifBlank { "项目文件" },
+                description = projectLocalPath,
+                type = ProjectType.LOCAL,
+                isActive = true,
+                localPath = projectLocalPath,
+                language = ProjectLanguage.UNKNOWN
+            )
+        } else null
+    }
 
     // ─────────────────────────────────────────────────────────
     // 4. 异步读取本地文件内容 (已升级双通道编码自适应读取)
@@ -652,7 +673,9 @@ fun EditorScreen(
                                 } else {
                                     executeJs("window.editorAPI.disableKeyboard()")
                                 }
-                            }
+                            },
+                            hasFileTree = treeProject != null,
+                            onOpenFileTree = { showFileTree = true }
                         )
                     }
                 }
@@ -800,6 +823,25 @@ fun EditorScreen(
                 }
             }
         }
+    }
+
+    // ── 文件树底部抽屉 ──────────────────────────────────────────
+    if (showFileTree && treeProject != null) {
+        FileExplorerSheet(
+            project = treeProject,
+            onDismiss = { showFileTree = false },
+            onOpenFile = { newFilePath ->
+                showFileTree = false
+                // 切换到同项目内其他文件：通过返回键退出当前编辑器
+                // 并利用 LaunchedEffect 在 AppNavigation 重新打开新路径
+                // 这里采用最简单且无副作用的方式：直接替换编辑器内容
+                // 如需跨文件切换请通过 onNavigateBack + 重新点击文件实现
+                // 目前：仅当选中了不同文件时才触发
+                if (newFilePath != filePath) {
+                    onNavigateBack()
+                }
+            }
+        )
     }
 }
 
@@ -950,7 +992,9 @@ private fun EditorActionsBar(
     isKeyboardEnabled: Boolean,
     onSave: () -> Unit,
     onToggleKeyboard: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    hasFileTree: Boolean = false,
+    onOpenFileTree: () -> Unit = {}
 ) {
     Surface(
         tonalElevation = 4.dp,
@@ -962,10 +1006,9 @@ private fun EditorActionsBar(
                 .navigationBarsPadding()
                 .height(48.dp)
                 .padding(horizontal = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(0.dp)
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            // 保存文件
+            // ── 左侧：保存 + 软键盘 ──
             IconButton(onClick = onSave) {
                 Icon(
                     imageVector = Icons.Default.Save,
@@ -974,7 +1017,6 @@ private fun EditorActionsBar(
                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            // 软键盘开关
             IconButton(onClick = onToggleKeyboard) {
                 Icon(
                     imageVector = if (isKeyboardEnabled)
@@ -986,6 +1028,20 @@ private fun EditorActionsBar(
                     else
                         MaterialTheme.colorScheme.onSurfaceVariant
                 )
+            }
+
+            Spacer(modifier = Modifier.weight(1f))
+
+            // ── 右侧：文件树入口 ──
+            if (hasFileTree) {
+                IconButton(onClick = onOpenFileTree) {
+                    Icon(
+                        imageVector = Icons.Default.AccountTree,
+                        contentDescription = "文件树",
+                        modifier = Modifier.size(22.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
         }
     }

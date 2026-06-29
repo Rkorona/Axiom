@@ -27,7 +27,12 @@ import java.io.File
 sealed class Screen {
     object Home : Screen()
     object Terminal : Screen()
-    data class Editor(val filePath: String, val projectId: String) : Screen()
+    data class Editor(
+        val filePath: String,
+        val projectId: String,
+        val projectName: String = "",
+        val projectLocalPath: String? = null
+    ) : Screen()
 }
 
 
@@ -125,9 +130,14 @@ fun AppNavigation(settingsViewModel: SettingsViewModel = viewModel()) {
                 },
                 onProjectSheetDismiss = { selectedProject = null },
                 onOpenFile = { filePath ->
-                    val pid = selectedProject?.id ?: ""
+                    val proj = selectedProject
                     selectedProject = null
-                    currentScreen = Screen.Editor(filePath = filePath, projectId = pid)
+                    currentScreen = Screen.Editor(
+                        filePath = filePath,
+                        projectId = proj?.id ?: "",
+                        projectName = proj?.name ?: "",
+                        projectLocalPath = proj?.localPath
+                    )
                 },
                 onNewLocalProject = { showNewLocalDialog = true },
                 onCloneGithub = {},
@@ -163,7 +173,9 @@ fun AppNavigation(settingsViewModel: SettingsViewModel = viewModel()) {
                         scope.launch { repository.updateLastModified(screen.projectId) }
                     }
                 },
-                settings = settings
+                settings = settings,
+                projectName = screen.projectName,
+                projectLocalPath = screen.projectLocalPath
             )
         }
     }
