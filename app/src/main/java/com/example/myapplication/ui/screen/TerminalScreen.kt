@@ -46,7 +46,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 // ─────────────────────────────────────────────
 private class TerminalJsBridge(
     private val onInput: (ByteArray) -> Unit,
-    private val onResize: (Int, Int) -> Unit
+    private val onResizeCallback: (Int, Int) -> Unit
 ) {
     @JavascriptInterface
     fun sendInput(base64: String) {
@@ -55,7 +55,7 @@ private class TerminalJsBridge(
 
     @JavascriptInterface
     fun onResize(rows: Int, cols: Int) {
-        onResize(rows, cols)
+        onResizeCallback(rows, cols)
     }
 }
 
@@ -216,7 +216,7 @@ fun TerminalScreen(
                             addJavascriptInterface(
                                 TerminalJsBridge(
                                     onInput  = { data -> vm.sendInput(data) },
-                                    onResize = { rows, cols -> vm.resizePty(rows, cols) }
+                                    onResizeCallback = { rows, cols -> vm.resizePty(rows, cols) }
                                 ),
                                 "Android"
                             )
