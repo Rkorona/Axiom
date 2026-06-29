@@ -5,10 +5,10 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- Rounded card background -->
+    <!-- Rounded card: rect(24,24,84,84) rx=14 — using arc commands for proper circular corners -->
     <path
         android:fillColor="#222E35"
-        android:pathData="M24,36 Q24,24 36,24 L72,24 Q84,24 84,36 L84,72 Q84,84 72,84 L36,84 Q24,84 24,72 Z" />
+        android:pathData="M38,24 L70,24 A14,14 0 0 1 84,38 L84,70 A14,14 0 0 1 70,84 L38,84 A14,14 0 0 1 24,70 L24,38 A14,14 0 0 1 38,24 Z" />
 
     <!-- Chevron ">" in mint/teal -->
     <path
