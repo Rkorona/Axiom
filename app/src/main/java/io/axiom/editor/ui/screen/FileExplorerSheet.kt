@@ -456,6 +456,7 @@ fun FileExplorerSheet(
 
     var isOperationInProgress by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
+    var showActionsMenu by remember { mutableStateOf(false) }
 
     val uploadLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenMultipleDocuments()
@@ -546,6 +547,65 @@ fun FileExplorerSheet(
                             )
                         }
                     }
+                    Box {
+                        IconButton(onClick = { showActionsMenu = true }) {
+                            Icon(
+                                imageVector = Icons.Filled.MoreVert,
+                                contentDescription = "更多操作",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        DropdownMenu(
+                            expanded = showActionsMenu,
+                            onDismissRequest = { showActionsMenu = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("新建文件") },
+                                leadingIcon = { Icon(Icons.Outlined.NoteAdd, contentDescription = null) },
+                                onClick = {
+                                    showActionsMenu = false
+                                    val targetDir = rootDocPath.ifBlank { project.localPath ?: "" }
+                                    if (targetDir.isNotBlank()) { newItemTargetPath = targetDir; showNewFileDialog = true }
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("新建文件夹") },
+                                leadingIcon = { Icon(Icons.Outlined.CreateNewFolder, contentDescription = null) },
+                                onClick = {
+                                    showActionsMenu = false
+                                    val targetDir = rootDocPath.ifBlank { project.localPath ?: "" }
+                                    if (targetDir.isNotBlank()) { newItemTargetPath = targetDir; showNewFolderDialog = true }
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("上传文件") },
+                                leadingIcon = { Icon(Icons.Outlined.Upload, contentDescription = null) },
+                                onClick = {
+                                    showActionsMenu = false
+                                    val targetDir = rootDocPath.ifBlank { project.localPath ?: "" }
+                                    if (targetDir.isNotBlank()) uploadLauncher.launch(arrayOf("*/*"))
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("下载项目") },
+                                leadingIcon = { Icon(Icons.Outlined.Download, contentDescription = null) },
+                                onClick = {
+                                    showActionsMenu = false
+                                    val srcPath = project.localPath ?: ""
+                                    if (srcPath.isNotBlank()) {
+                                        isOperationInProgress = true
+                                        scope.launch(Dispatchers.IO) {
+                                            val (success, error) = createProjectZipToDownloads(context, srcPath, project.name)
+                                            withContext(Dispatchers.Main) {
+                                                isOperationInProgress = false
+                                                snackbarHostState.showSnackbar(if (success) "已打包并保存到下载目录" else "下载失败：$error")
+                                            }
+                                        }
+                                    }
+                                }
+                            )
+                        }
+                    }
                 }
 
                 HorizontalDivider(modifier = Modifier.padding(top = 8.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
@@ -609,36 +669,8 @@ fun FileExplorerSheet(
                     }
                 }
 
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
-                Row(modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 8.dp, vertical = 8.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
-                    SheetBottomAction("新建文件") {
-                        val targetDir = rootDocPath.ifBlank { project.localPath ?: "" }
-                        if (targetDir.isNotBlank()) { newItemTargetPath = targetDir; showNewFileDialog = true }
-                    }
-                    SheetBottomAction("新建文件夹") {
-                        val targetDir = rootDocPath.ifBlank { project.localPath ?: "" }
-                        if (targetDir.isNotBlank()) { newItemTargetPath = targetDir; showNewFolderDialog = true }
-                    }
-                    SheetBottomAction("上传文件") {
-                        val targetDir = rootDocPath.ifBlank { project.localPath ?: "" }
-                        if (targetDir.isNotBlank()) uploadLauncher.launch(arrayOf("*/*"))
-                    }
-                    SheetBottomAction("下载") {
-                        val srcPath = project.localPath ?: ""
-                        if (srcPath.isNotBlank()) {
-                            isOperationInProgress = true
-                            scope.launch(Dispatchers.IO) {
-                                val (success, error) = createProjectZipToDownloads(context, srcPath, project.name)
-                                withContext(Dispatchers.Main) {
-                                    isOperationInProgress = false
-                                    snackbarHostState.showSnackbar(if (success) "已打包并保存到下载目录" else "下载失败：$error")
-                                }
-                            }
-                        }
-                    }
-                }
             }
-            SnackbarHost(hostState = snackbarHostState, modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 72.dp))
+            SnackbarHost(hostState = snackbarHostState, modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding())
         }
     }
 
@@ -860,13 +892,6 @@ private fun flattenSheetVisible(node: SheetFileNode, depth: Int, expanded: Set<S
     return if (node.isDirectory && node.path in expanded) {
         listOf(selfRow) + node.children.flatMap { flattenSheetVisible(it, depth + 1, expanded) }
     } else listOf(selfRow)
-}
-
-@Composable
-private fun SheetBottomAction(label: String, onClick: () -> Unit) {
-    TextButton(onClick = onClick) {
-        Text(text = label, style = MaterialTheme.typography.labelLarge)
-    }
 }
 
 private fun sheetFileIconColor(extension: String): Color = when (extension) {

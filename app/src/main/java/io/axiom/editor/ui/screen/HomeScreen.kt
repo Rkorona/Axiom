@@ -116,7 +116,7 @@ private fun filterAndSortProjects(
     return when (order) {
         ProjectSortOrder.DEFAULT -> filtered
         ProjectSortOrder.NAME_ASC ->
-            filtered.sortedWith { a, b -> String.CASE_INSENSITIVE_ORDER.compare(a.name, a.name) }
+            filtered.sortedWith { a, b -> String.CASE_INSENSITIVE_ORDER.compare(a.name, b.name) }
         ProjectSortOrder.NAME_DESC ->
             filtered.sortedWith { a, b -> String.CASE_INSENSITIVE_ORDER.compare(b.name, a.name) }
         ProjectSortOrder.TYPE_LOCAL_FIRST ->
@@ -692,12 +692,6 @@ fun TerminalCard(onClick: () -> Unit, modifier: Modifier = Modifier) {
                     maxLines = 1
                 )
             }
-            Icon(
-                imageVector = Icons.Outlined.Terminal,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-                modifier = Modifier.size(20.dp)
-            )
         }
     }
 }
