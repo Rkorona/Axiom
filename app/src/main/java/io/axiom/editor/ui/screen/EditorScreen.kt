@@ -204,6 +204,7 @@ fun EditorScreen(
     // 注入编辑器外观设置（字体、行号、换行、补全等）
     // ─────────────────────────────────────────────────────────
     fun applyEditorSettings(isDark: Boolean) {
+        suppressModFor(700L)   // setLineWrapping / setLanguage 等会触发 onStatsChanged
         val fs = settings.editorFontSize.toInt()
         val tabSz = settings.tabWidth.size
         val showGutter = settings.showLineNumbers
@@ -329,6 +330,18 @@ fun EditorScreen(
     // 文件树底部抽屉状态
     var showFileTree by remember { mutableStateOf(false) }
     var showFileDropdown by remember { mutableStateOf(false) }
+
+    // ── 修改状态 & 保存提示 ──────────────────────────────────
+    var isModified by remember { mutableStateOf(false) }
+    var showSavedIndicator by remember { mutableStateOf(false) }
+    var savedIndicatorTick by remember { mutableStateOf(0) }
+    // 用原子布尔区分「用户编辑」与「程序注入」触发的 onStatsChanged
+    val suppressMod = remember { java.util.concurrent.atomic.AtomicBoolean(false) }
+
+    fun suppressModFor(ms: Long = 700L) {
+        suppressMod.set(true)
+        coroutineScope.launch { kotlinx.coroutines.delay(ms); suppressMod.set(false) }
+    }
     val treeProject = remember(projectName, projectLocalPath) {
         if (projectLocalPath != null) {
             Project(
@@ -391,6 +404,7 @@ fun EditorScreen(
                 launch(Dispatchers.Main) {
                     fileContent = text
                     fileEncoding = charset.name()
+                    isModified = false
                     isFileLoaded = true
 
                     // 若编辑器已就绪（文件切换场景），直接注入新内容，
@@ -398,6 +412,7 @@ fun EditorScreen(
                     if (editorAlreadyReady) {
                         val isDark = isDarkTheme
                         val bg = if (isDark) "#141729" else "#ffffff"
+                        suppressModFor(800L)  // 注入内容会触发 onStatsChanged
                         executeJs("document.documentElement.style.setProperty('--editor-bg','$bg')")
                         executeJs("window.editorAPI.setContentBase64('${text.toBase64()}')")
                         executeJs("window.editorAPI.setLanguage('$targetExt')")
@@ -427,6 +442,7 @@ fun EditorScreen(
     LaunchedEffect(isEditorReady, isFileLoaded) {
         if (isEditorReady && isFileLoaded) {
             val bg = if (isDarkTheme) "#141729" else "#ffffff"
+            suppressModFor(800L)  // 初始注入内容也要抑制
             executeJs("document.documentElement.style.setProperty('--editor-bg','$bg')")
             executeJs("window.editorAPI.setContentBase64('${fileContent.toBase64()}')")
             executeJs("window.editorAPI.setLanguage('$fileExtension')")
@@ -476,7 +492,8 @@ fun EditorScreen(
                             }
                             fileContent = content
                             launch(Dispatchers.Main) {
-                                Toast.makeText(context, "文件已保存", Toast.LENGTH_SHORT).show()
+                                isModified = false
+                                savedIndicatorTick++
                                 onFileSaved?.invoke()
                             }
                         } catch (e: Exception) {
@@ -501,6 +518,15 @@ fun EditorScreen(
                     saveFile()
                 }
             }
+        }
+    }
+
+    // 保存提示计时器：显示 2.5 秒后隐藏
+    LaunchedEffect(savedIndicatorTick) {
+        if (savedIndicatorTick > 0) {
+            showSavedIndicator = true
+            kotlinx.coroutines.delay(2500)
+            showSavedIndicator = false
         }
     }
 
@@ -545,7 +571,10 @@ fun EditorScreen(
                                 )
                                 if (fileExtension.isNotBlank()) {
                                     Surface(
-                                        color = MaterialTheme.colorScheme.primaryContainer,
+                                        color = if (isModified)
+                                            MaterialTheme.colorScheme.errorContainer
+                                        else
+                                            MaterialTheme.colorScheme.primaryContainer,
                                         shape = RoundedCornerShape(4.dp),
                                         tonalElevation = 0.dp
                                     ) {
@@ -556,7 +585,10 @@ fun EditorScreen(
                                                 fontWeight = FontWeight.Bold,
                                                 letterSpacing = 0.5.sp
                                             ),
-                                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                            color = if (isModified)
+                                                MaterialTheme.colorScheme.onErrorContainer
+                                            else
+                                                MaterialTheme.colorScheme.onPrimaryContainer,
                                             modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
                                         )
                                     }
@@ -575,15 +607,32 @@ fun EditorScreen(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
-                                Text(
-                                    text = if (isSafUri) "外部文件" else filePath
-                                        .substringBeforeLast('/')
-                                        .let { dir -> if (dir.length > 28) "…" + dir.takeLast(28) else dir },
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
+                                AnimatedContent(
+                                    targetState = showSavedIndicator,
+                                    transitionSpec = {
+                                        (fadeIn() + expandVertically()).togetherWith(fadeOut() + shrinkVertically())
+                                    },
+                                    label = "subtitle"
+                                ) { saved ->
+                                    if (saved) {
+                                        Text(
+                                            text = "✓ 已保存",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.85f),
+                                            maxLines = 1
+                                        )
+                                    } else {
+                                        Text(
+                                            text = if (isSafUri) "外部文件" else filePath
+                                                .substringBeforeLast('/')
+                                                .let { dir -> if (dir.length > 28) "…" + dir.takeLast(28) else dir },
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                }
                             }
                         }
                         // ── 同目录文件下拉菜单（无选项卡模式）──
@@ -817,7 +866,11 @@ fun EditorScreen(
                                     coroutineScope.launch(Dispatchers.Main) {
                                         linesCount = lines
                                         charCount = length
-                                        indentLabel = indent // 接收前端动态回传的缩进规格标签
+                                        indentLabel = indent
+                                        // 用户编辑才标记为已修改（程序注入时 suppressMod=true）
+                                        if (!suppressMod.get() && isFileLoaded && isEditorReady) {
+                                            isModified = true
+                                        }
                                     }
                                 },
                                 onCursorChangedCallback = { line, col ->
