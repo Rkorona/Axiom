@@ -14,6 +14,11 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.activity.compose.BackHandler
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import com.example.myapplication.data.AppSettings
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.KeyboardArrowDown
@@ -74,6 +79,7 @@ private class TerminalJsBridge(
 @Composable
 fun TerminalScreen(
     onNavigateBack: () -> Unit = {},
+    settings: AppSettings = AppSettings(),
     modifier: Modifier = Modifier,
     vm: TerminalViewModel = viewModel()
 ) {
@@ -83,6 +89,17 @@ fun TerminalScreen(
     val downloadProgress   = vm.downloadProgress
     val currentStatusMessage = vm.currentStatusMessage
     val context            = LocalContext.current
+
+    // 屏幕常亮
+    val activity = context as? android.app.Activity
+    DisposableEffect(settings.keepScreenOn) {
+        if (settings.keepScreenOn) {
+            activity?.window?.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+        onDispose {
+            activity?.window?.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+    }
 
     // Ctrl 键工具栏状态
     var isCtrlPressed      by remember { mutableStateOf(false) }
@@ -107,6 +124,65 @@ fun TerminalScreen(
     LaunchedEffect(envState, pageReady) {
         if (envState == EnvironmentState.Ready && pageReady) {
             vm.startShellIfNeeded()
+        }
+    }
+
+    // ── 设置同步到终端 ──────────────────────────────────────────
+    val coroutineScope = rememberCoroutineScope()
+
+    fun applyTerminalSettings() {
+        val wv = webViewRef.value ?: return
+        val fs = settings.terminalFontSize.toInt()
+        wv.post { wv.evaluateJavascript("if(window.setFontSize) window.setFontSize($fs)", null) }
+        val theme = settings.terminalTheme
+        wv.post {
+            wv.evaluateJavascript(
+                "if(window.setTheme) window.setTheme('${theme.bg}','${theme.fg}')", null
+            )
+        }
+    }
+
+    fun applyTerminalFont() {
+        val fontUri = settings.terminalFontUri
+        val wv = webViewRef.value ?: return
+        if (fontUri.isEmpty()) {
+            wv.post {
+                wv.evaluateJavascript(
+                    "if(window.setFontFamily) window.setFontFamily('')", null
+                )
+            }
+            return
+        }
+        coroutineScope.launch(Dispatchers.IO) {
+            try {
+                val bytes = context.contentResolver.openInputStream(
+                    android.net.Uri.parse(fontUri)
+                )?.use { it.readBytes() } ?: return@launch
+                val b64 = Base64.encodeToString(bytes, Base64.NO_WRAP)
+                val ext = fontUri.substringAfterLast('.').lowercase()
+                val mime = if (ext == "otf") "font/otf" else "font/ttf"
+                launch(Dispatchers.Main) {
+                    wv.post {
+                        wv.evaluateJavascript(
+                            "if(window.setFontFamily) window.setFontFamily('$mime','$b64')", null
+                        )
+                    }
+                }
+            } catch (_: Exception) {}
+        }
+    }
+
+    LaunchedEffect(pageReady) {
+        if (pageReady) {
+            applyTerminalSettings()
+            applyTerminalFont()
+        }
+    }
+
+    LaunchedEffect(settings) {
+        if (pageReady) {
+            applyTerminalSettings()
+            applyTerminalFont()
         }
     }
 

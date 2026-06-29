@@ -8,7 +8,9 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.platform.LocalContext
 import androidx.documentfile.provider.DocumentFile
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.myapplication.data.ProjectRepository
+import com.example.myapplication.data.SettingsViewModel
 import com.example.myapplication.ui.component.NewLocalProjectDialog
 import com.example.myapplication.ui.model.Project
 import com.example.myapplication.ui.model.ProjectLanguage
@@ -33,7 +35,7 @@ sealed class Screen {
 // 导航状态机
 // ─────────────────────────────────────────────
 @Composable
-fun AppNavigation() {
+fun AppNavigation(settingsViewModel: SettingsViewModel = viewModel()) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
@@ -49,7 +51,6 @@ fun AppNavigation() {
         projects.filter { it.language == ProjectLanguage.UNKNOWN && it.localPath != null }
             .forEach { project ->
                 val path = project.localPath!!
-                // 只处理文件系统路径（不处理 content:// SAF URI）
                 if (!path.startsWith("content://")) {
                     val files = File(path).list()?.toList() ?: emptyList()
                     val detected = ProjectLanguage.detect(files)
@@ -69,7 +70,6 @@ fun AppNavigation() {
     ) { uri: Uri? ->
         if (uri == null) return@rememberLauncherForActivityResult
 
-        // 核心安全：持久化 SAF 目录访问权限，App 重启后依然具有读写该目录及其子节点的完整权限
         val persistFlags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
         runCatching {
             context.contentResolver.takePersistableUriPermission(uri, persistFlags)
@@ -88,7 +88,6 @@ fun AppNavigation() {
                 else uri.toString()
             }
 
-        // 用 DocumentFile 列出根目录文件名，推断项目语言
         val fileNames = DocumentFile.fromTreeUri(context, uri)
             ?.listFiles()
             ?.mapNotNull { it.name?.lowercase() }
@@ -109,6 +108,7 @@ fun AppNavigation() {
     }
 
     var selectedProject by remember { mutableStateOf<Project?>(null) }
+    val settings = settingsViewModel.settings
 
     when (val screen = currentScreen) {
         is Screen.Home -> {
@@ -117,57 +117,44 @@ fun AppNavigation() {
                 selectedTab = selectedTab,
                 onTabSelected = { selectedTab = it },
                 selectedProject = selectedProject,
+                settingsViewModel = settingsViewModel,
                 onProjectClick = { project ->
                     if (!project.localPath.isNullOrBlank()) {
                         selectedProject = project
                     }
                 },
-                onProjectSheetDismiss = {
-                    selectedProject = null
-                },
+                onProjectSheetDismiss = { selectedProject = null },
                 onOpenFile = { filePath ->
                     val pid = selectedProject?.id ?: ""
                     selectedProject = null
                     currentScreen = Screen.Editor(filePath = filePath, projectId = pid)
                 },
-                onNewLocalProject = {
-                    showNewLocalDialog = true
-                },
-                onCloneGithub = {
-                    // TODO: 预留：打开 GitHub 克隆对话框
-                },
-                onImportFile = {
-                    importFolderLauncher.launch(null)
-                },
-                onFromTemplate = {
-                    // TODO: 预留：打开模板选择页
-                },
-                onSettingsClick = {
-                    // TODO: 预留：后续接入设置页
-                },
-                onTerminalClick = {
-                    currentScreen = Screen.Terminal
-                }
+                onNewLocalProject = { showNewLocalDialog = true },
+                onCloneGithub = {},
+                onImportFile = { importFolderLauncher.launch(null) },
+                onFromTemplate = {},
+                onSettingsClick = {},
+                onTerminalClick = { currentScreen = Screen.Terminal }
             )
         }
 
         is Screen.Terminal -> {
             TerminalScreen(
-                onNavigateBack = { currentScreen = Screen.Home }
+                onNavigateBack = { currentScreen = Screen.Home },
+                settings = settings
             )
         }
 
         is Screen.Editor -> {
             EditorScreen(
                 filePath = screen.filePath,
-                onNavigateBack = {
-                    currentScreen = Screen.Home
-                },
+                onNavigateBack = { currentScreen = Screen.Home },
                 onFileSaved = {
                     if (screen.projectId.isNotEmpty()) {
                         scope.launch { repository.updateLastModified(screen.projectId) }
                     }
-                }
+                },
+                settings = settings
             )
         }
     }
@@ -175,7 +162,6 @@ fun AppNavigation() {
     if (showNewLocalDialog) {
         NewLocalProjectDialog(
             onConfirm = { name, localPath ->
-                // 新建空项目，暂无文件可检测；后续打开时可再推断
                 val newProject = Project(
                     id = System.currentTimeMillis().toString(),
                     name = name,

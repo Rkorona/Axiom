@@ -49,6 +49,8 @@ import androidx.compose.foundation.layout.isImeVisible
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.io.File
+import com.example.myapplication.data.AppSettings
+import com.example.myapplication.data.EncodingMode
 
 // ═════════════════════════════════════════════════════════════
 // 安全编解码工具函数与双通道编码自动检测
@@ -156,9 +158,10 @@ class WebAppInterface(
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class) 
 @Composable
 fun EditorScreen(
-    filePath: String, // 需要打开和编辑的文件绝对路径
+    filePath: String,
     onNavigateBack: () -> Unit,
     onFileSaved: (() -> Unit)? = null,
+    settings: AppSettings = AppSettings(),
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -177,6 +180,72 @@ fun EditorScreen(
             wv.post {
                 wv.evaluateJavascript(script, null)
             }
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // 注入编辑器外观设置（字体、行号、换行、补全等）
+    // ─────────────────────────────────────────────────────────
+    fun applyEditorSettings(isDark: Boolean) {
+        val fs = settings.editorFontSize.toInt()
+        val tabSz = settings.tabWidth.size
+        val showGutter = settings.showLineNumbers
+        val wrap = settings.wordWrap
+        val autocomplete = settings.autoComplete
+
+        // 注入或更新自定义样式块
+        val css = buildString {
+            append(".cm-content,.cm-gutters{font-size:${fs}px!important}")
+            if (!showGutter) append(".cm-gutters{display:none!important}")
+            if (wrap) append(".cm-scroller{overflow-x:hidden!important}.cm-content{white-space:pre-wrap!important;word-break:break-all!important}")
+            if (!autocomplete) append(".cm-tooltip{display:none!important}")
+        }
+        executeJs("""
+            (function(){
+              var s=document.getElementById('__app_style');
+              if(!s){s=document.createElement('style');s.id='__app_style';document.head.appendChild(s);}
+              s.textContent=${'"'}${css}${'"'};
+            })()
+        """.trimIndent())
+
+        // Tab 宽度
+        executeJs("window.editorAPI.setIndentation('Space',$tabSz)")
+    }
+
+    fun applyEditorFont() {
+        val fontUri = settings.editorFontUri
+        if (fontUri.isEmpty()) {
+            executeJs("""
+                (function(){
+                  var s=document.getElementById('__app_font');
+                  if(s) s.remove();
+                  var s2=document.getElementById('__app_font_apply');
+                  if(s2) s2.remove();
+                })()
+            """.trimIndent())
+            return
+        }
+        coroutineScope.launch(Dispatchers.IO) {
+            try {
+                val bytes = context.contentResolver.openInputStream(
+                    android.net.Uri.parse(fontUri)
+                )?.use { it.readBytes() } ?: return@launch
+                val b64 = android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
+                val ext = fontUri.substringAfterLast('.').lowercase()
+                val mime = if (ext == "otf") "font/otf" else "font/ttf"
+                launch(Dispatchers.Main) {
+                    executeJs("""
+                        (function(){
+                          var s=document.getElementById('__app_font');
+                          if(!s){s=document.createElement('style');s.id='__app_font';document.head.appendChild(s);}
+                          s.textContent='@font-face{font-family:"AppCustomFont";src:url("data:$mime;base64,$b64");}';
+                          var s2=document.getElementById('__app_font_apply');
+                          if(!s2){s2=document.createElement('style');s2.id='__app_font_apply';document.head.appendChild(s2);}
+                          s2.textContent='.cm-scroller,.cm-content,.cm-line{font-family:"AppCustomFont",monospace!important}';
+                        })()
+                    """.trimIndent())
+                }
+            } catch (_: Exception) {}
         }
     }
 
@@ -251,13 +320,18 @@ fun EditorScreen(
                     }
                 }
 
-                // 自动嗅探字符编码并转换为字符串，解决 GBK 注释乱码
-                val charset = detectEncoding(bytes)
+                // 根据设置选择编码方式（手动指定或自动嗅探）
+                val charset = when (settings.fileEncoding) {
+                    EncodingMode.UTF8  -> java.nio.charset.StandardCharsets.UTF_8
+                    EncodingMode.GBK   -> java.nio.charset.Charset.forName("GB18030")
+                    EncodingMode.UTF16 -> java.nio.charset.StandardCharsets.UTF_16
+                    EncodingMode.AUTO  -> detectEncoding(bytes)
+                }
                 val text = bytes.toString(charset)
 
                 launch(Dispatchers.Main) {
                     fileContent = text
-                    fileEncoding = charset.name() // 存储解析出来的字符集名称 (如 "UTF-8" 或 "GBK")
+                    fileEncoding = charset.name()
                     isFileLoaded = true
                 }
             } catch (e: Exception) {
@@ -287,11 +361,21 @@ fun EditorScreen(
             executeJs("window.editorAPI.setContentBase64('${fileContent.toBase64()}')")
             executeJs("window.editorAPI.setLanguage('$fileExtension')")
             executeJs("window.editorAPI.setTheme($isDarkTheme)")
+            applyEditorSettings(isDarkTheme)
+            applyEditorFont()
             webViewRef?.postDelayed({
                 webViewRef?.evaluateJavascript(
                     "window.dispatchEvent(new Event('resize'))", null
                 )
             }, 150)
+        }
+    }
+
+    // 设置变化时实时同步到编辑器
+    LaunchedEffect(settings) {
+        if (isEditorReady) {
+            applyEditorSettings(isDarkTheme)
+            applyEditorFont()
         }
     }
 
@@ -337,7 +421,21 @@ fun EditorScreen(
     }
 
     // ─────────────────────────────────────────────────────────
-    // 7. 页面 UI 布局构建
+    // 7. 自动保存定时器
+    // ─────────────────────────────────────────────────────────
+    LaunchedEffect(settings.autoSave, settings.autoSaveInterval) {
+        if (settings.autoSave) {
+            while (true) {
+                kotlinx.coroutines.delay(settings.autoSaveInterval.ms)
+                if (isEditorReady && isFileLoaded) {
+                    saveFile()
+                }
+            }
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // 8. 页面 UI 布局构建
     // ─────────────────────────────────────────────────────────
     Scaffold(
         modifier = Modifier.imePadding(),

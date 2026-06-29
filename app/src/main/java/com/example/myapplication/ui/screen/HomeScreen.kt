@@ -146,6 +146,7 @@ fun HomeScreen(
     selectedTab: Int,
     onTabSelected: (Int) -> Unit,
     selectedProject: Project? = null,
+    settingsViewModel: com.example.myapplication.data.SettingsViewModel? = null,
     onProjectClick: (Project) -> Unit = {},
     onProjectSheetDismiss: () -> Unit = {},
     onOpenFile: (String) -> Unit = {},
@@ -393,9 +394,12 @@ fun HomeScreen(
                 }
             }
             3 -> {
-                SettingsScreen(
-                    modifier = Modifier.padding(innerPadding)
-                )
+                if (settingsViewModel != null) {
+                    SettingsScreen(
+                        viewModel = settingsViewModel,
+                        modifier = Modifier.padding(innerPadding)
+                    )
+                }
             }
         }
     }

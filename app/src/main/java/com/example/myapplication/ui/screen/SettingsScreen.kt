@@ -1,7 +1,12 @@
 package com.example.myapplication.ui.screen
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -14,15 +19,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.myapplication.data.*
 
 // ─────────────────────────────────────────────────────────────────
-// 颜色
+// 固定强调色（主题无关，仅用于图标背景）
 // ─────────────────────────────────────────────────────────────────
-private val CardBg        = Color(0xFF1E2130)
-private val DividerColor  = Color(0xFF2A2D3E)
 private val LabelBlue     = Color(0xFF4D9FFF)
 private val IconBgDefault = Color(0xFF3A3F55)
 private val IconBgGreen   = Color(0xFF153D2E)
@@ -33,55 +38,19 @@ private val IconTintGreen  = Color(0xFF2ECC8E)
 private val IconTintOrange = Color(0xFFE89A3C)
 private val IconTintPurple = Color(0xFFBB86FC)
 private val IconTintRed    = Color(0xFFEF4444)
-private val ValueColor    = Color(0xFF8A8FA8)
-private val ChevronColor  = Color(0xFF555A70)
-
-// ─────────────────────────────────────────────────────────────────
-// 枚举
-// ─────────────────────────────────────────────────────────────────
-private enum class ThemeOption(val label: String) {
-    SYSTEM("跟随系统"), LIGHT("浅色"), DARK("深色")
-}
-private enum class TabWidthOption(val label: String) {
-    TWO("2 个空格"), FOUR("4 个空格"), EIGHT("8 个空格")
-}
-private enum class AutoSaveInterval(val label: String) {
-    S30("30 秒"), MIN1("1 分钟"), MIN3("3 分钟"), MIN5("5 分钟")
-}
-private enum class EncodingOption(val label: String) {
-    AUTO("自动检测"), UTF8("UTF-8"), GBK("GBK / GB18030"), UTF16("UTF-16")
-}
-private enum class TerminalThemeOption(val label: String) {
-    TERMIUS("Termius 深蓝"), DARK("纯黑"), GRAY("深灰")
-}
-private enum class DefaultSortOption(val label: String) {
-    DEFAULT("默认"), NAME_ASC("名称 A→Z"), NAME_DESC("名称 Z→A"), TYPE("按类型")
-}
+private val IconTintDefault = Color(0xFFCCCCCC)
 
 // ─────────────────────────────────────────────────────────────────
 // 主入口
 // ─────────────────────────────────────────────────────────────────
 @Composable
-fun SettingsScreen(modifier: Modifier = Modifier) {
+fun SettingsScreen(
+    viewModel: SettingsViewModel,
+    modifier: Modifier = Modifier
+) {
+    val s = viewModel.settings
+    val context = LocalContext.current
 
-    // 外观
-    var themeOption         by remember { mutableStateOf(ThemeOption.SYSTEM) }
-    // 编辑器
-    var editorFontSize      by remember { mutableStateOf(14f) }
-    var autoComplete        by remember { mutableStateOf(true) }
-    var showLineNumbers     by remember { mutableStateOf(true) }
-    var wordWrap            by remember { mutableStateOf(false) }
-    var tabWidth            by remember { mutableStateOf(TabWidthOption.FOUR) }
-    var autoSave            by remember { mutableStateOf(false) }
-    var autoSaveInterval    by remember { mutableStateOf(AutoSaveInterval.MIN1) }
-    var encoding            by remember { mutableStateOf(EncodingOption.AUTO) }
-    // 终端
-    var terminalFontSize    by remember { mutableStateOf(13f) }
-    var terminalTheme       by remember { mutableStateOf(TerminalThemeOption.TERMIUS) }
-    var keepScreenOn        by remember { mutableStateOf(false) }
-    // 项目
-    var defaultSort         by remember { mutableStateOf(DefaultSortOption.DEFAULT) }
-    var confirmDelete       by remember { mutableStateOf(true) }
     // 弹窗开关
     var showThemeDialog         by remember { mutableStateOf(false) }
     var showTabWidthDialog      by remember { mutableStateOf(false) }
@@ -95,6 +64,46 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
     var showCacheClearedDialog  by remember { mutableStateOf(false) }
     var showUpdateDialog        by remember { mutableStateOf(false) }
     var showLicenseDialog       by remember { mutableStateOf(false) }
+
+    // 字体文件选择器（编辑器）
+    val editorFontLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(
+                    uri,
+                    android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+            }
+            val name = uri.lastPathSegment
+                ?.substringAfterLast('/')
+                ?.substringAfterLast(':')
+                ?.ifBlank { "custom_font" }
+                ?: "custom_font"
+            viewModel.setEditorFont(uri.toString(), name)
+        }
+    }
+
+    // 字体文件选择器（终端）
+    val terminalFontLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(
+                    uri,
+                    android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+            }
+            val name = uri.lastPathSegment
+                ?.substringAfterLast('/')
+                ?.substringAfterLast(':')
+                ?.ifBlank { "custom_font" }
+                ?: "custom_font"
+            viewModel.setTerminalFont(uri.toString(), name)
+        }
+    }
 
     LazyColumn(
         modifier = modifier
@@ -111,7 +120,7 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                     icon = Icons.Filled.Palette,
                     iconBg = IconBgDefault,
                     title = "主题",
-                    value = themeOption.label,
+                    value = s.themeOption.label,
                     isLast = true,
                     onClick = { showThemeDialog = true }
                 )
@@ -127,15 +136,27 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                     icon = Icons.Filled.FormatSize,
                     iconBg = IconBgDefault,
                     title = "字体大小",
-                    value = "${editorFontSize.toInt()} sp",
+                    value = "${s.editorFontSize.toInt()} sp",
                     onClick = { showEditorFontDialog = true }
+                )
+                CardDivider()
+                CardRowClickable(
+                    icon = Icons.Filled.FontDownload,
+                    iconBg = IconBgDefault,
+                    title = "自定义字体",
+                    value = if (s.editorFontName.isNotEmpty()) s.editorFontName else "系统默认",
+                    onClick = { editorFontLauncher.launch(arrayOf("*/*")) },
+                    onLongClick = if (s.editorFontName.isNotEmpty()) {
+                        { viewModel.clearEditorFont() }
+                    } else null,
+                    subtitle = if (s.editorFontName.isNotEmpty()) "长按重置为默认" else ""
                 )
                 CardDivider()
                 CardRowClickable(
                     icon = Icons.Filled.Translate,
                     iconBg = IconBgDefault,
                     title = "文件编码",
-                    value = encoding.label,
+                    value = s.fileEncoding.label,
                     onClick = { showEncodingDialog = true }
                 )
                 CardDivider()
@@ -143,31 +164,31 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                     icon = Icons.Filled.AutoAwesome,
                     iconBg = IconBgDefault,
                     title = "自动补全",
-                    checked = autoComplete,
-                    onCheckedChange = { autoComplete = it }
+                    checked = s.autoComplete,
+                    onCheckedChange = { viewModel.setAutoComplete(it) }
                 )
                 CardDivider()
                 CardRowSwitch(
                     icon = Icons.Filled.FormatListNumbered,
                     iconBg = IconBgDefault,
                     title = "显示行号",
-                    checked = showLineNumbers,
-                    onCheckedChange = { showLineNumbers = it }
+                    checked = s.showLineNumbers,
+                    onCheckedChange = { viewModel.setShowLineNumbers(it) }
                 )
                 CardDivider()
                 CardRowSwitch(
                     icon = Icons.Filled.WrapText,
                     iconBg = IconBgDefault,
                     title = "自动换行",
-                    checked = wordWrap,
-                    onCheckedChange = { wordWrap = it }
+                    checked = s.wordWrap,
+                    onCheckedChange = { viewModel.setWordWrap(it) }
                 )
                 CardDivider()
                 CardRowClickable(
                     icon = Icons.Filled.SpaceBar,
                     iconBg = IconBgDefault,
                     title = "Tab 宽度",
-                    value = tabWidth.label,
+                    value = s.tabWidth.label,
                     onClick = { showTabWidthDialog = true }
                 )
                 CardDivider()
@@ -176,22 +197,20 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                     iconBg = IconBgGreen,
                     iconTint = IconTintGreen,
                     title = "自动保存",
-                    checked = autoSave,
-                    onCheckedChange = { autoSave = it }
+                    checked = s.autoSave,
+                    onCheckedChange = { viewModel.setAutoSave(it) }
                 )
-                if (autoSave) {
+                if (s.autoSave) {
                     CardDivider()
                     CardRowClickable(
                         icon = Icons.Filled.Timer,
                         iconBg = IconBgGreen,
                         iconTint = IconTintGreen,
                         title = "保存间隔",
-                        value = autoSaveInterval.label,
+                        value = s.autoSaveInterval.label,
                         isLast = true,
                         onClick = { showAutoSaveDialog = true }
                     )
-                } else {
-                    // isLast on the switch row when autoSave is off
                 }
             }
             Spacer(Modifier.height(20.dp))
@@ -206,8 +225,21 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                     iconBg = IconBgGreen,
                     iconTint = IconTintGreen,
                     title = "字体大小",
-                    value = "${terminalFontSize.toInt()} sp",
+                    value = "${s.terminalFontSize.toInt()} sp",
                     onClick = { showTerminalFontDialog = true }
+                )
+                CardDivider()
+                CardRowClickable(
+                    icon = Icons.Filled.FontDownload,
+                    iconBg = IconBgGreen,
+                    iconTint = IconTintGreen,
+                    title = "自定义字体",
+                    value = if (s.terminalFontName.isNotEmpty()) s.terminalFontName else "系统默认",
+                    onClick = { terminalFontLauncher.launch(arrayOf("*/*")) },
+                    onLongClick = if (s.terminalFontName.isNotEmpty()) {
+                        { viewModel.clearTerminalFont() }
+                    } else null,
+                    subtitle = if (s.terminalFontName.isNotEmpty()) "长按重置为默认" else ""
                 )
                 CardDivider()
                 CardRowClickable(
@@ -215,7 +247,7 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                     iconBg = IconBgGreen,
                     iconTint = IconTintGreen,
                     title = "配色方案",
-                    value = terminalTheme.label,
+                    value = s.terminalTheme.label,
                     onClick = { showTerminalThemeDialog = true }
                 )
                 CardDivider()
@@ -225,9 +257,9 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                     iconTint = IconTintGreen,
                     title = "屏幕常亮",
                     subtitle = "终端运行时保持屏幕不息屏",
-                    checked = keepScreenOn,
+                    checked = s.keepScreenOn,
                     isLast = true,
-                    onCheckedChange = { keepScreenOn = it }
+                    onCheckedChange = { viewModel.setKeepScreenOn(it) }
                 )
             }
             Spacer(Modifier.height(20.dp))
@@ -242,7 +274,7 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                     iconBg = IconBgOrange,
                     iconTint = IconTintOrange,
                     title = "默认排序",
-                    value = defaultSort.label,
+                    value = s.defaultSort.label,
                     onClick = { showDefaultSortDialog = true }
                 )
                 CardDivider()
@@ -252,9 +284,9 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                     iconTint = IconTintRed,
                     title = "删除前确认",
                     subtitle = "删除项目时弹出确认对话框",
-                    checked = confirmDelete,
+                    checked = s.confirmDelete,
                     isLast = true,
-                    onCheckedChange = { confirmDelete = it }
+                    onCheckedChange = { viewModel.setConfirmDelete(it) }
                 )
             }
             Spacer(Modifier.height(20.dp))
@@ -317,54 +349,43 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
         }
     }
 
-    // ── 清除缓存确认 ──────────────────────────────────────────────
+    // ── 弹窗 ─────────────────────────────────────────────────────
+
     if (showClearCacheDialog) {
         AlertDialog(
             onDismissRequest = { showClearCacheDialog = false },
-            icon = { Icon(Icons.Filled.CleaningServices, contentDescription = null,
-                tint = IconTintRed) },
+            icon = { Icon(Icons.Filled.CleaningServices, contentDescription = null, tint = IconTintRed) },
             title = { Text("清理终端缓存") },
             text = { Text("将清除终端历史记录和临时文件，不会影响已安装的 Debian 环境。") },
             confirmButton = {
-                TextButton(onClick = {
-                    showClearCacheDialog = false
-                    showCacheClearedDialog = true
-                }) { Text("清理", color = IconTintRed) }
+                TextButton(onClick = { showClearCacheDialog = false; showCacheClearedDialog = true }) {
+                    Text("清理", color = IconTintRed)
+                }
             },
-            dismissButton = {
-                TextButton(onClick = { showClearCacheDialog = false }) { Text("取消") }
-            }
+            dismissButton = { TextButton(onClick = { showClearCacheDialog = false }) { Text("取消") } }
         )
     }
 
-    // ── 清理完成提示 ──────────────────────────────────────────────
     if (showCacheClearedDialog) {
         AlertDialog(
             onDismissRequest = { showCacheClearedDialog = false },
-            icon = { Icon(Icons.Filled.CheckCircle, contentDescription = null,
-                tint = IconTintGreen) },
+            icon = { Icon(Icons.Filled.CheckCircle, contentDescription = null, tint = IconTintGreen) },
             title = { Text("清理完成") },
             text = { Text("终端缓存已清除。") },
-            confirmButton = {
-                TextButton(onClick = { showCacheClearedDialog = false }) { Text("好的") }
-            }
+            confirmButton = { TextButton(onClick = { showCacheClearedDialog = false }) { Text("好的") } }
         )
     }
 
-    // ── 检查更新 ──────────────────────────────────────────────────
     if (showUpdateDialog) {
         AlertDialog(
             onDismissRequest = { showUpdateDialog = false },
             icon = { Icon(Icons.Filled.SystemUpdate, contentDescription = null) },
             title = { Text("检查更新") },
             text = { Text("当前已是最新版本 1.0.0") },
-            confirmButton = {
-                TextButton(onClick = { showUpdateDialog = false }) { Text("好的") }
-            }
+            confirmButton = { TextButton(onClick = { showUpdateDialog = false }) { Text("好的") } }
         )
     }
 
-    // ── 开源许可 ──────────────────────────────────────────────────
     if (showLicenseDialog) {
         AlertDialog(
             onDismissRequest = { showLicenseDialog = false },
@@ -381,96 +402,86 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                     lineHeight = 22.sp
                 )
             },
-            confirmButton = {
-                TextButton(onClick = { showLicenseDialog = false }) { Text("关闭") }
-            }
+            confirmButton = { TextButton(onClick = { showLicenseDialog = false }) { Text("关闭") } }
         )
     }
 
-    // ── 主题 ──────────────────────────────────────────────────────
     if (showThemeDialog) {
         SingleChoiceDialog(
             title = "选择主题",
-            options = ThemeOption.entries.map { it.label },
-            selectedIndex = ThemeOption.entries.indexOf(themeOption),
-            onSelect = { themeOption = ThemeOption.entries[it] },
+            options = ThemeMode.entries.map { it.label },
+            selectedIndex = ThemeMode.entries.indexOf(s.themeOption),
+            onSelect = { viewModel.setThemeOption(ThemeMode.entries[it]) },
             onDismiss = { showThemeDialog = false }
         )
     }
 
-    // ── Tab 宽度 ──────────────────────────────────────────────────
     if (showTabWidthDialog) {
         SingleChoiceDialog(
             title = "Tab 宽度",
-            options = TabWidthOption.entries.map { it.label },
-            selectedIndex = TabWidthOption.entries.indexOf(tabWidth),
-            onSelect = { tabWidth = TabWidthOption.entries[it] },
+            options = TabWidthMode.entries.map { it.label },
+            selectedIndex = TabWidthMode.entries.indexOf(s.tabWidth),
+            onSelect = { viewModel.setTabWidth(TabWidthMode.entries[it]) },
             onDismiss = { showTabWidthDialog = false }
         )
     }
 
-    // ── 文件编码 ──────────────────────────────────────────────────
     if (showEncodingDialog) {
         SingleChoiceDialog(
             title = "文件编码",
-            options = EncodingOption.entries.map { it.label },
-            selectedIndex = EncodingOption.entries.indexOf(encoding),
-            onSelect = { encoding = EncodingOption.entries[it] },
+            options = EncodingMode.entries.map { it.label },
+            selectedIndex = EncodingMode.entries.indexOf(s.fileEncoding),
+            onSelect = { viewModel.setFileEncoding(EncodingMode.entries[it]) },
             onDismiss = { showEncodingDialog = false }
         )
     }
 
-    // ── 自动保存间隔 ──────────────────────────────────────────────
     if (showAutoSaveDialog) {
         SingleChoiceDialog(
             title = "自动保存间隔",
-            options = AutoSaveInterval.entries.map { it.label },
-            selectedIndex = AutoSaveInterval.entries.indexOf(autoSaveInterval),
-            onSelect = { autoSaveInterval = AutoSaveInterval.entries[it] },
+            options = AutoSaveMode.entries.map { it.label },
+            selectedIndex = AutoSaveMode.entries.indexOf(s.autoSaveInterval),
+            onSelect = { viewModel.setAutoSaveInterval(AutoSaveMode.entries[it]) },
             onDismiss = { showAutoSaveDialog = false }
         )
     }
 
-    // ── 终端配色 ──────────────────────────────────────────────────
     if (showTerminalThemeDialog) {
         SingleChoiceDialog(
             title = "终端配色方案",
-            options = TerminalThemeOption.entries.map { it.label },
-            selectedIndex = TerminalThemeOption.entries.indexOf(terminalTheme),
-            onSelect = { terminalTheme = TerminalThemeOption.entries[it] },
+            options = TerminalThemeMode.entries.map { it.label },
+            selectedIndex = TerminalThemeMode.entries.indexOf(s.terminalTheme),
+            onSelect = { viewModel.setTerminalTheme(TerminalThemeMode.entries[it]) },
             onDismiss = { showTerminalThemeDialog = false }
         )
     }
 
-    // ── 默认排序 ──────────────────────────────────────────────────
     if (showDefaultSortDialog) {
         SingleChoiceDialog(
             title = "默认排序方式",
-            options = DefaultSortOption.entries.map { it.label },
-            selectedIndex = DefaultSortOption.entries.indexOf(defaultSort),
-            onSelect = { defaultSort = DefaultSortOption.entries[it] },
+            options = SortMode.entries.map { it.label },
+            selectedIndex = SortMode.entries.indexOf(s.defaultSort),
+            onSelect = { viewModel.setDefaultSort(SortMode.entries[it]) },
             onDismiss = { showDefaultSortDialog = false }
         )
     }
 
-    // ── 编辑器字体 ────────────────────────────────────────────────
     if (showEditorFontDialog) {
         FontSizeDialog(
             title = "编辑器字体大小",
-            value = editorFontSize,
+            value = s.editorFontSize,
             range = 10f..24f,
-            onConfirm = { editorFontSize = it },
+            onConfirm = { viewModel.setEditorFontSize(it) },
             onDismiss = { showEditorFontDialog = false }
         )
     }
 
-    // ── 终端字体 ──────────────────────────────────────────────────
     if (showTerminalFontDialog) {
         FontSizeDialog(
             title = "终端字体大小",
-            value = terminalFontSize,
+            value = s.terminalFontSize,
             range = 10f..24f,
-            onConfirm = { terminalFontSize = it },
+            onConfirm = { viewModel.setTerminalFontSize(it) },
             onDismiss = { showTerminalFontDialog = false }
         )
     }
@@ -491,13 +502,13 @@ private fun SectionLabel(text: String) {
 }
 
 // ─────────────────────────────────────────────────────────────────
-// 圆角卡片容器
+// 圆角卡片容器（主题自适应）
 // ─────────────────────────────────────────────────────────────────
 @Composable
 private fun SettingsCard(content: @Composable ColumnScope.() -> Unit) {
     Surface(
         shape = RoundedCornerShape(14.dp),
-        color = CardBg,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(content = content)
@@ -511,22 +522,25 @@ private fun SettingsCard(content: @Composable ColumnScope.() -> Unit) {
 private fun CardDivider() {
     HorizontalDivider(
         modifier = Modifier.padding(start = 56.dp),
-        color = DividerColor
+        color = MaterialTheme.colorScheme.outlineVariant
     )
 }
 
 // ─────────────────────────────────────────────────────────────────
-// 可点击行（右侧值 + 箭头）
+// 可点击行（支持长按）
 // ─────────────────────────────────────────────────────────────────
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun CardRowClickable(
     icon: ImageVector,
     iconBg: Color,
-    iconTint: Color = Color(0xFFCCCCCC),
+    iconTint: Color = IconTintDefault,
     title: String,
     value: String,
+    subtitle: String = "",
     isLast: Boolean = false,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onLongClick: (() -> Unit)? = null,
 ) {
     val shape = if (isLast)
         RoundedCornerShape(bottomStart = 14.dp, bottomEnd = 14.dp)
@@ -536,31 +550,46 @@ private fun CardRowClickable(
         modifier = Modifier
             .fillMaxWidth()
             .clip(shape)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 14.dp),
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick
+            )
+            .padding(horizontal = 16.dp, vertical = if (subtitle.isNotEmpty()) 10.dp else 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         IconBox(icon, iconBg, iconTint)
         Spacer(Modifier.width(14.dp))
-        Text(title, style = MaterialTheme.typography.bodyLarge, color = Color.White,
-            modifier = Modifier.weight(1f))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(title,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface)
+            if (subtitle.isNotEmpty()) {
+                Text(subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
         if (value.isNotEmpty()) {
-            Text(value, style = MaterialTheme.typography.bodyMedium, color = ValueColor)
+            Text(value,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1)
             Spacer(Modifier.width(4.dp))
         }
         Icon(Icons.Filled.ChevronRight, contentDescription = null,
-            tint = ChevronColor, modifier = Modifier.size(20.dp))
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(20.dp))
     }
 }
 
 // ─────────────────────────────────────────────────────────────────
-// 只读信息行（右侧 badge 文字，无箭头）
+// 只读信息行
 // ─────────────────────────────────────────────────────────────────
 @Composable
 private fun CardRowInfo(
     icon: ImageVector,
     iconBg: Color,
-    iconTint: Color = Color(0xFFCCCCCC),
+    iconTint: Color = IconTintDefault,
     title: String,
     badge: String
 ) {
@@ -572,9 +601,13 @@ private fun CardRowInfo(
     ) {
         IconBox(icon, iconBg, iconTint)
         Spacer(Modifier.width(14.dp))
-        Text(title, style = MaterialTheme.typography.bodyLarge, color = Color.White,
+        Text(title,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.weight(1f))
-        Text(badge, style = MaterialTheme.typography.bodyMedium, color = ValueColor)
+        Text(badge,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -585,7 +618,7 @@ private fun CardRowInfo(
 private fun CardRowSwitch(
     icon: ImageVector,
     iconBg: Color,
-    iconTint: Color = Color(0xFFCCCCCC),
+    iconTint: Color = IconTintDefault,
     title: String,
     subtitle: String = "",
     checked: Boolean,
@@ -607,9 +640,13 @@ private fun CardRowSwitch(
         IconBox(icon, iconBg, iconTint)
         Spacer(Modifier.width(14.dp))
         Column(modifier = Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.bodyLarge, color = Color.White)
+            Text(title,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface)
             if (subtitle.isNotEmpty()) {
-                Text(subtitle, style = MaterialTheme.typography.bodySmall, color = ValueColor)
+                Text(subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
         Switch(checked = checked, onCheckedChange = onCheckedChange,
@@ -618,7 +655,7 @@ private fun CardRowSwitch(
 }
 
 // ─────────────────────────────────────────────────────────────────
-// 图标盒子（圆角正方形）
+// 图标盒子
 // ─────────────────────────────────────────────────────────────────
 @Composable
 private fun IconBox(icon: ImageVector, bg: Color, tint: Color) {
@@ -668,9 +705,7 @@ private fun SingleChoiceDialog(
                 }
             }
         },
-        confirmButton = {
-            TextButton(onClick = onDismiss) { Text("取消") }
-        }
+        confirmButton = { TextButton(onClick = onDismiss) { Text("取消") } }
     )
 }
 
@@ -708,9 +743,11 @@ private fun FontSizeDialog(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text("${range.start.toInt()} sp", style = MaterialTheme.typography.labelSmall,
+                    Text("${range.start.toInt()} sp",
+                        style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text("${range.endInclusive.toInt()} sp", style = MaterialTheme.typography.labelSmall,
+                    Text("${range.endInclusive.toInt()} sp",
+                        style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
@@ -718,8 +755,7 @@ private fun FontSizeDialog(
         confirmButton = {
             TextButton(onClick = { onConfirm(current); onDismiss() }) { Text("确定") }
         },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("取消") }
-        }
+        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } }
     )
 }
+

@@ -285,11 +285,41 @@
 
     // ── Settings ────────────────────────────────────────────────
     window.setFontSize = function(size) {
+      FONT_SIZE = size;
       term.options.fontSize = size;
       doFit();
     };
     window.setTheme = function(bg, fg) {
+      document.body.style.background = bg;
+      document.getElementById('terminal').style.background = bg;
       term.options.theme = Object.assign({}, term.options.theme, { background: bg, foreground: fg });
+    };
+    window.setFontFamily = function(mime, base64) {
+      // 清除旧的自定义字体
+      var old = document.getElementById('__custom_font_style');
+      if (old) old.remove();
+      var old2 = document.getElementById('__custom_font_apply');
+      if (old2) old2.remove();
+
+      if (!mime || !base64) {
+        // 重置为默认字体
+        term.options.fontFamily = FONT_FAMILY;
+        doFit();
+        return;
+      }
+
+      var s = document.createElement('style');
+      s.id = '__custom_font_style';
+      s.textContent = '@font-face{font-family:"TermCustomFont";src:url("data:' + mime + ';base64,' + base64 + '");}';
+      document.head.appendChild(s);
+
+      var s2 = document.createElement('style');
+      s2.id = '__custom_font_apply';
+      s2.textContent = '.xterm-rows span,.xterm-rows,.xterm-screen{font-family:"TermCustomFont",monospace!important}';
+      document.head.appendChild(s2);
+
+      term.options.fontFamily = '"TermCustomFont", monospace';
+      doFit();
     };
     window.clearTerminal = function() { term.clear(); };
 
