@@ -175,41 +175,14 @@ fun TerminalScreen(
                             settings.allowFileAccess = true
                             settings.allowFileAccessFromFileURLs = true
                             settings.allowUniversalAccessFromFileURLs = true
-                            setLayerType(android.view.View.LAYER_TYPE_SOFTWARE, null)
 
                             webChromeClient = object : android.webkit.WebChromeClient() {
                                 override fun onConsoleMessage(consoleMessage: android.webkit.ConsoleMessage): Boolean {
                                     android.util.Log.d(
                                         "TerminalScreen",
-                                        "WebView console: ${consoleMessage.message()} (${consoleMessage.sourceId()}:${consoleMessage.lineNumber()})"
+                                        "WV: ${consoleMessage.message()}"
                                     )
                                     return true
-                                }
-                            }
-
-                            webViewClient = object : WebViewClient() {
-                                override fun onPageFinished(view: WebView?, url: String?) {
-                                    super.onPageFinished(view, url)
-                                    Log.d("TerminalScreen", "WebView page finished: $url")
-                                    pageReady = true
-                                }
-
-                                override fun onReceivedError(
-                                    view: WebView,
-                                    request: WebResourceRequest,
-                                    error: android.webkit.WebResourceError
-                                ) {
-                                    super.onReceivedError(view, request, error)
-                                    Log.e("TerminalScreen", "WebView error: ${error.description} url=${request.url}")
-                                }
-
-                                override fun onReceivedHttpError(
-                                    view: WebView,
-                                    request: WebResourceRequest,
-                                    errorResponse: WebResourceResponse
-                                ) {
-                                    super.onReceivedHttpError(view, request, errorResponse)
-                                    Log.e("TerminalScreen", "HTTP error: ${errorResponse.statusCode} ${errorResponse.reasonPhrase} url=${request.url}")
                                 }
                             }
 
@@ -222,11 +195,9 @@ fun TerminalScreen(
                             )
 
                             val assetLoader = WebViewAssetLoader.Builder()
-                                .addPathHandler(
-                                    "/assets/",
-                                    WebViewAssetLoader.AssetsPathHandler(ctx)
-                                )
+                                .addPathHandler("/assets/", WebViewAssetLoader.AssetsPathHandler(ctx))
                                 .build()
+
                             webViewClient = object : WebViewClient() {
                                 override fun shouldInterceptRequest(
                                     view: WebView,
@@ -236,8 +207,17 @@ fun TerminalScreen(
 
                                 override fun onPageFinished(view: WebView?, url: String?) {
                                     super.onPageFinished(view, url)
-                                    Log.d("TerminalScreen", "WebView page finished: $url")
+                                    Log.d("TerminalScreen", "page finished: $url w=${view?.width} h=${view?.height}")
                                     pageReady = true
+                                    view?.let { wv ->
+                                        val density = ctx.resources.displayMetrics.density
+                                        val cssW = wv.width  / density
+                                        val cssH = wv.height / density
+                                        Log.d("TerminalScreen", "passing to JS: cssW=$cssW cssH=$cssH density=$density")
+                                        wv.evaluateJavascript(
+                                            "if(window.setViewportSize) window.setViewportSize($cssW,$cssH)", null
+                                        )
+                                    }
                                 }
 
                                 override fun onReceivedError(
@@ -255,7 +235,20 @@ fun TerminalScreen(
                                     errorResponse: WebResourceResponse
                                 ) {
                                     super.onReceivedHttpError(view, request, errorResponse)
-                                    Log.e("TerminalScreen", "HTTP error: ${errorResponse.statusCode} ${errorResponse.reasonPhrase} url=${request.url}")
+                                    Log.e("TerminalScreen", "HTTP error: ${errorResponse.statusCode} url=${request.url}")
+                                }
+                            }
+
+                            // Re-pass exact dimensions whenever the WebView is resized
+                            // (e.g. keyboard appears/hides, orientation change)
+                            viewTreeObserver.addOnGlobalLayoutListener {
+                                val density = ctx.resources.displayMetrics.density
+                                val cssW = this.width  / density
+                                val cssH = this.height / density
+                                if (cssW > 0f && cssH > 0f) {
+                                    evaluateJavascript(
+                                        "if(window.setViewportSize) window.setViewportSize($cssW,$cssH)", null
+                                    )
                                 }
                             }
 
