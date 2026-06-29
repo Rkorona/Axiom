@@ -2,19 +2,28 @@
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
-    viewportWidth="108"
-    viewportHeight="108">
-    
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Inner card: rounded rect from (24,24) to (84,84) rx=14 -->
     <path
+        android:fillColor="#222E35"
+        android:pathData="M38,24 L70,24 A14,14 0 0 1 84,38 L84,70 A14,14 0 0 1 70,84 L38,84 A14,14 0 0 1 24,70 L24,38 A14,14 0 0 1 38,24 Z" />
+
+    <!-- Chevron ">" mint/teal -->
+    <path
+        android:fillColor="#00000000"
         android:strokeColor="#A3EDDE"
-        android:strokeWidth="7"
+        android:strokeWidth="6"
         android:strokeLineCap="round"
         android:strokeLineJoin="round"
-        android:pathData="M 38,36 L 56,54 L 38,72" />
+        android:pathData="M42,42 L56,54 L42,66" />
 
+    <!-- Cursor dash blue -->
     <path
+        android:fillColor="#00000000"
         android:strokeColor="#A8C7FA"
-        android:strokeWidth="7"
+        android:strokeWidth="6"
         android:strokeLineCap="round"
-        android:pathData="M 62,72 H 76" />
+        android:pathData="M60,66 H72" />
 </vector>
