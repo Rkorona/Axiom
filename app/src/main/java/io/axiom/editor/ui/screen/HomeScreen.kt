@@ -1,11 +1,9 @@
 package io.axiom.editor.ui.screen
 
-import androidx.compose.animation.AnimatedVisibility
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
@@ -19,6 +17,8 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
@@ -31,7 +31,6 @@ import androidx.compose.ui.Alignment
 import kotlinx.coroutines.delay
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Outline
@@ -181,8 +180,8 @@ fun HomeScreen(
     // ── AddProject sheet 状态 ──
     var showAddSheet by remember { mutableStateOf(false) }
 
-    // ── 长按选中状态 ──
-    var longPressedProjectId by remember { mutableStateOf<String?>(null) }
+    // ── 多选状态：长按进入多选，选中态下点击其他条目可继续勾选/取消 ──
+    var selectedProjectIds by remember { mutableStateOf<Set<String>>(emptySet()) }
 
     // ── 编辑对话框状态 ──
     var editingProject by remember { mutableStateOf<Project?>(null) }
@@ -209,18 +208,51 @@ fun HomeScreen(
         filterAndSortProjects(projects, searchQuery, sortOrder)
     }
 
+    // ── 选中模式下，系统返回键优先退出选中态 ──
+    BackHandler(enabled = selectedProjectIds.isNotEmpty()) {
+        selectedProjectIds = emptySet()
+    }
+
     Scaffold(
         topBar = {
-            AppTopBar(
-                selectedTab = selectedTab,
-                sortOrder = sortOrder,
-                onSortOrderChange = { sortOrder = it },
-                isSearchActive = isSearchActive,
-                onSearchActiveChange = { isSearchActive = it },
-                searchQuery = searchQuery,
-                onSearchQueryChange = { searchQuery = it },
-                isScrolled = isScrolled
-            )
+            Crossfade(
+                targetState = selectedTab == 0 && selectedProjectIds.isNotEmpty(),
+                animationSpec = tween(180)
+            ) { inSelectionMode ->
+                if (inSelectionMode) {
+                    val selectedProjects = projects.filter { it.id in selectedProjectIds }
+                    SelectionTopBar(
+                        selectedCount = selectedProjects.size,
+                        onClose = { selectedProjectIds = emptySet() },
+                        onEditClick = {
+                            selectedProjects.singleOrNull()?.let { editingProject = it }
+                        },
+                        onNewClick = {
+                            selectedProjectIds = emptySet()
+                            showAddSheet = true
+                        },
+                        onCopyClick = {
+                            selectedProjectIds = emptySet()
+                            selectedProjects.forEach { onCopyProject(it) }
+                        },
+                        onDeleteClick = {
+                            selectedProjectIds = emptySet()
+                            selectedProjects.forEach { onDeleteProject(it) }
+                        }
+                    )
+                } else {
+                    AppTopBar(
+                        selectedTab = selectedTab,
+                        sortOrder = sortOrder,
+                        onSortOrderChange = { sortOrder = it },
+                        isSearchActive = isSearchActive,
+                        onSearchActiveChange = { isSearchActive = it },
+                        searchQuery = searchQuery,
+                        onSearchQueryChange = { searchQuery = it },
+                        isScrolled = isScrolled
+                    )
+                }
+            }
         },
         floatingActionButton = {
             if (selectedTab == 0) {
@@ -255,29 +287,14 @@ fun HomeScreen(
                     searchQuery = searchQuery,
                     sortOrder = sortOrder,
                     isSearchActive = isSearchActive,
-                    onProjectClick = { project ->
-                        if (longPressedProjectId != null) {
-                            longPressedProjectId = null
-                        } else {
-                            onProjectClick(project)
-                        }
-                    },
+                    onProjectClick = onProjectClick,
                     onTerminalClick = onTerminalClick,
-                    longPressedProjectId = longPressedProjectId,
-                    onLongPress = { project -> longPressedProjectId = project.id },
-                    onCancelLongPress = { longPressedProjectId = null },
-                    onEditProject = { project -> editingProject = project },
-                    onDeleteProject = { project ->
-                        longPressedProjectId = null
-                        onDeleteProject(project)
-                    },
-                    onCopyProject = { project ->
-                        longPressedProjectId = null
-                        onCopyProject(project)
-                    },
-                    onNewProject = {
-                        longPressedProjectId = null
-                        showAddSheet = true
+                    selectedProjectIds = selectedProjectIds,
+                    onToggleSelect = { project ->
+                        selectedProjectIds = if (project.id in selectedProjectIds)
+                            selectedProjectIds - project.id
+                        else
+                            selectedProjectIds + project.id
                     },
                     listState = listState,
                     modifier = Modifier.padding(innerPadding)
@@ -327,7 +344,7 @@ fun HomeScreen(
             onConfirm = { newName ->
                 onEditProject(editingProject!!, newName)
                 editingProject = null
-                longPressedProjectId = null
+                selectedProjectIds = emptySet()
             },
             onDismiss = {
                 editingProject = null
@@ -427,6 +444,130 @@ fun EditProjectDialog(
 }
 
 // ─────────────────────────────────────────────
+// 选中态顶栏（长按选中项目后，替代默认 AppTopBar）
+// 参考 Termius 的选中态设计：关闭 + 已选数量 + 编辑 + 更多
+// ─────────────────────────────────────────────
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SelectionTopBar(
+    selectedCount: Int,
+    onClose: () -> Unit,
+    onEditClick: () -> Unit,
+    onNewClick: () -> Unit,
+    onCopyClick: () -> Unit,
+    onDeleteClick: () -> Unit
+) {
+    var menuExpanded by remember { mutableStateOf(false) }
+
+    Column {
+        TopAppBar(
+            title = {
+                Text(
+                    text = "已选择 $selectedCount 项",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            },
+            navigationIcon = {
+                IconButton(onClick = onClose) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "取消选择"
+                    )
+                }
+            },
+            actions = {
+                if (selectedCount == 1) {
+                    IconButton(onClick = onEditClick) {
+                        Icon(
+                            imageVector = Icons.Default.Edit,
+                            contentDescription = "重命名"
+                        )
+                    }
+                }
+                Box {
+                    IconButton(onClick = { menuExpanded = true }) {
+                        Icon(
+                            imageVector = Icons.Default.MoreVert,
+                            contentDescription = "更多操作"
+                        )
+                    }
+                    DropdownMenu(
+                        expanded = menuExpanded,
+                        onDismissRequest = { menuExpanded = false },
+                        shape = RoundedCornerShape(14.dp),
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        tonalElevation = 0.dp,
+                        shadowElevation = 6.dp
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("全新", fontWeight = FontWeight.Medium) },
+                            onClick = {
+                                menuExpanded = false
+                                onNewClick()
+                            },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Default.NoteAdd,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp),
+                                    tint = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("复制", fontWeight = FontWeight.Medium) },
+                            onClick = {
+                                menuExpanded = false
+                                onCopyClick()
+                            },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Default.ContentCopy,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp),
+                                    tint = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                        )
+                        HorizontalDivider(
+                            modifier = Modifier.padding(horizontal = 8.dp),
+                            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
+                        )
+                        DropdownMenuItem(
+                            text = { Text("删除", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Medium) },
+                            onClick = {
+                                menuExpanded = false
+                                onDeleteClick()
+                            },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Default.Delete,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp),
+                                    tint = MaterialTheme.colorScheme.error
+                                )
+                            }
+                        )
+                    }
+                }
+            },
+            colors = TopAppBarDefaults.topAppBarColors(
+                containerColor = MaterialTheme.colorScheme.surface,
+                titleContentColor = MaterialTheme.colorScheme.onSurface,
+                navigationIconContentColor = MaterialTheme.colorScheme.onSurface,
+                actionIconContentColor = MaterialTheme.colorScheme.onSurface
+            )
+        )
+        HorizontalDivider(
+            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+            thickness = 1.dp
+        )
+    }
+}
+
+// ─────────────────────────────────────────────
 // 项目列表
 // ─────────────────────────────────────────────
 @Composable
@@ -438,15 +579,11 @@ fun ProjectList(
     searchQuery: String = "",
     sortOrder: ProjectSortOrder = ProjectSortOrder.DEFAULT,
     isSearchActive: Boolean = false,
-    longPressedProjectId: String? = null,
-    onLongPress: (Project) -> Unit = {},
-    onCancelLongPress: () -> Unit = {},
-    onEditProject: (Project) -> Unit = {},
-    onDeleteProject: (Project) -> Unit = {},
-    onCopyProject: (Project) -> Unit = {},
-    onNewProject: () -> Unit = {},
+    selectedProjectIds: Set<String> = emptySet(),
+    onToggleSelect: (Project) -> Unit = {},
     listState: LazyListState = rememberLazyListState()
 ) {
+    val isSelectionActive = selectedProjectIds.isNotEmpty()
     LazyColumn(
         state = listState,
         modifier = modifier.fillMaxSize(),
@@ -541,17 +678,13 @@ fun ProjectList(
             }
         } else {
             items(projects, key = { it.id }) { project ->
-                val isLongPressed = longPressedProjectId == project.id
+                val isSelected = project.id in selectedProjectIds
                 ProjectCard(
                     project = project,
-                    isLongPressed = isLongPressed,
+                    isSelected = isSelected,
+                    isSelectionActive = isSelectionActive,
                     onClick = { onProjectClick(project) },
-                    onLongPress = { onLongPress(project) },
-                    onCancelLongPress = onCancelLongPress,
-                    onEditClick = { onEditProject(project) },
-                    onDeleteClick = { onDeleteProject(project) },
-                    onCopyClick = { onCopyProject(project) },
-                    onNewClick = onNewProject
+                    onToggleSelect = { onToggleSelect(project) }
                 )
             }
         }
@@ -581,13 +714,9 @@ fun ProjectCard(
     project: Project,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    isLongPressed: Boolean = false,
-    onLongPress: () -> Unit = {},
-    onCancelLongPress: () -> Unit = {},
-    onEditClick: () -> Unit = {},
-    onDeleteClick: () -> Unit = {},
-    onCopyClick: () -> Unit = {},
-    onNewClick: () -> Unit = {}
+    isSelected: Boolean = false,
+    isSelectionActive: Boolean = false,
+    onToggleSelect: () -> Unit = {}
 ) {
     var tickMs by remember { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(Unit) {
@@ -597,202 +726,82 @@ fun ProjectCard(
         }
     }
 
-    var menuExpanded by remember { mutableStateOf(false) }
+    val containerColor by animateColorAsState(
+        targetValue = if (isSelected)
+            MaterialTheme.colorScheme.primary.copy(alpha = 0.09f)
+        else
+            MaterialTheme.colorScheme.surfaceContainerLow,
+        animationSpec = tween(180)
+    )
 
-    Column(modifier = modifier.fillMaxWidth()) {
-        // ── 长按操作栏（编辑 + 菜单）──
-        AnimatedVisibility(
-            visible = isLongPressed,
-            enter = expandVertically(
-                expandFrom = Alignment.Bottom,
-                animationSpec = tween(200)
-            ) + fadeIn(animationSpec = tween(150)),
-            exit = shrinkVertically(
-                shrinkTowards = Alignment.Bottom,
-                animationSpec = tween(180)
-            ) + fadeOut(animationSpec = tween(120))
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 4.dp, vertical = 4.dp),
-                horizontalArrangement = Arrangement.End,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // 编辑按钮
-                Surface(
-                    onClick = onEditClick,
-                    shape = RoundedCornerShape(10.dp),
-                    color = MaterialTheme.colorScheme.primaryContainer,
-                    modifier = Modifier.shadow(2.dp, RoundedCornerShape(10.dp))
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Edit,
-                            contentDescription = "编辑",
-                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Text(
-                            text = "编辑",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer,
-                            fontWeight = FontWeight.SemiBold
-                        )
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .pointerInput(isSelectionActive) {
+                detectTapGestures(
+                    onTap = {
+                        // 选中态下，点击任意条目都是勾选/取消勾选，可同时多选
+                        if (isSelectionActive) onToggleSelect() else onClick()
+                    },
+                    onLongPress = {
+                        if (!isSelectionActive) onToggleSelect()
                     }
-                }
-
-                Spacer(modifier = Modifier.width(8.dp))
-
-                // 菜单按钮（含下拉菜单）
-                Box {
-                    Surface(
-                        onClick = { menuExpanded = true },
-                        shape = RoundedCornerShape(10.dp),
-                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                        modifier = Modifier.shadow(2.dp, RoundedCornerShape(10.dp))
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.MoreVert,
-                                contentDescription = "更多",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Text(
-                                text = "菜单",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                        }
-                    }
-
-                    DropdownMenu(
-                        expanded = menuExpanded,
-                        onDismissRequest = { menuExpanded = false },
-                        shape = RoundedCornerShape(14.dp),
-                        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                        tonalElevation = 0.dp,
-                        shadowElevation = 6.dp
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text("全新", fontWeight = FontWeight.Medium) },
-                            onClick = {
-                                menuExpanded = false
-                                onNewClick()
-                            },
-                            leadingIcon = {
-                                Icon(
-                                    imageVector = Icons.Default.NoteAdd,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(18.dp),
-                                    tint = MaterialTheme.colorScheme.onSurface
-                                )
-                            }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("复制", fontWeight = FontWeight.Medium) },
-                            onClick = {
-                                menuExpanded = false
-                                onCopyClick()
-                            },
-                            leadingIcon = {
-                                Icon(
-                                    imageVector = Icons.Default.ContentCopy,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(18.dp),
-                                    tint = MaterialTheme.colorScheme.onSurface
-                                )
-                            }
-                        )
-                        HorizontalDivider(
-                            modifier = Modifier.padding(horizontal = 8.dp),
-                            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
-                        )
-                        DropdownMenuItem(
-                            text = { Text("删除", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Medium) },
-                            onClick = {
-                                menuExpanded = false
-                                onDeleteClick()
-                            },
-                            leadingIcon = {
-                                Icon(
-                                    imageVector = Icons.Default.Delete,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(18.dp),
-                                    tint = MaterialTheme.colorScheme.error
-                                )
-                            }
-                        )
-                    }
-                }
-            }
-        }
-
-        // ── 卡片本体 ──
-        Card(
+                )
+            },
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = containerColor),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+    ) {
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .pointerInput(isLongPressed) {
-                    detectTapGestures(
-                        onTap = {
-                            if (isLongPressed) onCancelLongPress() else onClick()
-                        },
-                        onLongPress = {
-                            if (!isLongPressed) onLongPress()
-                        }
-                    )
-                },
-            shape = RoundedCornerShape(12.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = if (isLongPressed)
-                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
-                else
-                    MaterialTheme.colorScheme.surfaceContainerLow
-            ),
-            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 14.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                LanguageIcon(language = project.language)
-                Spacer(modifier = Modifier.width(14.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+            Crossfade(targetState = isSelected, animationSpec = tween(150)) { selected ->
+                if (selected) {
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primary),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            text = project.name,
-                            style = MaterialTheme.typography.bodyLarge,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f, fill = false)
+                        Icon(
+                            imageVector = Icons.Default.Check,
+                            contentDescription = "已选中",
+                            tint = MaterialTheme.colorScheme.onPrimary,
+                            modifier = Modifier.size(22.dp)
                         )
-                        InlineTypeBadge(type = project.type)
                     }
-                    Spacer(modifier = Modifier.height(3.dp))
-                    Text(
-                        text = formatRelativeTime(project.lastModified, tickMs),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1
-                    )
+                } else {
+                    LanguageIcon(language = project.language)
                 }
+            }
+            Spacer(modifier = Modifier.width(14.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text(
+                        text = project.name,
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
+                    InlineTypeBadge(type = project.type)
+                }
+                Spacer(modifier = Modifier.height(3.dp))
+                Text(
+                    text = formatRelativeTime(project.lastModified, tickMs),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1
+                )
             }
         }
     }
