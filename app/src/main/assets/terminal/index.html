@@ -145,6 +145,14 @@
       var iw2 = Math.floor(w);
       var ih2 = Math.floor(h);
       if (iw2 <= 0 || ih2 <= 0) return;
+
+      // Skip no-op calls. During the IME show/hide slide animation, Android's
+      // OnGlobalLayoutListener can fire 50+ times in ~250ms, often repeating the
+      // same (stale) size before the real one comes through. Re-running fit()
+      // for identical dimensions is pure churn and was adding noise that made
+      // the real resize harder to reason about.
+      if (iw2 === _kotlinCssW && ih2 === _kotlinCssH) return;
+
       _kotlinCssW = iw2;
       _kotlinCssH = ih2;
       console.log('setViewportSize: w=' + iw2 + ' h=' + ih2);
@@ -157,15 +165,15 @@
       termEl.style.width  = iw2 + 'px';
       termEl.style.height = ih2 + 'px';
 
-      var c   = measureCell(term.options.fontSize, term.options.fontFamily, term.options.lineHeight);
-      var cw  = (c.w > 0) ? c.w : cellW;
-      var ch  = (c.h > 0) ? c.h : cellH;
-      var cols2 = Math.max(2, Math.floor(iw2 / cw));
-      var rows2 = Math.max(1, Math.floor(ih2 / ch));
-      console.log('setViewportSize → cols=' + cols2 + ' rows=' + rows2);
-      if (term.cols !== cols2 || term.rows !== rows2) {
-        term.resize(cols2, rows2);
-      }
+      // Use FitAddon's own measurement instead of the hand-rolled offscreen-span
+      // probe. measureCell() estimates ~14.6px/row via CSS line-height on a <span>,
+      // but xterm's real renderer comes out closer to fontSize*lineHeight (~16.25px).
+      // That ~10% gap is invisible when there's slack space, but at a tight
+      // keyboard-up height it overshoots the row count by 1-2 rows, and the bottom
+      // row (the newest output / prompt) gets clipped by #terminal's overflow:hidden
+      // — no amount of scrollToBottom() can fix a row that doesn't physically fit.
+      fitAddon.fit();
+      console.log('setViewportSize → cols=' + term.cols + ' rows=' + term.rows);
       try { Android.onResize(term.rows, term.cols); } catch(e) {}
       scheduleScrollToBottom();
     };
@@ -182,15 +190,8 @@
       termEl.style.width  = iw2 + 'px';
       termEl.style.height = ih2 + 'px';
 
-      var c   = measureCell(term.options.fontSize, term.options.fontFamily, term.options.lineHeight);
-      var cw  = (c.w > 0) ? c.w : cellW;
-      var ch  = (c.h > 0) ? c.h : cellH;
-      var cols2 = Math.max(2, Math.floor(iw2 / cw));
-      var rows2 = Math.max(1, Math.floor(ih2 / ch));
-      console.log('doFit: rows=' + rows2 + ' cols=' + cols2 + ' ih=' + ih2);
-      if (term.rows !== rows2 || term.cols !== cols2) {
-        term.resize(cols2, rows2);
-      }
+      fitAddon.fit();
+      console.log('doFit: rows=' + term.rows + ' cols=' + term.cols + ' ih=' + ih2);
       try { Android.onResize(term.rows, term.cols); } catch(e) {}
       scheduleScrollToBottom();
     }
