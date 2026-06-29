@@ -160,7 +160,7 @@ static void configure_termios_raw(struct termios *t) {
  *   int[] forkExecPty(String[] cmd, String[] env, String workDir)
  */
 JNIEXPORT jintArray JNICALL
-Java_com_example_myapplication_utils_PtyProcess_forkExecPty(
+Java_io_axiom_editor_utils_PtyProcess_forkExecPty(
     JNIEnv *env, jclass clazz,
     jobjectArray cmdArray,
     jobjectArray envArray,
@@ -261,7 +261,7 @@ cleanup:
  *   void resizePty(int fd, int rows, int cols)
  */
 JNIEXPORT void JNICALL
-Java_com_example_myapplication_utils_PtyProcess_resizePty(
+Java_io_axiom_editor_utils_PtyProcess_resizePty(
     JNIEnv *env, jclass clazz, jint fd, jint rows, jint cols
 ) {
     if (fd < 0 || rows <= 0 || cols <= 0) {
@@ -285,7 +285,7 @@ Java_com_example_myapplication_utils_PtyProcess_resizePty(
  * 返回 null 表示 EOF 或错误
  */
 JNIEXPORT jbyteArray JNICALL
-Java_com_example_myapplication_utils_PtyProcess_readPty(
+Java_io_axiom_editor_utils_PtyProcess_readPty(
     JNIEnv *env, jclass clazz, jint fd
 ) {
     if (fd < 0) return NULL;
@@ -319,7 +319,7 @@ Java_com_example_myapplication_utils_PtyProcess_readPty(
  *   byte[] readPtyNB(int fd)
  */
 JNIEXPORT jbyteArray JNICALL
-Java_com_example_myapplication_utils_PtyProcess_readPtyNB(
+Java_io_axiom_editor_utils_PtyProcess_readPtyNB(
     JNIEnv *env, jclass clazz, jint fd
 ) {
     if (fd < 0) return NULL;
@@ -352,7 +352,7 @@ Java_com_example_myapplication_utils_PtyProcess_readPtyNB(
  * 返回写入的字节数，-1 表示错误
  */
 JNIEXPORT jint JNICALL
-Java_com_example_myapplication_utils_PtyProcess_writePty(
+Java_io_axiom_editor_utils_PtyProcess_writePty(
     JNIEnv *env, jclass clazz, jint fd, jbyteArray data
 ) {
     if (fd < 0 || !data) return -1;
@@ -382,7 +382,7 @@ Java_com_example_myapplication_utils_PtyProcess_writePty(
  *   int writePtyStr(int fd, String text)
  */
 JNIEXPORT jint JNICALL
-Java_com_example_myapplication_utils_PtyProcess_writePtyStr(
+Java_io_axiom_editor_utils_PtyProcess_writePtyStr(
     JNIEnv *env, jclass clazz, jint fd, jstring jtext
 ) {
     if (fd < 0 || !jtext) return -1;
@@ -409,7 +409,7 @@ Java_com_example_myapplication_utils_PtyProcess_writePtyStr(
  *   -3xx  : 停止，-signo（如 -20 表示 SIGSTOP）
  */
 JNIEXPORT jint JNICALL
-Java_com_example_myapplication_utils_PtyProcess_waitFor(
+Java_io_axiom_editor_utils_PtyProcess_waitFor(
     JNIEnv *env, jclass clazz, jint pid
 ) {
     if (pid <= 0) return -1;
@@ -446,7 +446,7 @@ Java_com_example_myapplication_utils_PtyProcess_waitFor(
  *   int waitForNB(int pid)
  */
 JNIEXPORT jint JNICALL
-Java_com_example_myapplication_utils_PtyProcess_waitForNB(
+Java_io_axiom_editor_utils_PtyProcess_waitForNB(
     JNIEnv *env, jclass clazz, jint pid
 ) {
     if (pid <= 0) return -1;
@@ -473,7 +473,7 @@ Java_com_example_myapplication_utils_PtyProcess_waitForNB(
  *   boolean killPid(int pid, int sig)
  */
 JNIEXPORT jboolean JNICALL
-Java_com_example_myapplication_utils_PtyProcess_killPid(
+Java_io_axiom_editor_utils_PtyProcess_killPid(
     JNIEnv *env, jclass clazz, jint pid, jint sig
 ) {
     if (pid <= 0) return JNI_FALSE;
@@ -493,7 +493,7 @@ Java_com_example_myapplication_utils_PtyProcess_killPid(
  *   void closeFd(int fd)
  */
 JNIEXPORT void JNICALL
-Java_com_example_myapplication_utils_PtyProcess_closeFd(
+Java_io_axiom_editor_utils_PtyProcess_closeFd(
     JNIEnv *env, jclass clazz, jint fd
 ) {
     if (fd >= 0) {
@@ -510,7 +510,7 @@ Java_com_example_myapplication_utils_PtyProcess_closeFd(
  * 返回 true 表示可读（包含 EOF）
  */
 JNIEXPORT jboolean JNICALL
-Java_com_example_myapplication_utils_PtyProcess_isDataAvailable(
+Java_io_axiom_editor_utils_PtyProcess_isDataAvailable(
     JNIEnv *env, jclass clazz, jint fd, jint timeoutMs
 ) {
     if (fd < 0) return JNI_FALSE;
@@ -540,7 +540,7 @@ Java_com_example_myapplication_utils_PtyProcess_isDataAvailable(
  *   boolean setNonBlocking(int fd, boolean nonBlocking)
  */
 JNIEXPORT jboolean JNICALL
-Java_com_example_myapplication_utils_PtyProcess_setNonBlocking(
+Java_io_axiom_editor_utils_PtyProcess_setNonBlocking(
     JNIEnv *env, jclass clazz, jint fd, jboolean nonBlocking
 ) {
     if (fd < 0) return JNI_FALSE;
@@ -568,7 +568,7 @@ Java_com_example_myapplication_utils_PtyProcess_setNonBlocking(
  *   boolean setRawMode(int fd)
  */
 JNIEXPORT jboolean JNICALL
-Java_com_example_myapplication_utils_PtyProcess_setRawMode(
+Java_io_axiom_editor_utils_PtyProcess_setRawMode(
     JNIEnv *env, jclass clazz, jint fd
 ) {
     if (fd < 0) return JNI_FALSE;
@@ -593,7 +593,7 @@ Java_com_example_myapplication_utils_PtyProcess_setRawMode(
  *   boolean setEchoMode(int fd, boolean echo)
  */
 JNIEXPORT jboolean JNICALL
-Java_com_example_myapplication_utils_PtyProcess_setEchoMode(
+Java_io_axiom_editor_utils_PtyProcess_setEchoMode(
     JNIEnv *env, jclass clazz, jint fd, jboolean echo
 ) {
     if (fd < 0) return JNI_FALSE;
@@ -620,7 +620,7 @@ Java_com_example_myapplication_utils_PtyProcess_setEchoMode(
  *   int[] getWindowSize(int fd)  → [rows, cols]
  */
 JNIEXPORT jintArray JNICALL
-Java_com_example_myapplication_utils_PtyProcess_getWindowSize(
+Java_io_axiom_editor_utils_PtyProcess_getWindowSize(
     JNIEnv *env, jclass clazz, jint fd
 ) {
     if (fd < 0) return NULL;
