@@ -14,8 +14,10 @@
       overflow: hidden;
     }
     #terminal {
-      position: fixed;
-      top: 0; left: 0; right: 0; bottom: 0;
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%;
+      height: 100%;
       background: #111625;
       overflow: hidden;
     }
@@ -146,6 +148,15 @@
       _kotlinCssW = iw2;
       _kotlinCssH = ih2;
       console.log('setViewportSize: w=' + iw2 + ' h=' + ih2);
+
+      // Force the terminal div to exactly match the known visible area.
+      // position:fixed / bottom:0 in WebView anchors to the layout viewport,
+      // not the visual viewport, so the prompt ends up behind the keyboard.
+      // Explicit pixel dimensions guarantee xterm.js sees the real visible size.
+      var termEl = document.getElementById('terminal');
+      termEl.style.width  = iw2 + 'px';
+      termEl.style.height = ih2 + 'px';
+
       var c   = measureCell(term.options.fontSize, term.options.fontFamily, term.options.lineHeight);
       var cw  = (c.w > 0) ? c.w : cellW;
       var ch  = (c.h > 0) ? c.h : cellH;
@@ -161,9 +172,16 @@
 
     // ── Resize helper (for window resize / keyboard in-out) ───────
     function doFit() {
-      // Prefer Kotlin-provided dimensions; fall back to JS measurement
+      // Always prefer Kotlin-provided dimensions; they reflect the true WebView size
+      // after Compose imePadding shrinks it. JS viewport APIs are unreliable in WebView.
       var iw2 = _kotlinCssW || document.documentElement.clientWidth  || window.innerWidth  || 360;
       var ih2 = _kotlinCssH || document.documentElement.clientHeight || window.innerHeight || 640;
+
+      // Keep the terminal div in sync with the known visible area
+      var termEl = document.getElementById('terminal');
+      termEl.style.width  = iw2 + 'px';
+      termEl.style.height = ih2 + 'px';
+
       var c   = measureCell(term.options.fontSize, term.options.fontFamily, term.options.lineHeight);
       var cw  = (c.w > 0) ? c.w : cellW;
       var ch  = (c.h > 0) ? c.h : cellH;
