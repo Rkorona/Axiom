@@ -53,6 +53,7 @@ import kotlinx.coroutines.launch
 import java.io.File
 import io.axiom.editor.data.AppSettings
 import io.axiom.editor.data.EncodingMode
+import io.axiom.editor.data.ThemeMode
 
 // ═════════════════════════════════════════════════════════════
 // 安全编解码工具函数与双通道编码自动检测
@@ -302,7 +303,11 @@ fun EditorScreen(
 
     // 主题、键盘控制
     val isSystemDark = isSystemInDarkTheme()
-    var isDarkTheme by rememberSaveable { mutableStateOf(isSystemDark) }
+    val isDarkTheme = when (settings.themeOption) {
+        ThemeMode.SYSTEM -> isSystemDark
+        ThemeMode.LIGHT  -> false
+        ThemeMode.DARK   -> true
+    }
     var isKeyboardEnabled by rememberSaveable { mutableStateOf(false) }
 
     // ─────────────────────────────────────────────────────────
@@ -351,8 +356,7 @@ fun EditorScreen(
         }
     }
     
-    LaunchedEffect(isSystemDark) {
-        isDarkTheme = isSystemDark
+    LaunchedEffect(isDarkTheme) {
         if (isEditorReady) {
             val bg = if (isDarkTheme) "#141729" else "#ffffff"
             executeJs("document.documentElement.style.setProperty('--editor-bg','$bg')")
