@@ -24,6 +24,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.axiom.editor.data.*
+import io.axiom.editor.ui.component.AppTopBar
 
 // ─────────────────────────────────────────────────────────────────
 // 固定强调色（主题无关，仅用于图标背景）
@@ -43,8 +44,27 @@ private val IconTintDefault = Color(0xFFCCCCCC)
 // ─────────────────────────────────────────────────────────────────
 // 主入口
 // ─────────────────────────────────────────────────────────────────
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun SettingsScreen(
+    viewModel: SettingsViewModel,
+    modifier: Modifier = Modifier
+) {
+    Scaffold(
+        modifier = modifier,
+        topBar = {
+            AppTopBar(selectedTab = 3)
+        }
+    ) { innerPadding ->
+        SettingsContent(
+            viewModel = viewModel,
+            modifier = Modifier.padding(innerPadding)
+        )
+    }
+}
+
+@Composable
+private fun SettingsContent(
     viewModel: SettingsViewModel,
     modifier: Modifier = Modifier
 ) {

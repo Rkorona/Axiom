@@ -6,41 +6,29 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.FolderOpen
-import androidx.compose.material.icons.outlined.Hub
-import androidx.compose.material.icons.outlined.SortByAlpha
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import kotlinx.coroutines.delay
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Density
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.axiom.editor.ui.component.AddProjectAction
 import io.axiom.editor.ui.component.AddProjectSheet
 import io.axiom.editor.ui.component.AppBottomNavBar
+import io.axiom.editor.ui.component.AppTopBar
 import io.axiom.editor.ui.model.Project
 import io.axiom.editor.ui.model.ProjectLanguage
 import io.axiom.editor.ui.model.ProjectType
@@ -159,11 +147,8 @@ fun HomeScreen(
     // ── 搜索状态 ──
     var isSearchActive by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
-    val searchFocusRequester = remember { FocusRequester() }
-    val keyboardController = LocalSoftwareKeyboardController.current
 
     // ── 排序状态 ──
-    var sortMenuExpanded by remember { mutableStateOf(false) }
     var sortOrder by remember { mutableStateOf(ProjectSortOrder.DEFAULT) }
 
     // ── AddProject sheet 状态 ──
@@ -174,201 +159,17 @@ fun HomeScreen(
         filterAndSortProjects(projects, searchQuery, sortOrder)
     }
 
-    // 搜索栏激活时自动弹出键盘
-    LaunchedEffect(isSearchActive) {
-        if (isSearchActive) {
-            searchFocusRequester.requestFocus()
-        }
-    }
-
     Scaffold(
         topBar = {
-            // 根据不同的 Tab 渲染对应的顶栏，保证视觉隔离
-            when (selectedTab) {
-                0 -> { // 项目列表顶栏
-                    if (isSearchActive) {
-                        // ── Termius 风格胶囊搜索栏 ──
-                        Surface(
-                            color = MaterialTheme.colorScheme.surface,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .statusBarsPadding()
-                                    .padding(horizontal = 12.dp, vertical = 8.dp)
-                                    .height(48.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Surface(
-                                    shape = RoundedCornerShape(22.dp),
-                                    color = MaterialTheme.colorScheme.surfaceVariant,
-                                    modifier = Modifier.fillMaxSize()
-                                ) {
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxSize()
-                                            .padding(start = 4.dp, end = 6.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        IconButton(
-                                            onClick = {
-                                                isSearchActive = false
-                                                searchQuery = ""
-                                                keyboardController?.hide()
-                                            },
-                                            modifier = Modifier.size(40.dp)
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Default.Close,
-                                                contentDescription = "关闭搜索",
-                                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                modifier = Modifier.size(18.dp)
-                                            )
-                                        }
-                                        TextField(
-                                            value = searchQuery,
-                                            onValueChange = { searchQuery = it },
-                                            modifier = Modifier
-                                                .weight(1f)
-                                                .focusRequester(searchFocusRequester),
-                                            placeholder = {
-                                                Text(
-                                                    text = "搜索项目名称…",
-                                                    style = MaterialTheme.typography.bodyMedium,
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f)
-                                                )
-                                            },
-                                            singleLine = true,
-                                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                                            keyboardActions = KeyboardActions(
-                                                onSearch = { keyboardController?.hide() }
-                                            ),
-                                            colors = TextFieldDefaults.colors(
-                                                focusedContainerColor = Color.Transparent,
-                                                unfocusedContainerColor = Color.Transparent,
-                                                focusedIndicatorColor = Color.Transparent,
-                                                unfocusedIndicatorColor = Color.Transparent,
-                                                disabledIndicatorColor = Color.Transparent,
-                                                errorIndicatorColor = Color.Transparent,
-                                            ),
-                                            textStyle = MaterialTheme.typography.bodyMedium,
-                                        )
-                                        if (searchQuery.isNotEmpty()) {
-                                            IconButton(
-                                                onClick = { searchQuery = "" },
-                                                modifier = Modifier.size(32.dp)
-                                            ) {
-                                                Icon(
-                                                    imageVector = Icons.Default.Close,
-                                                    contentDescription = "清空",
-                                                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
-                                                    modifier = Modifier.size(14.dp)
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    } else {
-                        TopAppBar(
-                            expandedHeight = 64.dp,
-                            navigationIcon = {
-                                IconButton(onClick = {}) {
-                                    Icon(
-                                        imageVector = Icons.Outlined.Hub,
-                                        contentDescription = "Logo",
-                                        tint = MaterialTheme.colorScheme.onSurface
-                                    )
-                                }
-                            },
-                            title = {
-                                Text(
-                                    text = "Axiom",
-                                    style = MaterialTheme.typography.titleLarge,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            },
-                            actions = {
-                                IconButton(onClick = { isSearchActive = true }) {
-                                    Icon(
-                                        imageVector = Icons.Default.Search,
-                                        contentDescription = "搜索",
-                                        tint = MaterialTheme.colorScheme.onSurface
-                                    )
-                                }
-                                Box {
-                                    IconButton(onClick = { sortMenuExpanded = true }) {
-                                        Icon(
-                                            imageVector = Icons.Outlined.SortByAlpha,
-                                            contentDescription = "排序",
-                                            tint = if (sortOrder == ProjectSortOrder.DEFAULT)
-                                                MaterialTheme.colorScheme.onSurface
-                                            else
-                                                MaterialTheme.colorScheme.primary
-                                        )
-                                    }
-                                    DropdownMenu(
-                                        expanded = sortMenuExpanded,
-                                        onDismissRequest = { sortMenuExpanded = false },
-                                        shape = RoundedCornerShape(14.dp),
-                                        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                                        tonalElevation = 0.dp,
-                                        shadowElevation = 4.dp
-                                    ) {
-                                        ProjectSortOrder.entries.forEach { order ->
-                                            DropdownMenuItem(
-                                                text = {
-                                                    Text(
-                                                        text = order.label,
-                                                        color = if (sortOrder == order)
-                                                            MaterialTheme.colorScheme.primary
-                                                        else
-                                                            MaterialTheme.colorScheme.onSurface,
-                                                        fontWeight = if (sortOrder == order)
-                                                            FontWeight.SemiBold
-                                                        else
-                                                            FontWeight.Normal
-                                                    )
-                                                },
-                                                onClick = {
-                                                    sortOrder = order
-                                                    sortMenuExpanded = false
-                                                },
-                                                leadingIcon = if (sortOrder == order) ({
-                                                    Icon(
-                                                        imageVector = Icons.Default.Check,
-                                                        contentDescription = "已选中",
-                                                        tint = MaterialTheme.colorScheme.primary,
-                                                        modifier = Modifier.size(16.dp)
-                                                    )
-                                                }) else null
-                                            )
-                                        }
-                                    }
-                                }
-                            },
-                            colors = TopAppBarDefaults.topAppBarColors(
-                                containerColor = MaterialTheme.colorScheme.surface
-                            )
-                        )
-                    }
-                }
-                1 -> {
-                    TopAppBar(
-                        expandedHeight = 64.dp,
-                        title = { Text("GitHub Repositories", fontWeight = FontWeight.Bold) },
-                        colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
-                    )
-                }
-                3 -> {
-                    TopAppBar(
-                        expandedHeight = 64.dp,
-                        title = { Text("设置", fontWeight = FontWeight.Bold) },
-                        colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
-                    )
-                }
-            }
+            AppTopBar(
+                selectedTab = selectedTab,
+                sortOrder = sortOrder,
+                onSortOrderChange = { sortOrder = it },
+                isSearchActive = isSearchActive,
+                onSearchActiveChange = { isSearchActive = it },
+                searchQuery = searchQuery,
+                onSearchQueryChange = { searchQuery = it }
+            )
         },
         floatingActionButton = {
             // 只在项目列表页 (Tab 0) 且键盘未弹起时显示创建项目的悬浮按钮
