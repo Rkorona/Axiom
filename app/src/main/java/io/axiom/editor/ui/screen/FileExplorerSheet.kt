@@ -446,6 +446,29 @@ fun FileExplorerSheet(
     var childrenCache by remember(project.localPath) { mutableStateOf<Map<String, List<SheetFileNode>>>(emptyMap()) }
     var loadingDirs by remember { mutableStateOf<Set<String>>(emptySet()) }
     var safTreeUri by remember(project.localPath) { mutableStateOf<Uri?>(null) }
+    // 搜索
+    var searchQuery by remember(project.localPath) { mutableStateOf("") }
+    var searchResults by remember { mutableStateOf<List<SheetFileNode>?>(null) }
+    var isSearching by remember { mutableStateOf(false) }
+
+    LaunchedEffect(searchQuery) {
+        if (searchQuery.isBlank()) {
+            searchResults = null
+            isSearching = false
+            return@LaunchedEffect
+        }
+        kotlinx.coroutines.delay(300L)
+        isSearching = true
+        searchResults = null
+        val path = project.localPath ?: run { isSearching = false; return@LaunchedEffect }
+        val tUri = safTreeUri
+        val results = withContext(Dispatchers.IO) {
+            if (tUri != null) searchSheetSafFiles(context, tUri, searchQuery)
+            else searchSheetLocalFiles(path, searchQuery)
+        }
+        searchResults = results
+        isSearching = false
+    }
 
     var contextNode by remember { mutableStateOf<SheetFileNode?>(null) }
     var showContextSheet by remember { mutableStateOf(false) }
@@ -635,59 +658,122 @@ fun FileExplorerSheet(
                             }
                         }
                         is SheetLoadState.Loaded -> {
-                            val displayRows = remember(state.root, expandedPaths, childrenCache) {
-                                flattenSheetVisible(state.root, depth = 0, expanded = expandedPaths, childrenCache = childrenCache)
-                            }
+                            Column(modifier = Modifier.fillMaxSize()) {
+                            // 搜索栏
+                            TextField(
+                                value = searchQuery,
+                                onValueChange = { searchQuery = it },
+                                placeholder = { Text("搜索文件名…", style = MaterialTheme.typography.bodyMedium) },
+                                leadingIcon = { Icon(Icons.Outlined.Search, null, modifier = Modifier.size(20.dp)) },
+                                trailingIcon = {
+                                    if (searchQuery.isNotEmpty()) {
+                                        IconButton(onClick = { searchQuery = "" }) {
+                                            Icon(Icons.Outlined.Close, null, modifier = Modifier.size(18.dp))
+                                        }
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+                                singleLine = true,
+                                colors = TextFieldDefaults.colors(
+                                    focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                    focusedIndicatorColor = Color.Transparent,
+                                    unfocusedIndicatorColor = Color.Transparent,
+                                    disabledIndicatorColor = Color.Transparent
+                                ),
+                                shape = RoundedCornerShape(10.dp)
+                            )
 
-                            if (displayRows.isEmpty()) {
-                                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                    Text("项目为空", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                }
-                            } else {
-                                LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(vertical = 4.dp)) {
-                                    items(displayRows, key = { it.node.path }) { row ->
-                                        val isExpanded = row.node.path in expandedPaths
-                                        SheetFileTreeRow(
-                                            row = row,
-                                            isExpanded = isExpanded,
-                                            isLoading = row.node.path in loadingDirs,
-                                            onClick = {
-                                                if (row.node.isDirectory) {
-                                                    if (isExpanded) {
-                                                        expandedPaths = expandedPaths - row.node.path
-                                                    } else {
-                                                        expandedPaths = expandedPaths + row.node.path
-                                                        val alreadyLoaded = row.node.path in childrenCache || row.node.children.isNotEmpty()
-                                                        if (!alreadyLoaded && row.node.path !in loadingDirs) {
-                                                            loadingDirs = loadingDirs + row.node.path
-                                                            scope.launch {
-                                                                val children = withContext(Dispatchers.IO) {
-                                                                    val tUri = safTreeUri
-                                                                    if (tUri != null) loadSheetSafChildren(context, tUri, row.node.path)
-                                                                    else loadSheetFileChildren(row.node.path)
-                                                                }
-                                                                childrenCache = childrenCache + (row.node.path to children)
-                                                                loadingDirs = loadingDirs - row.node.path
-                                                            }
-                                                        }
-                                                    }
-                                                } else {
-                                                    if (!openingFile) {
+                            Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                            if (searchQuery.isNotBlank()) {
+                                // 搜索结果模式
+                                when {
+                                    isSearching -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                        CircularProgressIndicator()
+                                    }
+                                    searchResults.isNullOrEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                        Text("没有找到「$searchQuery」", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                    else -> {
+                                        val results = searchResults!!
+                                        val projectRoot = project.localPath ?: ""
+                                        LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(vertical = 4.dp)) {
+                                            item {
+                                                Text(
+                                                    text = "找到 ${results.size} 个结果",
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+                                                )
+                                            }
+                                            items(results, key = { it.path }) { node ->
+                                                SheetSearchResultRow(node = node, projectRoot = projectRoot, onClick = {
+                                                    if (!node.isDirectory && !openingFile) {
                                                         openingFile = true
-                                                        onOpenFile(row.node.path)
+                                                        onOpenFile(node.path)
                                                         openingFile = false
                                                     }
-                                                }
-                                            },
-                                            onContextMenu = {
-                                                contextNode = row.node
-                                                showContextSheet = true
+                                                })
                                             }
-                                        )
+                                        }
+                                    }
+                                }
+                            } else {
+                                // 正常文件树模式
+                                val displayRows = remember(state.root, expandedPaths, childrenCache) {
+                                    flattenSheetVisible(state.root, depth = 0, expanded = expandedPaths, childrenCache = childrenCache)
+                                }
+                                if (displayRows.isEmpty()) {
+                                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                        Text("项目为空", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                } else {
+                                    LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(vertical = 4.dp)) {
+                                        items(displayRows, key = { it.node.path }) { row ->
+                                            val isExpanded = row.node.path in expandedPaths
+                                            SheetFileTreeRow(
+                                                row = row,
+                                                isExpanded = isExpanded,
+                                                isLoading = row.node.path in loadingDirs,
+                                                onClick = {
+                                                    if (row.node.isDirectory) {
+                                                        if (isExpanded) {
+                                                            expandedPaths = expandedPaths - row.node.path
+                                                        } else {
+                                                            expandedPaths = expandedPaths + row.node.path
+                                                            val alreadyLoaded = row.node.path in childrenCache || row.node.children.isNotEmpty()
+                                                            if (!alreadyLoaded && row.node.path !in loadingDirs) {
+                                                                loadingDirs = loadingDirs + row.node.path
+                                                                scope.launch {
+                                                                    val children = withContext(Dispatchers.IO) {
+                                                                        val tUri = safTreeUri
+                                                                        if (tUri != null) loadSheetSafChildren(context, tUri, row.node.path)
+                                                                        else loadSheetFileChildren(row.node.path)
+                                                                    }
+                                                                    childrenCache = childrenCache + (row.node.path to children)
+                                                                    loadingDirs = loadingDirs - row.node.path
+                                                                }
+                                                            }
+                                                        }
+                                                    } else {
+                                                        if (!openingFile) {
+                                                            openingFile = true
+                                                            onOpenFile(row.node.path)
+                                                            openingFile = false
+                                                        }
+                                                    }
+                                                },
+                                                onContextMenu = {
+                                                    contextNode = row.node
+                                                    showContextSheet = true
+                                                }
+                                            )
+                                        }
                                     }
                                 }
                             }
-
+                            } // end Box(weight 1f)
+                            } // end Column
                             if (openingFile || isOperationInProgress) {
                                 Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.22f)), contentAlignment = Alignment.Center) {
                                     CircularProgressIndicator()
@@ -941,6 +1027,89 @@ private fun loadSheetSafChildren(context: Context, treeUri: Uri, docPath: String
             }
     } catch (e: Exception) {
         emptyList()
+    }
+}
+
+private fun searchSheetLocalFiles(rootPath: String, query: String, maxResults: Int = 300): List<SheetFileNode> {
+    val results = mutableListOf<SheetFileNode>()
+    val q = query.lowercase()
+    fun recurse(file: File) {
+        if (results.size >= maxResults) return
+        if (file.name.lowercase().contains(q)) {
+            results.add(SheetFileNode(file.name, file.absolutePath, file.isDirectory, if (file.isDirectory) "" else file.extension.lowercase()))
+        }
+        if (file.isDirectory) file.listFiles()?.sortedWith(compareBy({ !it.isDirectory }, { it.name.lowercase() }))?.forEach { recurse(it) }
+    }
+    recurse(File(rootPath))
+    return results
+}
+
+private fun searchSheetSafFiles(context: Context, treeUri: Uri, query: String, maxResults: Int = 300): List<SheetFileNode> {
+    val results = mutableListOf<SheetFileNode>()
+    val q = query.lowercase()
+    fun recurse(docId: String, depth: Int) {
+        if (results.size >= maxResults || depth > 8) return
+        try {
+            val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, docId)
+            context.contentResolver.query(childrenUri, arrayOf(
+                DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+                DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+                DocumentsContract.Document.COLUMN_MIME_TYPE
+            ), null, null, null)?.use { cursor ->
+                while (cursor.moveToNext() && results.size < maxResults) {
+                    val childId = cursor.getString(0) ?: continue
+                    val childName = cursor.getString(1) ?: continue
+                    val isDir = cursor.getString(2) == DocumentsContract.Document.MIME_TYPE_DIR
+                    val childDocUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, childId)
+                    if (childName.lowercase().contains(q)) {
+                        results.add(SheetFileNode(childName, childDocUri.toString(), isDir, if (isDir) "" else childName.substringAfterLast('.', "").lowercase()))
+                    }
+                    if (isDir) recurse(childId, depth + 1)
+                }
+            }
+        } catch (_: Exception) {}
+    }
+    recurse(DocumentsContract.getTreeDocumentId(treeUri), 0)
+    return results
+}
+
+@Composable
+private fun SheetSearchResultRow(node: SheetFileNode, projectRoot: String, onClick: () -> Unit) {
+    val relPath = if (node.path.startsWith("content://")) ""
+    else node.path.removePrefix(projectRoot).substringBeforeLast('/').trimStart('/')
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(if (!node.isDirectory) Modifier.clickable(onClick = onClick) else Modifier)
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Spacer(Modifier.width(4.dp))
+        if (node.isDirectory) {
+            Icon(Icons.Outlined.Folder, null, modifier = Modifier.size(20.dp), tint = Color(0xFF7C9CBF))
+        } else {
+            SheetFileExtBadge(node.extension)
+        }
+        Spacer(Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = node.name,
+                style = MaterialTheme.typography.bodyMedium,
+                color = if (node.isDirectory) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f) else MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            if (relPath.isNotBlank()) {
+                Text(
+                    text = relPath,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
     }
 }
 

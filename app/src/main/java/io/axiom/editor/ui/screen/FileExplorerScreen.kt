@@ -14,8 +14,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowRight
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.FolderOpen
 import androidx.compose.material.icons.outlined.Folder
+import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.SentimentDissatisfied
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -80,6 +82,29 @@ fun FileExplorerScreen(
     var loadingDirs by remember { mutableStateOf<Set<String>>(emptySet()) }
     // SAF 项目的树根 URI，供子目录懒加载使用
     var safTreeUri by remember { mutableStateOf<Uri?>(null) }
+    // 搜索
+    var searchQuery by remember { mutableStateOf("") }
+    var searchResults by remember { mutableStateOf<List<FileNode>?>(null) }
+    var isSearching by remember { mutableStateOf(false) }
+
+    LaunchedEffect(searchQuery) {
+        if (searchQuery.isBlank()) {
+            searchResults = null
+            isSearching = false
+            return@LaunchedEffect
+        }
+        kotlinx.coroutines.delay(300L)
+        isSearching = true
+        searchResults = null
+        val path = project.localPath ?: run { isSearching = false; return@LaunchedEffect }
+        val tUri = safTreeUri
+        val results = withContext(Dispatchers.IO) {
+            if (tUri != null) searchSafFiles(context, tUri, searchQuery)
+            else searchLocalFiles(path, searchQuery)
+        }
+        searchResults = results
+        isSearching = false
+    }
 
     // 在 IO 线程浅层加载文件树（只扫描根 + 直接子节点）
     LaunchedEffect(project.localPath) {
@@ -197,71 +222,123 @@ fun FileExplorerScreen(
                 }
 
                 is LoadState.Loaded -> {
-                    val displayRows = remember(state.root, expandedPaths, childrenCache) {
-                        flattenVisible(state.root, depth = 0, expanded = expandedPaths, childrenCache = childrenCache)
-                    }
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        // 搜索栏
+                        TextField(
+                            value = searchQuery,
+                            onValueChange = { searchQuery = it },
+                            placeholder = { Text("搜索文件名…", style = MaterialTheme.typography.bodyMedium) },
+                            leadingIcon = { Icon(Icons.Outlined.Search, null, modifier = Modifier.size(20.dp)) },
+                            trailingIcon = {
+                                if (searchQuery.isNotEmpty()) {
+                                    IconButton(onClick = { searchQuery = "" }) {
+                                        Icon(Icons.Outlined.Close, null, modifier = Modifier.size(18.dp))
+                                    }
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
+                            singleLine = true,
+                            colors = TextFieldDefaults.colors(
+                                focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                focusedIndicatorColor = Color.Transparent,
+                                unfocusedIndicatorColor = Color.Transparent,
+                                disabledIndicatorColor = Color.Transparent
+                            ),
+                            shape = RoundedCornerShape(10.dp)
+                        )
 
-                    if (displayRows.isEmpty()) {
-                        Column(
-                            modifier = Modifier
-                                .align(Alignment.Center)
-                                .padding(32.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Outlined.FolderOpen,
-                                contentDescription = null,
-                                modifier = Modifier.size(52.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f)
-                            )
-                            Text(
-                                text = "项目目录为空",
-                                style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                            )
-                        }
-                    } else {
-                        LazyColumn(
-                            modifier = Modifier.fillMaxSize(),
-                            contentPadding = PaddingValues(vertical = 8.dp)
-                        ) {
-                            items(displayRows, key = { it.node.path }) { row ->
-                                val isExpanded = row.node.path in expandedPaths
-                                FileTreeRow(
-                                    row = row,
-                                    isExpanded = isExpanded,
-                                    isLoading = row.node.path in loadingDirs,
-                                    onClick = {
-                                        if (row.node.isDirectory) {
-                                            if (isExpanded) {
-                                                expandedPaths = expandedPaths - row.node.path
-                                            } else {
-                                                expandedPaths = expandedPaths + row.node.path
-                                                // 懒加载子节点（未缓存且未在加载中时触发）
-                                                val alreadyLoaded = row.node.path in childrenCache || row.node.children.isNotEmpty()
-                                                if (!alreadyLoaded && row.node.path !in loadingDirs) {
-                                                    loadingDirs = loadingDirs + row.node.path
-                                                    coroutineScope.launch {
-                                                        val children = withContext(Dispatchers.IO) {
-                                                            val tUri = safTreeUri
-                                                            if (tUri != null) loadSafChildren(context, tUri, row.node.path)
-                                                            else loadFileChildren(row.node.path)
-                                                        }
-                                                        childrenCache = childrenCache + (row.node.path to children)
-                                                        loadingDirs = loadingDirs - row.node.path
-                                                    }
-                                                }
+                        Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                            if (searchQuery.isNotBlank()) {
+                                when {
+                                    isSearching -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                        CircularProgressIndicator()
+                                    }
+                                    searchResults.isNullOrEmpty() -> Column(
+                                        modifier = Modifier.align(Alignment.Center).padding(32.dp),
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Icon(Icons.Outlined.SentimentDissatisfied, null, modifier = Modifier.size(40.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f))
+                                        Text("没有找到「$searchQuery」", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                    else -> {
+                                        val results = searchResults!!
+                                        val projectRoot = project.localPath ?: ""
+                                        LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(vertical = 4.dp)) {
+                                            item {
+                                                Text(
+                                                    text = "找到 ${results.size} 个结果",
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+                                                )
                                             }
-                                        } else {
-                                            if (!openingFile) {
-                                                openingFile = true
-                                                onOpenFile(row.node.path)
-                                                openingFile = false
+                                            items(results, key = { it.path }) { node ->
+                                                FileSearchResultRow(node = node, projectRoot = projectRoot, onClick = {
+                                                    if (!node.isDirectory && !openingFile) {
+                                                        openingFile = true
+                                                        onOpenFile(node.path)
+                                                        openingFile = false
+                                                    }
+                                                })
                                             }
                                         }
                                     }
-                                )
+                                }
+                            } else {
+                                val displayRows = remember(state.root, expandedPaths, childrenCache) {
+                                    flattenVisible(state.root, depth = 0, expanded = expandedPaths, childrenCache = childrenCache)
+                                }
+                                if (displayRows.isEmpty()) {
+                                    Column(
+                                        modifier = Modifier.align(Alignment.Center).padding(32.dp),
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Icon(Icons.Outlined.FolderOpen, null, modifier = Modifier.size(52.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f))
+                                        Text("项目目录为空", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
+                                    }
+                                } else {
+                                    LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(vertical = 8.dp)) {
+                                        items(displayRows, key = { it.node.path }) { row ->
+                                            val isExpanded = row.node.path in expandedPaths
+                                            FileTreeRow(
+                                                row = row,
+                                                isExpanded = isExpanded,
+                                                isLoading = row.node.path in loadingDirs,
+                                                onClick = {
+                                                    if (row.node.isDirectory) {
+                                                        if (isExpanded) {
+                                                            expandedPaths = expandedPaths - row.node.path
+                                                        } else {
+                                                            expandedPaths = expandedPaths + row.node.path
+                                                            val alreadyLoaded = row.node.path in childrenCache || row.node.children.isNotEmpty()
+                                                            if (!alreadyLoaded && row.node.path !in loadingDirs) {
+                                                                loadingDirs = loadingDirs + row.node.path
+                                                                coroutineScope.launch {
+                                                                    val children = withContext(Dispatchers.IO) {
+                                                                        val tUri = safTreeUri
+                                                                        if (tUri != null) loadSafChildren(context, tUri, row.node.path)
+                                                                        else loadFileChildren(row.node.path)
+                                                                    }
+                                                                    childrenCache = childrenCache + (row.node.path to children)
+                                                                    loadingDirs = loadingDirs - row.node.path
+                                                                }
+                                                            }
+                                                        }
+                                                    } else {
+                                                        if (!openingFile) {
+                                                            openingFile = true
+                                                            onOpenFile(row.node.path)
+                                                            openingFile = false
+                                                        }
+                                                    }
+                                                }
+                                            )
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
@@ -441,6 +518,96 @@ private fun flattenVisible(
         listOf(selfRow) + children.flatMap { flattenVisible(it, depth + 1, expanded, childrenCache) }
     } else {
         listOf(selfRow)
+    }
+}
+
+// ─────────────────────────────────────────────
+// 文件搜索
+// ─────────────────────────────────────────────
+private fun searchLocalFiles(rootPath: String, query: String, maxResults: Int = 300): List<FileNode> {
+    val results = mutableListOf<FileNode>()
+    val q = query.lowercase()
+    fun recurse(file: File) {
+        if (results.size >= maxResults) return
+        if (file.name.lowercase().contains(q)) {
+            results.add(FileNode(file.name, file.absolutePath, file.isDirectory, if (file.isDirectory) "" else file.extension.lowercase()))
+        }
+        if (file.isDirectory) file.listFiles()?.sortedWith(compareBy({ !it.isDirectory }, { it.name.lowercase() }))?.forEach { recurse(it) }
+    }
+    recurse(File(rootPath))
+    return results
+}
+
+private fun searchSafFiles(context: Context, treeUri: Uri, query: String, maxResults: Int = 300): List<FileNode> {
+    val results = mutableListOf<FileNode>()
+    val q = query.lowercase()
+    fun recurse(docId: String, depth: Int) {
+        if (results.size >= maxResults || depth > 8) return
+        try {
+            val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, docId)
+            context.contentResolver.query(childrenUri, arrayOf(
+                DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+                DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+                DocumentsContract.Document.COLUMN_MIME_TYPE
+            ), null, null, null)?.use { cursor ->
+                while (cursor.moveToNext() && results.size < maxResults) {
+                    val childId = cursor.getString(0) ?: continue
+                    val childName = cursor.getString(1) ?: continue
+                    val isDir = cursor.getString(2) == DocumentsContract.Document.MIME_TYPE_DIR
+                    val childDocUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, childId)
+                    if (childName.lowercase().contains(q)) {
+                        results.add(FileNode(childName, childDocUri.toString(), isDir, if (isDir) "" else childName.substringAfterLast('.', "").lowercase()))
+                    }
+                    if (isDir) recurse(childId, depth + 1)
+                }
+            }
+        } catch (_: Exception) {}
+    }
+    recurse(DocumentsContract.getTreeDocumentId(treeUri), 0)
+    return results
+}
+
+@Composable
+private fun FileSearchResultRow(node: FileNode, projectRoot: String, onClick: () -> Unit) {
+    val relPath = if (node.path.startsWith("content://")) ""
+    else node.path.removePrefix(projectRoot).substringBeforeLast('/').trimStart('/')
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(if (!node.isDirectory) Modifier.clickable(onClick = onClick) else Modifier)
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        if (node.isDirectory) {
+            Icon(Icons.Outlined.Folder, null, modifier = Modifier.size(20.dp), tint = Color(0xFF7C9CBF))
+        } else {
+            Box(
+                modifier = Modifier.size(20.dp).clip(RoundedCornerShape(4.dp)).background(fileIconColor(node.extension).copy(alpha = 0.15f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(node.extension.take(2).uppercase().ifBlank { "  " }, fontSize = 7.sp, fontWeight = FontWeight.Bold, color = fileIconColor(node.extension), maxLines = 1)
+            }
+        }
+        Spacer(Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = node.name,
+                style = MaterialTheme.typography.bodyMedium,
+                color = if (node.isDirectory) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f) else MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            if (relPath.isNotBlank()) {
+                Text(
+                    text = relPath,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
     }
 }
 
