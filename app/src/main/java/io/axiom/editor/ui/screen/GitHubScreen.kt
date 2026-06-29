@@ -61,6 +61,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -69,6 +70,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import coil3.compose.AsyncImage
 import io.axiom.editor.ui.model.LocalRepo
 import io.axiom.editor.ui.model.RemoteRepo
 import io.axiom.editor.ui.theme.AxiomColors
@@ -189,21 +191,15 @@ private fun GitHubTopBar(
         )
 
         if (isLoggedIn) {
-            Box(
+            AsyncImage(
+                model = avatarUrl,
+                contentDescription = "用户头像",
                 modifier = Modifier
                     .size(32.dp)
                     .clip(CircleShape)
-                    .background(AxiomColors.AccentBlue)
                     .border(1.dp, Color.White.copy(alpha = 0.1f), CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.Person,
-                    contentDescription = "用户头像",
-                    tint = Color.White,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
+                contentScale = ContentScale.Crop
+            )
         } else {
             IconButton(
                 onClick = onAddClick,

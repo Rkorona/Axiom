@@ -103,6 +103,7 @@ dependencies {
     implementation("dev.rikka.shizuku:api:13.1.5")
     implementation("dev.rikka.shizuku:provider:13.1.5")
     implementation("org.tukaani:xz:1.9")
+    implementation("io.coil-kt.coil3:coil-compose:3.5.0")
 
 
     
