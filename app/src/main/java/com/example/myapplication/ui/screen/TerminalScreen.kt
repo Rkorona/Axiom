@@ -13,7 +13,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.activity.compose.BackHandler
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.KeyboardArrowRight
@@ -62,12 +64,15 @@ private class TerminalJsBridge(
 // ─────────────────────────────────────────────
 // 主 Composable
 // ─────────────────────────────────────────────
-@OptIn(ExperimentalLayoutApi::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun TerminalScreen(
+    onNavigateBack: () -> Unit = {},
     modifier: Modifier = Modifier,
     vm: TerminalViewModel = viewModel()
 ) {
+    BackHandler { onNavigateBack() }
+
     val envState           = vm.envState
     val downloadProgress   = vm.downloadProgress
     val currentStatusMessage = vm.currentStatusMessage
@@ -134,9 +139,31 @@ fun TerminalScreen(
         vm.sendInput(bytes)
     }
 
+    Scaffold(
+        modifier = modifier,
+        topBar = {
+            TopAppBar(
+                navigationIcon = {
+                    IconButton(onClick = onNavigateBack) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "返回"
+                        )
+                    }
+                },
+                title = {
+                    Text("Linux Terminal (Debian)", fontWeight = FontWeight.Bold)
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                )
+            )
+        }
+    ) { innerPadding ->
     Box(
-        modifier = modifier
+        modifier = Modifier
             .fillMaxSize()
+            .padding(innerPadding)
             .imePadding()
     ) {
 
@@ -526,6 +553,7 @@ fun TerminalScreen(
                 }
             }
         }
+    }
     }
 }
 

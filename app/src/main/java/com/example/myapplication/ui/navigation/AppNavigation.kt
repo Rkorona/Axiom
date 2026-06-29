@@ -15,6 +15,7 @@ import com.example.myapplication.ui.model.ProjectLanguage
 import com.example.myapplication.ui.model.ProjectType
 import com.example.myapplication.ui.screen.EditorScreen
 import com.example.myapplication.ui.screen.HomeScreen
+import com.example.myapplication.ui.screen.TerminalScreen
 import kotlinx.coroutines.launch
 import java.io.File
 
@@ -23,6 +24,7 @@ import java.io.File
 // ─────────────────────────────────────────────
 sealed class Screen {
     object Home : Screen()
+    object Terminal : Screen()
     data class Editor(val filePath: String, val projectId: String) : Screen()
 }
 
@@ -142,7 +144,16 @@ fun AppNavigation() {
                 },
                 onSettingsClick = {
                     // TODO: 预留：后续接入设置页
+                },
+                onTerminalClick = {
+                    currentScreen = Screen.Terminal
                 }
+            )
+        }
+
+        is Screen.Terminal -> {
+            TerminalScreen(
+                onNavigateBack = { currentScreen = Screen.Home }
             )
         }
 

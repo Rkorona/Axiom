@@ -153,7 +153,8 @@ fun HomeScreen(
     onCloneGithub: () -> Unit = {},
     onImportFile: () -> Unit = {},
     onFromTemplate: () -> Unit = {},
-    onSettingsClick: () -> Unit = {}
+    onSettingsClick: () -> Unit = {},
+    onTerminalClick: () -> Unit = {}
 ) {
     // ── 搜索状态 ──
     var isSearchActive by remember { mutableStateOf(false) }
@@ -333,12 +334,6 @@ fun HomeScreen(
                         colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
                     )
                 }
-                2 -> { // 全新终端顶栏
-                    TopAppBar(
-                        title = { Text("Linux Terminal (Debian)", fontWeight = FontWeight.Bold) },
-                        colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
-                    )
-                }
                 3 -> {
                     TopAppBar(
                         title = { Text("设置", fontWeight = FontWeight.Bold) },
@@ -383,7 +378,7 @@ fun HomeScreen(
                     sortOrder = sortOrder,
                     isSearchActive = isSearchActive,
                     onProjectClick = onProjectClick,
-                    onTerminalClick = { onTabSelected(2) },
+                    onTerminalClick = onTerminalClick,
                     modifier = Modifier.padding(innerPadding)
                 )
             }
@@ -396,12 +391,6 @@ fun HomeScreen(
                 ) {
                     Text("GitHub 克隆管理页面（预留）", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-            }
-            2 -> {
-                // 渲染全新的 PRoot Debian 终端交互页面
-                TerminalScreen(
-                    modifier = Modifier.padding(innerPadding)
-                )
             }
             3 -> {
                 SettingsScreen(
