@@ -18,7 +18,13 @@ class SettingsStore(context: Context) {
         wordWrap           = prefs.getBoolean("wordWrap", false),
         tabWidth           = TabWidthMode.entries.getOrElse(prefs.getInt("tabWidth", 1)) { TabWidthMode.FOUR },
         autoSave           = prefs.getBoolean("autoSave", false),
-        autoSaveInterval   = AutoSaveMode.entries.find { it.name == prefs.getString("autoSaveInterval", "MIN1") } ?: AutoSaveMode.MIN1,
+        autoSaveInterval   = run {
+            when (val raw = prefs.all["autoSaveInterval"]) {
+                is String -> AutoSaveMode.entries.find { it.name == raw } ?: AutoSaveMode.MIN1
+                is Int    -> AutoSaveMode.entries.getOrElse(raw) { AutoSaveMode.MIN1 }
+                else      -> AutoSaveMode.MIN1
+            }
+        },
         fileEncoding       = EncodingMode.entries.getOrElse(prefs.getInt("fileEncoding", 0)) { EncodingMode.AUTO },
         enableFileTabs     = prefs.getBoolean("enableFileTabs", true),
         terminalFontSize   = prefs.getFloat("terminalFontSize", 13f),
