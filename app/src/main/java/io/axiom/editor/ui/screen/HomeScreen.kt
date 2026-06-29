@@ -16,7 +16,6 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.FolderOpen
 import androidx.compose.material.icons.outlined.Hub
 import androidx.compose.material.icons.outlined.SortByAlpha
-import androidx.compose.material.icons.outlined.Terminal
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -188,70 +187,92 @@ fun HomeScreen(
             when (selectedTab) {
                 0 -> { // 项目列表顶栏
                     if (isSearchActive) {
-                        TopAppBar(
-                            navigationIcon = {
-                                IconButton(
-                                    onClick = {
-                                        isSearchActive = false
-                                        searchQuery = ""
-                                        keyboardController?.hide()
-                                    }
+                        // ── Termius 风格胶囊搜索栏 ──
+                        Surface(
+                            color = MaterialTheme.colorScheme.surface,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .statusBarsPadding()
+                                    .padding(horizontal = 12.dp, vertical = 6.dp)
+                                    .height(44.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Surface(
+                                    shape = RoundedCornerShape(22.dp),
+                                    color = MaterialTheme.colorScheme.surfaceVariant,
+                                    modifier = Modifier.fillMaxSize()
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Close,
-                                        contentDescription = "关闭搜索",
-                                        tint = MaterialTheme.colorScheme.onSurface
-                                    )
-                                }
-                            },
-                            title = {
-                                TextField(
-                                    value = searchQuery,
-                                    onValueChange = { searchQuery = it },
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .focusRequester(searchFocusRequester),
-                                    placeholder = {
-                                        Text(
-                                            text = "搜索项目名称或路径…",
-                                            style = MaterialTheme.typography.bodyLarge,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .padding(start = 4.dp, end = 6.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        IconButton(
+                                            onClick = {
+                                                isSearchActive = false
+                                                searchQuery = ""
+                                                keyboardController?.hide()
+                                            },
+                                            modifier = Modifier.size(40.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Close,
+                                                contentDescription = "关闭搜索",
+                                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        }
+                                        TextField(
+                                            value = searchQuery,
+                                            onValueChange = { searchQuery = it },
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .focusRequester(searchFocusRequester),
+                                            placeholder = {
+                                                Text(
+                                                    text = "搜索项目名称或路径…",
+                                                    style = MaterialTheme.typography.bodyMedium,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f)
+                                                )
+                                            },
+                                            singleLine = true,
+                                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                                            keyboardActions = KeyboardActions(
+                                                onSearch = { keyboardController?.hide() }
+                                            ),
+                                            colors = TextFieldDefaults.colors(
+                                                focusedContainerColor = Color.Transparent,
+                                                unfocusedContainerColor = Color.Transparent,
+                                                focusedIndicatorColor = Color.Transparent,
+                                                unfocusedIndicatorColor = Color.Transparent,
+                                                disabledIndicatorColor = Color.Transparent,
+                                                errorIndicatorColor = Color.Transparent,
+                                            ),
+                                            textStyle = MaterialTheme.typography.bodyMedium,
                                         )
-                                    },
-                                    singleLine = true,
-                                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                                    keyboardActions = KeyboardActions(
-                                        onSearch = { keyboardController?.hide() }
-                                    ),
-                                    colors = TextFieldDefaults.colors(
-                                        focusedContainerColor = Color.Transparent,
-                                        unfocusedContainerColor = Color.Transparent,
-                                        focusedIndicatorColor = Color.Transparent,
-                                        unfocusedIndicatorColor = Color.Transparent,
-                                        disabledIndicatorColor = Color.Transparent,
-                                        errorIndicatorColor = Color.Transparent,
-                                    ),
-                                    textStyle = MaterialTheme.typography.bodyLarge,
-                                )
-                            },
-                            actions = {
-                                if (searchQuery.isNotEmpty()) {
-                                    IconButton(onClick = { searchQuery = "" }) {
-                                        Icon(
-                                            imageVector = Icons.Default.Close,
-                                            contentDescription = "清空搜索词",
-                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            modifier = Modifier.size(18.dp)
-                                        )
+                                        if (searchQuery.isNotEmpty()) {
+                                            IconButton(
+                                                onClick = { searchQuery = "" },
+                                                modifier = Modifier.size(32.dp)
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Close,
+                                                    contentDescription = "清空",
+                                                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
+                                                    modifier = Modifier.size(14.dp)
+                                                )
+                                            }
+                                        }
                                     }
                                 }
-                            },
-                            colors = TopAppBarDefaults.topAppBarColors(
-                                containerColor = MaterialTheme.colorScheme.surface
-                            )
-                        )
+                            }
+                        }
                     } else {
                         TopAppBar(
+                            expandedHeight = 52.dp,
                             navigationIcon = {
                                 IconButton(onClick = {}) {
                                     Icon(
@@ -263,7 +284,7 @@ fun HomeScreen(
                             },
                             title = {
                                 Text(
-                                    text = "Projects",
+                                    text = "Axiom",
                                     style = MaterialTheme.typography.titleLarge,
                                     fontWeight = FontWeight.Bold
                                 )
@@ -289,7 +310,11 @@ fun HomeScreen(
                                     }
                                     DropdownMenu(
                                         expanded = sortMenuExpanded,
-                                        onDismissRequest = { sortMenuExpanded = false }
+                                        onDismissRequest = { sortMenuExpanded = false },
+                                        shape = RoundedCornerShape(14.dp),
+                                        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                        tonalElevation = 0.dp,
+                                        shadowElevation = 4.dp
                                     ) {
                                         ProjectSortOrder.entries.forEach { order ->
                                             DropdownMenuItem(
@@ -331,12 +356,14 @@ fun HomeScreen(
                 }
                 1 -> {
                     TopAppBar(
+                        expandedHeight = 52.dp,
                         title = { Text("GitHub Repositories", fontWeight = FontWeight.Bold) },
                         colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
                     )
                 }
                 3 -> {
                     TopAppBar(
+                        expandedHeight = 52.dp,
                         title = { Text("设置", fontWeight = FontWeight.Bold) },
                         colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
                     )

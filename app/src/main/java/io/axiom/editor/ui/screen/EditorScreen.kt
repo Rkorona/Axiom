@@ -514,6 +514,7 @@ fun EditorScreen(
                     }
                 },
                 actions = {},
+                expandedHeight = 52.dp,
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(3.dp)
                 )

@@ -243,6 +243,7 @@ fun TerminalScreen(
                 title = {
                     Text("Linux Terminal (Debian)", fontWeight = FontWeight.Bold)
                 },
+                expandedHeight = 52.dp,
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surface
                 )
