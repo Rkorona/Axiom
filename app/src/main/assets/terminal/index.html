@@ -200,11 +200,11 @@
         var binary = atob(base64);
         var bytes = new Uint8Array(binary.length);
         for (var i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-        try { term.write(__utf8dec.decode(bytes)); }
+        try { term.write(__utf8dec.decode(bytes), function() { term.scrollToBottom(); }); }
         catch(e) {
           var s = '';
           for (var i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
-          term.write(s);
+          term.write(s, function() { term.scrollToBottom(); });
         }
       } catch(e) { console.error('writeOutput error', e); }
     };

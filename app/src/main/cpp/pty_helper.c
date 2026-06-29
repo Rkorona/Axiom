@@ -61,8 +61,8 @@ Java_com_example_myapplication_utils_PtyProcess_forkExecPty(
     t.c_iflag = ICRNL | IXON;
     t.c_oflag = OPOST | ONLCR;
     t.c_cflag = B38400 | CS8 | CREAD;
-    /* ICANON + ISIG + IEXTEN，但 **不** 加 ECHO / ECHOE / ECHOK */
-    t.c_lflag = ICANON | ISIG | IEXTEN;
+    /* ICANON + ISIG + IEXTEN + ECHO + ECHOE + ECHOK：启用标准回显 */
+    t.c_lflag = ICANON | ISIG | IEXTEN | ECHO | ECHOE | ECHOK;
     t.c_cc[VMIN]   = 1;
     t.c_cc[VTIME]  = 0;
     t.c_cc[VINTR]  = 3;    /* Ctrl+C  → SIGINT  */

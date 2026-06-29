@@ -1,0 +1,1 @@
+- [PTY echo config](pty-echo-config.md) — ECHO|ECHOE|ECHOK must be in c_lflag or typed input is invisible in the terminal
