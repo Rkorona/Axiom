@@ -349,15 +349,27 @@ fun EditorScreen(
     LaunchedEffect(filePath) {
         isFileLoaded = false
 
+        // 快照：记录本次 Effect 启动时的路径，防止旧协程注入新文件内容
+        val targetPath = filePath
+        val editorAlreadyReady = isEditorReady
+
+        // 提前计算文件扩展名（不依赖 remember，避免批处理竞态）
+        val targetExt = if (targetPath.startsWith("content://")) {
+            Uri.decode(Uri.parse(targetPath).lastPathSegment ?: "")
+                .substringAfterLast('/').substringAfterLast('.', "")
+        } else {
+            File(targetPath).extension
+        }
+
         launch(Dispatchers.IO) {
             try {
                 val bytes = if (isSafUri) {
-                    val uri = Uri.parse(filePath)
+                    val uri = Uri.parse(targetPath)
                     context.contentResolver.openInputStream(uri)
                         ?.use { it.readBytes() }
                         ?: byteArrayOf()
                 } else {
-                    val f = file!!
+                    val f = File(targetPath)
                     if (f.exists()) {
                         f.readBytes()
                     } else {
@@ -380,6 +392,18 @@ fun EditorScreen(
                     fileContent = text
                     fileEncoding = charset.name()
                     isFileLoaded = true
+
+                    // 若编辑器已就绪（文件切换场景），直接注入新内容，
+                    // 避免依赖 isFileLoaded 状态翻转被 Compose 批处理吞掉
+                    if (editorAlreadyReady) {
+                        val isDark = isDarkTheme
+                        val bg = if (isDark) "#141729" else "#ffffff"
+                        executeJs("document.documentElement.style.setProperty('--editor-bg','$bg')")
+                        executeJs("window.editorAPI.setContentBase64('${text.toBase64()}')")
+                        executeJs("window.editorAPI.setLanguage('$targetExt')")
+                        executeJs("window.editorAPI.setTheme($isDark)")
+                        applyEditorSettings(isDark)
+                    }
                 }
             } catch (e: Exception) {
                 launch(Dispatchers.Main) {
