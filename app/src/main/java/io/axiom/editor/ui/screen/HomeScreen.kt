@@ -195,8 +195,8 @@ fun HomeScreen(
                             Row(
                                 modifier = Modifier
                                     .statusBarsPadding()
-                                    .padding(horizontal = 12.dp, vertical = 6.dp)
-                                    .height(44.dp),
+                                    .padding(horizontal = 12.dp, vertical = 8.dp)
+                                    .height(48.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Surface(
@@ -233,7 +233,7 @@ fun HomeScreen(
                                                 .focusRequester(searchFocusRequester),
                                             placeholder = {
                                                 Text(
-                                                    text = "搜索项目名称或路径…",
+                                                    text = "搜索项目名称…",
                                                     style = MaterialTheme.typography.bodyMedium,
                                                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f)
                                                 )
