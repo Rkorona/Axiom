@@ -200,6 +200,15 @@ fun EditorScreen(
         }
     }
 
+    // ── 修改状态 & 保存提示 ──────────────────────────────────
+    // 用原子布尔区分「用户编辑」与「程序注入」触发的 onStatsChanged
+    val suppressMod = remember { java.util.concurrent.atomic.AtomicBoolean(false) }
+
+    fun suppressModFor(ms: Long = 700L) {
+        suppressMod.set(true)
+        coroutineScope.launch { kotlinx.coroutines.delay(ms); suppressMod.set(false) }
+    }
+
     // ─────────────────────────────────────────────────────────
     // 注入编辑器外观设置（字体、行号、换行、补全等）
     // ─────────────────────────────────────────────────────────
@@ -335,13 +344,6 @@ fun EditorScreen(
     var isModified by remember { mutableStateOf(false) }
     var showSavedIndicator by remember { mutableStateOf(false) }
     var savedIndicatorTick by remember { mutableStateOf(0) }
-    // 用原子布尔区分「用户编辑」与「程序注入」触发的 onStatsChanged
-    val suppressMod = remember { java.util.concurrent.atomic.AtomicBoolean(false) }
-
-    fun suppressModFor(ms: Long = 700L) {
-        suppressMod.set(true)
-        coroutineScope.launch { kotlinx.coroutines.delay(ms); suppressMod.set(false) }
-    }
     val treeProject = remember(projectName, projectLocalPath) {
         if (projectLocalPath != null) {
             Project(
