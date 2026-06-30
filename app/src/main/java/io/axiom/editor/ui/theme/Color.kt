@@ -52,7 +52,7 @@ val DarkSurface = Color(0xFF10131A)
 val DarkOnSurface = Color(0xFFE2E3EA)
 val DarkSurfaceVariant = Color(0xFF282C38)
 val DarkOnSurfaceVariant = Color(0xFF9EA3B0)
-val DarkSurfaceContainerLow = Color(0xFF1A1E29)
+val DarkSurfaceContainerLow = Color(0xFF1A1D30)
 val DarkSurfaceContainerHigh = Color(0xFF252934)
 val DarkOutline = Color(0xFF585D6A)
 val DarkError = Color(0xFFFFB4AB)
@@ -82,7 +82,7 @@ val GhLightLoginBorder      = Color(0x221A6FE8)
 
 // ---------- GitHub screen — dark token colors ----------
 val GhDarkBackground       = Color(0xFF0F111A)
-val GhDarkCard             = Color(0xFF1A1D30)
+val GhDarkCard             = DarkSurfaceContainerLow
 val GhDarkCardExpanded     = Color(0xFF1D213A)
 val GhDarkExpandedBorder   = Color(0x4D2160C4)
 val GhDarkInput            = Color(0xFF252942)
