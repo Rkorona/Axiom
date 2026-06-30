@@ -20,13 +20,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import io.axiom.editor.data.AppSettings
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.MoreHoriz
-import androidx.compose.material.icons.filled.TouchApp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -229,26 +227,7 @@ fun TerminalScreen(
     }
 
     Scaffold(
-        modifier = modifier,
-        topBar = {
-            TopAppBar(
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "返回"
-                        )
-                    }
-                },
-                title = {
-                    Text("Linux Terminal (Debian)", fontWeight = FontWeight.Bold)
-                },
-                expandedHeight = 52.dp,
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                )
-            )
-        }
+        modifier = modifier
     ) { innerPadding ->
     Box(
         modifier = Modifier
@@ -398,20 +377,20 @@ fun TerminalScreen(
                     }
                 }
 
-                // B. Termius 风格工具栏（始终显示）
+                // B. M3 风格工具栏（始终显示）
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(Color(0xFF1C2330))
+                        .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                 ) {
                         // 主工具行
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(44.dp)
+                                .height(48.dp)
                                 .drawBehind {
                                     drawLine(
-                                        color = Color(0xFF2E384D),
+                                        color = MaterialTheme.colorScheme.outlineVariant,
                                         start = Offset(0f, 0f),
                                         end = Offset(size.width, 0f),
                                         strokeWidth = 1.dp.toPx()
@@ -419,14 +398,12 @@ fun TerminalScreen(
                                 },
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            TerminalKeyButton(icon = Icons.Default.TouchApp) { }
-                            TerminalKeyDivider()
                             TerminalKeyButton(text = "Esc") { handleToolbarKeyPress("Esc") }
                             TerminalKeyDivider()
                             TerminalKeyButton(
                                 text = "Ctrl",
                                 isActive = isCtrlPressed,
-                                accentColor = Color(0xFF00D2D7)
+                                accentColor = MaterialTheme.colorScheme.primary
                             ) { handleToolbarKeyPress("Ctrl") }
                             TerminalKeyDivider()
                             TerminalKeyButton(icon = Icons.Default.KeyboardArrowUp) { handleToolbarKeyPress("↑") }
@@ -440,7 +417,7 @@ fun TerminalScreen(
                             TerminalKeyButton(
                                 icon = Icons.Default.MoreHoriz,
                                 isActive = showSecondaryPanel,
-                                accentColor = Color(0xFF38BDF8)
+                                accentColor = MaterialTheme.colorScheme.primary
                             ) { showSecondaryPanel = !showSecondaryPanel }
                         }
 
@@ -449,10 +426,10 @@ fun TerminalScreen(
                             FlowRow(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .background(Color(0xFF141A24))
+                                    .background(MaterialTheme.colorScheme.surface)
                                     .drawBehind {
                                         drawLine(
-                                            color = Color(0xFF242F41),
+                                            color = MaterialTheme.colorScheme.outlineVariant,
                                             start = Offset(0f, 0f),
                                             end = Offset(size.width, 0f),
                                             strokeWidth = 1.dp.toPx()
@@ -470,6 +447,7 @@ fun TerminalScreen(
                                         modifier = Modifier
                                             .width(58.dp)
                                             .height(44.dp)
+                                            .clip(RoundedCornerShape(8.dp))
                                             .clickable(
                                                 interactionSource = remember { MutableInteractionSource() },
                                                 indication = null
@@ -479,10 +457,10 @@ fun TerminalScreen(
                                         Text(
                                             text = sym,
                                             style = TextStyle(
-                                                color = Color(0xFFE2E8F0),
+                                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
                                                 fontFamily = FontFamily.Monospace,
                                                 fontSize = 12.sp,
-                                                fontWeight = FontWeight.Bold
+                                                fontWeight = FontWeight.Medium
                                             )
                                         )
                                     }
@@ -649,52 +627,46 @@ fun TerminalScreen(
 }
 
 // ─────────────────────────────────────────────
-// 工具栏按键组件（保持原有风格）
+// 工具栏按键组件（M3 风格）
 // ─────────────────────────────────────────────
 @Composable
 fun RowScope.TerminalKeyButton(
     text: String? = null,
     icon: ImageVector? = null,
     isActive: Boolean = false,
-    accentColor: Color = Color(0xFF38BDF8),
+    accentColor: Color = MaterialTheme.colorScheme.primary,
     onClick: () -> Unit
 ) {
-    Box(
+    Surface(
         modifier = Modifier
             .weight(1f)
             .fillMaxHeight()
+            .clip(RoundedCornerShape(8.dp))
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null
             ) { onClick() },
-        contentAlignment = Alignment.Center
+        color = if (isActive) accentColor.copy(alpha = 0.15f) else Color.Transparent,
+        shape = RoundedCornerShape(8.dp)
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
             when {
                 icon != null -> Icon(
                     imageVector = icon,
                     contentDescription = text,
-                    tint = if (isActive) accentColor else Color(0xFFE2E8F0),
-                    modifier = Modifier.size(18.dp)
+                    tint = if (isActive) accentColor else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                    modifier = Modifier.size(20.dp)
                 )
                 text != null -> Text(
                     text = text,
                     style = TextStyle(
-                        color = if (isActive) accentColor else Color(0xFFE2E8F0),
+                        color = if (isActive) accentColor else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
                         fontFamily = FontFamily.Monospace,
                         fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Medium
                     )
                 )
             }
-            Spacer(modifier = Modifier.height(3.dp))
-            Box(
-                modifier = Modifier
-                    .width(16.dp)
-                    .height(2.dp)
-                    .clip(RoundedCornerShape(1.dp))
-                    .background(if (isActive) accentColor else Color.Transparent)
-            )
         }
     }
 }
