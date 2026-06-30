@@ -475,6 +475,13 @@ private fun LocalRepoCard(
                                 textColor       = colors.accentRed
                             )
                         }
+                        if (repo.isRemoteAhead) {
+                            StatusBadge(
+                                text            = "远端有更新",
+                                backgroundColor = colors.accentBlueAlpha2,
+                                textColor       = colors.accentBlueLight
+                            )
+                        }
                         if (repo.unpushedCommits > 0) {
                             StatusBadge(
                                 text            = "${repo.unpushedCommits} 个待推送",

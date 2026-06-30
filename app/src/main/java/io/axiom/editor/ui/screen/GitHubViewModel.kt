@@ -382,10 +382,11 @@ class GitHubViewModel(application: Application) : AndroidViewModel(application) 
                     }
                 }
 
-                val scanned = withContext(Dispatchers.IO) { GitHubRepoScanner.scan(context) }
+                val scanned = withContext(Dispatchers.IO) { GitHubRepoScanner.scan(getApplication()) }
                 localRepos  = scanned
                 changedFiles = changedFiles + (repoName to emptyList())
-                commitHistory = commitHistory - repoName
+                // Pull 后不删除提交历史，让 loadCommitHistoryForRepo 异步替换
+                loadCommitHistoryForRepo(repoName)
                 setRepoMsg(repoName, "Pull 完成，代码已更新到最新版本", false)
             } catch (e: Exception) {
                 setRepoMsg(repoName, "Pull 失败：${e.message ?: "网络错误"}", true)

@@ -4,7 +4,8 @@ data class LocalRepo(
     val name: String,
     val branch: String,
     val uncommittedChanges: Int = 0,
-    val unpushedCommits: Int = 0
+    val unpushedCommits: Int = 0,
+    val isRemoteAhead: Boolean = false
 )
 
 data class RemoteRepo(

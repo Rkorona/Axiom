@@ -36,10 +36,12 @@ object GitHubRepoScanner {
         val gitDir = File(projectDir, ".git")
         val branch = readBranch(gitDir)
         val unpushed = detectUnpushed(gitDir, branch)
+        val isRemoteAhead = detectRemoteAhead(gitDir, branch)
         return LocalRepo(
             name = projectDir.name,
             branch = branch,
-            unpushedCommits = unpushed
+            unpushedCommits = unpushed,
+            isRemoteAhead = isRemoteAhead
         )
     }
 
@@ -59,6 +61,14 @@ object GitHubRepoScanner {
             ?: readPackedRef(gitDir, "refs/remotes/origin/$branch")
             ?: return 1
         return if (localHash == remoteHash) 0 else 1
+    }
+
+    private fun detectRemoteAhead(gitDir: File, branch: String): Boolean {
+        val remoteHash = readRefFile(gitDir, "refs/remotes/origin/$branch")
+            ?: readPackedRef(gitDir, "refs/remotes/origin/$branch")
+            ?: return false
+        val localHash = readRefFile(gitDir, "refs/heads/$branch") ?: return false
+        return remoteHash != localHash
     }
 
     private fun readRefFile(gitDir: File, ref: String): String? {
