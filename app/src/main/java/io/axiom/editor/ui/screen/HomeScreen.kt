@@ -418,7 +418,7 @@ fun HomeScreen(
             onDismissRequest = { pendingDeleteProjects = emptyList() },
             icon = { androidx.compose.material3.Icon(Icons.Filled.DeleteForever, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
             title = { Text("确认删除") },
-            text = { Text("将删除 $desc，此操作不可撤销。") },
+            text = { Text("将永久删除 $desc 及其所有本地文件，此操作不可撤销。") },
             confirmButton = {
                 androidx.compose.material3.TextButton(onClick = {
                     pendingDeleteProjects.forEach { onDeleteProject(it) }

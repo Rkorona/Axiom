@@ -193,7 +193,7 @@ fun AppNavigation(settingsViewModel: SettingsViewModel = viewModel()) {
                     scope.launch { repository.updateProjectName(project.id, newName) }
                 },
                 onDeleteProject = { project ->
-                    scope.launch { repository.deleteProject(project.id) }
+                    scope.launch { repository.deleteProject(project) }
                 },
                 onCopyProject = { project ->
                     scope.launch { repository.copyProject(project) }

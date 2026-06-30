@@ -19,8 +19,13 @@ class ProjectRepository(context: Context) {
         dao.insertProject(project.toEntity())
     }
 
-    suspend fun deleteProject(id: String) {
-        dao.deleteProjectById(id)
+    suspend fun deleteProject(project: io.axiom.editor.ui.model.Project) {
+        dao.deleteProjectById(project.id)
+        // 同步删除本地文件目录（私有目录用户无法从文件管理器访问，不删会造成存储泄漏）
+        project.localPath?.let { path ->
+            val dir = java.io.File(path)
+            if (dir.exists()) dir.deleteRecursively()
+        }
     }
 
     suspend fun updateProjectLanguage(id: String, language: io.axiom.editor.ui.model.ProjectLanguage) {
