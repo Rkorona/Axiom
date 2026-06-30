@@ -102,6 +102,11 @@ class GitHubViewModel(application: Application) : AndroidViewModel(application) 
     var searchQuery by mutableStateOf("")
         private set
 
+    // ── 远端状态刷新 ──────────────────────────────────────────────────
+    /** 切换到 GitHub 页面时静默刷新远端 SHA 的加载状态 */
+    var isRefreshingRemoteRefs by mutableStateOf(false)
+        private set
+
     // ── 每个仓库的独立操作状态 ────────────────────────────────────────
     /** repoName → 当前操作类型 ("fetch"/"pull"/"commit"/"push") */
     var repoOperationState by mutableStateOf<Map<String, String>>(emptyMap())
@@ -285,8 +290,24 @@ class GitHubViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     /**
-     * 应用启动后静默刷新各仓库的远端引用（不弹提示），
-     * 让 isRemoteAhead 在不手动 Fetch 的情况下也能正确显示。
+     * 切换到 GitHub 页面时调用：刷新所有本地仓库的远端引用并更新 isRemoteAhead 状态。
+     * 通过 isRefreshingRemoteRefs 向 UI 暴露加载状态。
+     */
+    fun refreshRemoteStatus() {
+        val token = accessToken
+        if (token.isEmpty() || localRepos.isEmpty()) return
+        viewModelScope.launch {
+            isRefreshingRemoteRefs = true
+            try {
+                withContext(Dispatchers.IO) { silentRefreshRemoteRefs(localRepos) }
+            } finally {
+                isRefreshingRemoteRefs = false
+            }
+        }
+    }
+
+    /**
+     * 静默刷新各仓库的远端引用（IO 线程），更新 isRemoteAhead 状态。
      */
     private suspend fun silentRefreshRemoteRefs(repos: List<LocalRepo>) {
         val token = accessToken

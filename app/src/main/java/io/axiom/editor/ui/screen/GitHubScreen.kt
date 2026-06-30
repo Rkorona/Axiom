@@ -108,6 +108,11 @@ fun GitHubScreen(
             if (viewModel.isLoggedIn && showLoginSheet) onLoginSheetDismiss()
         }
 
+        // 每次进入 GitHub 页面时自动刷新远端状态
+        LaunchedEffect(Unit) {
+            viewModel.refreshRemoteStatus()
+        }
+
         LaunchedEffect(viewModel.cloneMessage) {
             if (viewModel.cloneMessage != null) {
                 kotlinx.coroutines.delay(3500)
@@ -157,6 +162,7 @@ fun GitHubScreen(
                     LocalRepoCard(
                         repo                = repo,
                         isExpanded          = isExpanded,
+                        isRefreshing        = viewModel.isRefreshingRemoteRefs,
                         onToggle            = { viewModel.toggleRepoExpansion(repo.name) },
                         changedFiles        = viewModel.changedFiles[repo.name] ?: emptyList(),
                         commitHistory       = viewModel.commitHistory[repo.name] ?: emptyList(),
@@ -395,6 +401,7 @@ private fun SectionTitle(title: String) {
 private fun LocalRepoCard(
     repo: LocalRepo,
     isExpanded: Boolean,
+    isRefreshing: Boolean,
     onToggle: () -> Unit,
     changedFiles: List<ChangedFile>,
     commitHistory: List<CommitRecord>,
@@ -468,26 +475,34 @@ private fun LocalRepoCard(
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                         verticalAlignment     = Alignment.CenterVertically
                     ) {
-                        if (uncommittedCount > 0) {
-                            StatusBadge(
-                                text            = "$uncommittedCount 个修改",
-                                backgroundColor = colors.accentRedAlpha,
-                                textColor       = colors.accentRed
+                        if (isRefreshing) {
+                            CircularProgressIndicator(
+                                modifier    = Modifier.size(16.dp),
+                                strokeWidth = 2.dp,
+                                color       = colors.accentBlue
                             )
-                        }
-                        if (repo.isRemoteAhead) {
-                            StatusBadge(
-                                text            = "远端有更新",
-                                backgroundColor = colors.accentBlueAlpha2,
-                                textColor       = colors.accentBlueLight
-                            )
-                        }
-                        if (repo.unpushedCommits > 0) {
-                            StatusBadge(
-                                text            = "${repo.unpushedCommits} 个待推送",
-                                backgroundColor = colors.accentBlueAlpha2,
-                                textColor       = colors.accentBlueLight
-                            )
+                        } else {
+                            if (uncommittedCount > 0) {
+                                StatusBadge(
+                                    text            = "$uncommittedCount 个修改",
+                                    backgroundColor = colors.accentRedAlpha,
+                                    textColor       = colors.accentRed
+                                )
+                            }
+                            if (repo.isRemoteAhead) {
+                                StatusBadge(
+                                    text            = "远端有更新",
+                                    backgroundColor = colors.accentBlueAlpha2,
+                                    textColor       = colors.accentBlueLight
+                                )
+                            }
+                            if (repo.unpushedCommits > 0) {
+                                StatusBadge(
+                                    text            = "${repo.unpushedCommits} 个待推送",
+                                    backgroundColor = colors.accentBlueAlpha2,
+                                    textColor       = colors.accentBlueLight
+                                )
+                            }
                         }
                     }
                 }
