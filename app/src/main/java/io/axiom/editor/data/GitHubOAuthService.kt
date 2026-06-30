@@ -229,6 +229,36 @@ object GitHubOAuthService {
     }
 
     // ═══════════════════════════════════════════════════════════════════
+    // 远端文件内容（冲突检测用）
+    // ═══════════════════════════════════════════════════════════════════
+
+    /**
+     * 获取远端单个文件的原始字节（通过 Contents API，最大约 1 MB）。
+     * 文件不存在或请求失败返回 null。
+     */
+    fun downloadRemoteFileBytes(
+        token: String,
+        fullName: String,
+        filePath: String,
+        branch: String
+    ): ByteArray? {
+        // path 中的每段单独编码，保留 '/' 分隔符
+        val encodedPath = filePath.split("/").joinToString("/") { encode(it) }
+        val conn = apiGet(
+            token,
+            "https://api.github.com/repos/$fullName/contents/$encodedPath?ref=${encode(branch)}"
+        )
+        if (conn.responseCode != 200) return null
+        return try {
+            val json     = org.json.JSONObject(conn.inputStream.bufferedReader().readText())
+            val content  = json.optString("content", "").replace("\n", "")
+            val encoding = json.optString("encoding", "base64")
+            if (encoding == "base64") Base64.decode(content, Base64.DEFAULT)
+            else content.toByteArray(Charsets.UTF_8)
+        } catch (_: Exception) { null }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
     // Push（GitHub Trees API 原子推送）
     // ═══════════════════════════════════════════════════════════════════
 

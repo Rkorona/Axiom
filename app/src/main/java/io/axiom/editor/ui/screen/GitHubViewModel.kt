@@ -36,6 +36,13 @@ import java.util.TimeZone
 
 enum class GitHubLoginState { Idle, Loading, Error }
 
+data class PushConflictState(
+    val repoName: String,
+    val pushMessage: String,
+    /** 在远端也被修改的文件列表（相对路径） */
+    val conflictFiles: List<String>
+)
+
 class GitHubViewModel(application: Application) : AndroidViewModel(application) {
 
     private val store = GitHubStore(application)
@@ -105,6 +112,11 @@ class GitHubViewModel(application: Application) : AndroidViewModel(application) 
     // ── 远端状态刷新 ──────────────────────────────────────────────────
     /** 切换到 GitHub 页面时静默刷新远端 SHA 的加载状态 */
     var isRefreshingRemoteRefs by mutableStateOf(false)
+        private set
+
+    // ── Push 冲突检测 ─────────────────────────────────────────────────
+    /** 非 null 时显示冲突确认弹窗 */
+    var pushConflictState by mutableStateOf<PushConflictState?>(null)
         private set
 
     // ── 每个仓库的独立操作状态 ────────────────────────────────────────
@@ -552,6 +564,9 @@ class GitHubViewModel(application: Application) : AndroidViewModel(application) 
     // Push
     // ═══════════════════════════════════════════════════════════════════
 
+    /**
+     * Push 入口：先检测冲突，有冲突时暂停并弹窗，无冲突时直接推送。
+     */
     fun pushRepo(repoName: String, pushMessage: String = "") {
         val token = accessToken
         if (token.isEmpty()) return
@@ -559,18 +574,11 @@ class GitHubViewModel(application: Application) : AndroidViewModel(application) 
             setRepoOp(repoName, "push")
             try {
                 val dir = withContext(Dispatchers.IO) { findProjectDir(repoName) }
-                if (dir == null) {
-                    setRepoMsg(repoName, "找不到本地仓库目录", true)
-                    return@launch
-                }
+                if (dir == null) { setRepoMsg(repoName, "找不到本地仓库目录", true); return@launch }
                 val fullName = withContext(Dispatchers.IO) { readRemoteFullName(dir) }
-                if (fullName == null) {
-                    setRepoMsg(repoName, "无法读取远端仓库地址", true)
-                    return@launch
-                }
+                if (fullName == null) { setRepoMsg(repoName, "无法读取远端仓库地址", true); return@launch }
                 val branch = localRepos.find { it.name == repoName }?.branch ?: "main"
 
-                // 对比已提交快照 vs 远端快照，只推送通过 Commit 提交的内容
                 val filesToPush = withContext(Dispatchers.IO) {
                     GitHubFileChangeScanner.scanCommittedVsRemote(dir)
                 }
@@ -579,55 +587,128 @@ class GitHubViewModel(application: Application) : AndroidViewModel(application) 
                     return@launch
                 }
 
-                // 确定提交信息
-                val message = pushMessage.ifBlank {
-                    val pending = withContext(Dispatchers.IO) {
-                        GitHubFileChangeScanner.readCommits(dir)
-                            .filter { !it.isPushed }
-                            .map { it.shortMessage }
-                    }
-                    if (pending.isNotEmpty()) pending.joinToString("; ")
-                    else "Update ${filesToPush.size} file(s)"
+                // ── 冲突检测：比对远端当前内容与本地基线 ──────────────────
+                val conflictFiles = withContext(Dispatchers.IO) {
+                    detectConflicts(token, fullName, branch, dir, filesToPush)
+                }
+                if (conflictFiles.isNotEmpty()) {
+                    // 暂停 push，弹出冲突确认弹窗
+                    val resolvedMessage = buildPushMessage(dir, pushMessage, filesToPush.size)
+                    setRepoOp(repoName, null)
+                    pushConflictState = PushConflictState(repoName, resolvedMessage, conflictFiles)
+                    return@launch
                 }
 
-                val newSha = withContext(Dispatchers.IO) {
-                    GitHubOAuthService.pushToGitHub(
-                        token       = token,
-                        fullName    = fullName,
-                        branch      = branch,
-                        filesToPush = filesToPush,
-                        message     = message,
-                        projectDir  = dir
-                    )
-                }
-
-                withContext(Dispatchers.IO) {
-                    // 同步本地双侧引用（确保父目录存在，避免 ENOENT）
-                    File(dir, ".git/refs/heads/$branch").apply { parentFile?.mkdirs() }.writeText("$newSha\n")
-                    File(dir, ".git/refs/remotes/origin/$branch").apply { parentFile?.mkdirs() }.writeText("$newSha\n")
-                    // 将已提交快照（AXIOM_INDEX）复制为新的远端基线（AXIOM_REMOTE_INDEX）
-                    // 注意：不重建自工作区，这样未提交的工作区修改不会影响下次 Push 的基线
-                    GitHubFileChangeScanner.syncRemoteIndexFromCommitted(dir)
-                    // 标记所有本地提交为已推送
-                    GitHubFileChangeScanner.markCommitsPushed(dir)
-                }
-
-                val scanned = withContext(Dispatchers.IO) {
-                    GitHubRepoScanner.scan(getApplication())
-                }
-                localRepos = scanned
-                val history = withContext(Dispatchers.IO) {
-                    GitHubFileChangeScanner.readCommits(dir)
-                }
-                commitHistory = commitHistory + (repoName to history)
-                // Push 后刷新变更文件（远端快照已更新，变更应清空）
-                refreshChangedFilesForRepo(repoName)
-                setRepoMsg(repoName, "Push 成功！${filesToPush.size} 个文件已上传 ✓", false)
+                // 无冲突，直接推送
+                val resolvedMessage = buildPushMessage(dir, pushMessage, filesToPush.size)
+                performPush(repoName, token, fullName, branch, dir, filesToPush, resolvedMessage)
             } catch (e: Exception) {
                 setRepoMsg(repoName, "Push 失败：${e.message ?: "网络错误"}", true)
-            } finally {
                 setRepoOp(repoName, null)
             }
+        }
+    }
+
+    /** 用户在冲突弹窗中选择"强制推送" */
+    fun confirmForcePush() {
+        val state = pushConflictState ?: return
+        pushConflictState = null
+        val token = accessToken
+        if (token.isEmpty()) return
+        viewModelScope.launch {
+            setRepoOp(state.repoName, "push")
+            try {
+                val dir      = withContext(Dispatchers.IO) { findProjectDir(state.repoName) } ?: return@launch
+                val fullName = withContext(Dispatchers.IO) { readRemoteFullName(dir) } ?: return@launch
+                val branch   = localRepos.find { it.name == state.repoName }?.branch ?: "main"
+                val files    = withContext(Dispatchers.IO) { GitHubFileChangeScanner.scanCommittedVsRemote(dir) }
+                performPush(state.repoName, token, fullName, branch, dir, files, state.pushMessage)
+            } catch (e: Exception) {
+                setRepoMsg(state.repoName, "Push 失败：${e.message ?: "网络错误"}", true)
+                setRepoOp(state.repoName, null)
+            }
+        }
+    }
+
+    /** 用户在冲突弹窗中选择"取消" */
+    fun dismissPushConflict() {
+        pushConflictState = null
+    }
+
+    // ── 冲突检测辅助 ─────────────────────────────────────────────────
+
+    /**
+     * 对比每个待推送文件的远端当前内容 vs 本地基线（AXIOM_REMOTE_INDEX）的 MD5。
+     * 若远端内容变化 → 说明该文件被其他人修改过 → 冲突。
+     * 仅对 MODIFIED / DELETED 文件检测（ADDED 文件在远端不存在，无法冲突）。
+     */
+    private fun detectConflicts(
+        token: String,
+        fullName: String,
+        branch: String,
+        projectDir: File,
+        filesToPush: List<io.axiom.editor.ui.model.ChangedFile>
+    ): List<String> {
+        val baselineMap = GitHubFileChangeScanner.readRemoteIndexMap(projectDir)
+        val conflicts   = mutableListOf<String>()
+        for (file in filesToPush) {
+            val baselineMd5 = baselineMap[file.path] ?: continue // ADDED 文件，基线中没有 → 跳过
+            val remoteBytes = GitHubOAuthService.downloadRemoteFileBytes(token, fullName, file.path, branch)
+                ?: continue // 远端不存在（已删除）→ 跳过
+            val remoteMd5 = GitHubFileChangeScanner.md5OfBytes(remoteBytes)
+            if (remoteMd5 != baselineMd5) {
+                conflicts.add(file.path)
+            }
+        }
+        return conflicts
+    }
+
+    private suspend fun buildPushMessage(dir: File, pushMessage: String, fileCount: Int): String =
+        pushMessage.ifBlank {
+            val pending = withContext(Dispatchers.IO) {
+                GitHubFileChangeScanner.readCommits(dir)
+                    .filter { !it.isPushed }
+                    .map { it.shortMessage }
+            }
+            if (pending.isNotEmpty()) pending.joinToString("; ")
+            else "Update $fileCount file(s)"
+        }
+
+    /** 实际执行 Push 的核心逻辑（冲突检测通过后调用）。调用前必须已 setRepoOp("push")。*/
+    private suspend fun performPush(
+        repoName: String,
+        token: String,
+        fullName: String,
+        branch: String,
+        dir: File,
+        filesToPush: List<io.axiom.editor.ui.model.ChangedFile>,
+        message: String
+    ) {
+        try {
+            val newSha = withContext(Dispatchers.IO) {
+                GitHubOAuthService.pushToGitHub(
+                    token       = token,
+                    fullName    = fullName,
+                    branch      = branch,
+                    filesToPush = filesToPush,
+                    message     = message,
+                    projectDir  = dir
+                )
+            }
+            withContext(Dispatchers.IO) {
+                File(dir, ".git/refs/heads/$branch").apply { parentFile?.mkdirs() }.writeText("$newSha\n")
+                File(dir, ".git/refs/remotes/origin/$branch").apply { parentFile?.mkdirs() }.writeText("$newSha\n")
+                GitHubFileChangeScanner.syncRemoteIndexFromCommitted(dir)
+                GitHubFileChangeScanner.markCommitsPushed(dir)
+            }
+            val scanned = withContext(Dispatchers.IO) { GitHubRepoScanner.scan(getApplication()) }
+            localRepos = scanned
+            val history = withContext(Dispatchers.IO) { GitHubFileChangeScanner.readCommits(dir) }
+            commitHistory = commitHistory + (repoName to history)
+            refreshChangedFilesForRepo(repoName)
+            setRepoMsg(repoName, "Push 成功！${filesToPush.size} 个文件已上传 ✓", false)
+        } finally {
+            setRepoOp(repoName, null)
         }
     }
 

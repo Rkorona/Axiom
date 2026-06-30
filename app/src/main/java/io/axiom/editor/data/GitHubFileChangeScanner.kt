@@ -245,6 +245,19 @@ object GitHubFileChangeScanner {
             .filter { it.isFile }
     }
 
+    /** 读取远端基线快照（AXIOM_REMOTE_INDEX）的路径→MD5映射 */
+    fun readRemoteIndexMap(projectDir: File): Map<String, String> {
+        val file = File(projectDir, ".git/$REMOTE_INDEX_FILE")
+        return if (file.exists()) readIndexMap(file) else emptyMap()
+    }
+
+    /** 计算字节数组的 MD5（供冲突检测对比远端内容） */
+    fun md5OfBytes(bytes: ByteArray): String {
+        val md = MessageDigest.getInstance("MD5")
+        md.update(bytes)
+        return md.digest().joinToString("") { "%02x".format(it) }
+    }
+
     private fun md5(file: File): String = try {
         val md = MessageDigest.getInstance("MD5")
         file.inputStream().buffered().use { input ->

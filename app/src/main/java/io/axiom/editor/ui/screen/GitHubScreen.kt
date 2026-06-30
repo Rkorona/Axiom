@@ -247,6 +247,14 @@ fun GitHubScreen(
                 )
             }
 
+            viewModel.pushConflictState?.let { conflict ->
+                PushConflictSheet(
+                    conflict       = conflict,
+                    onForcePush    = { viewModel.confirmForcePush() },
+                    onDismiss      = { viewModel.dismissPushConflict() }
+                )
+            }
+
             // 克隆结果通知横条
             AnimatedVisibility(
                 visible = viewModel.cloneMessage != null,
@@ -1393,6 +1401,152 @@ private fun LoginBottomSheet(
                     text     = "取消",
                     color    = if (isLoading) colors.textMuted else colors.textSecondary,
                     fontSize = 14.sp
+                )
+            }
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Push 冲突确认弹窗
+// ═══════════════════════════════════════════════════════════════════
+
+@Composable
+private fun PushConflictSheet(
+    conflict: PushConflictState,
+    onForcePush: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val colors     = LocalGitHubColors.current
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    ModalBottomSheet(
+        onDismissRequest   = onDismiss,
+        sheetState         = sheetState,
+        containerColor     = colors.card,
+        dragHandle         = null
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp)
+                .padding(top = 28.dp, bottom = 32.dp),
+            verticalArrangement = Arrangement.spacedBy(0.dp)
+        ) {
+            // 标题行
+            Row(
+                verticalAlignment     = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Box(
+                    modifier          = Modifier
+                        .size(36.dp)
+                        .background(colors.accentRedAlpha, RoundedCornerShape(10.dp)),
+                    contentAlignment  = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector        = Icons.Rounded.Info,
+                        contentDescription = null,
+                        tint               = colors.accentRed,
+                        modifier           = Modifier.size(18.dp)
+                    )
+                }
+                Column {
+                    Text(
+                        text       = "检测到合并冲突",
+                        fontSize   = 16.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color      = colors.textPrimary
+                    )
+                    Text(
+                        text     = "${conflict.conflictFiles.size} 个文件在远端已被修改",
+                        fontSize = 12.sp,
+                        color    = colors.textSecondary
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // 冲突文件列表
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(colors.cardExpanded, RoundedCornerShape(10.dp))
+                    .padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                conflict.conflictFiles.take(8).forEach { path ->
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment     = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text     = "M",
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            color    = colors.accentRed,
+                            modifier = Modifier
+                                .background(colors.accentRedAlpha, RoundedCornerShape(4.dp))
+                                .padding(horizontal = 4.dp, vertical = 1.dp)
+                        )
+                        Text(
+                            text     = path,
+                            fontSize = 12.sp,
+                            color    = colors.textSecondary,
+                            fontFamily = FontFamily.Monospace,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+                if (conflict.conflictFiles.size > 8) {
+                    Text(
+                        text     = "…还有 ${conflict.conflictFiles.size - 8} 个文件",
+                        fontSize = 11.sp,
+                        color    = colors.textMuted
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Text(
+                text     = "你的本地修改与远端修改冲突。强制推送会覆盖远端的改动，建议先 Pull 拉取最新内容后再推送。",
+                fontSize = 13.sp,
+                color    = colors.textSecondary,
+                lineHeight = 18.sp
+            )
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // 操作按钮
+            Button(
+                onClick        = onForcePush,
+                modifier       = Modifier.fillMaxWidth(),
+                shape          = RoundedCornerShape(12.dp),
+                colors         = ButtonDefaults.buttonColors(containerColor = colors.accentRed),
+                contentPadding = PaddingValues(vertical = 14.dp)
+            ) {
+                Text(
+                    text       = "强制推送（覆盖远端）",
+                    fontSize   = 15.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color      = Color.White
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            TextButton(
+                onClick  = onDismiss,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text     = "取消，先 Pull 再推送",
+                    color    = colors.accentBlueLight,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium
                 )
             }
         }
