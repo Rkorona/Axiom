@@ -67,7 +67,9 @@ object GitHubRepoScanner {
         val remoteHash = readRefFile(gitDir, "refs/remotes/origin/$branch")
             ?: readPackedRef(gitDir, "refs/remotes/origin/$branch")
             ?: return false
-        val localHash = readRefFile(gitDir, "refs/heads/$branch") ?: return false
+        val localHash = readRefFile(gitDir, "refs/heads/$branch")
+        // 如果本地 ref 文件不存在（旧版克隆未写入），只要远端 ref 存在就视为远端有更新
+            ?: return true
         return remoteHash != localHash
     }
 

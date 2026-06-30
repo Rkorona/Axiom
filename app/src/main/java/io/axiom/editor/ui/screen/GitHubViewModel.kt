@@ -423,7 +423,10 @@ class GitHubViewModel(application: Application) : AndroidViewModel(application) 
                     )
                     tempDir.mkdirs()
                     try {
-                        val s = GitHubOAuthService.downloadAndExtractRepo(
+                        // 先独立获取最新 commit SHA（API 返回完整 40 位），不依赖 zipball Content-Disposition
+                        val latestSha = GitHubOAuthService.getLatestCommitSha(token, fullName, branch)
+
+                        GitHubOAuthService.downloadAndExtractRepo(
                             token    = token,
                             fullName = fullName,
                             branch   = branch,
@@ -438,15 +441,13 @@ class GitHubViewModel(application: Application) : AndroidViewModel(application) 
                             f.renameTo(File(dir, f.name))
                         }
 
-                        // 更新双侧引用
-                        if (s.length == 40) {
-                            val headRef   = File(dir, ".git/refs/heads/$branch")
-                            val remoteRef = File(dir, ".git/refs/remotes/origin/$branch")
-                            headRef.parentFile?.mkdirs()
-                            remoteRef.parentFile?.mkdirs()
-                            headRef.writeText("$s\n")
-                            remoteRef.writeText("$s\n")
-                        }
+                        // 用 API 返回的可靠 40 位 SHA 更新双侧引用
+                        val headRef   = File(dir, ".git/refs/heads/$branch")
+                        val remoteRef = File(dir, ".git/refs/remotes/origin/$branch")
+                        headRef.parentFile?.mkdirs()
+                        remoteRef.parentFile?.mkdirs()
+                        headRef.writeText("$latestSha\n")
+                        remoteRef.writeText("$latestSha\n")
                         // 重置两侧快照（干净基线）
                         GitHubFileChangeScanner.writeIndex(dir)
 
@@ -659,7 +660,9 @@ class GitHubViewModel(application: Application) : AndroidViewModel(application) 
                 val (branch, sha) = withContext(Dispatchers.IO) {
                     val b = GitHubOAuthService.getDefaultBranch(token, repo.fullName)
                     destDir.mkdirs()
-                    val s = GitHubOAuthService.downloadAndExtractRepo(
+                    // 用 API 获取可靠的 40 位 commit SHA，不依赖 zipball Content-Disposition
+                    val s = GitHubOAuthService.getLatestCommitSha(token, repo.fullName, b)
+                    GitHubOAuthService.downloadAndExtractRepo(
                         token    = token,
                         fullName = repo.fullName,
                         branch   = b,

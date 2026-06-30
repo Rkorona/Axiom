@@ -357,9 +357,11 @@ object GitHubOAuthService {
             setRequestProperty("Authorization", "Bearer $token")
             setRequestProperty("Accept", "application/vnd.github+json")
             setRequestProperty("X-GitHub-Api-Version", "2022-11-28")
+            setRequestProperty("Cache-Control", "no-cache")
             this.connectTimeout = connectTimeout
             this.readTimeout    = readTimeout
             instanceFollowRedirects = true
+            useCaches = false
         }
         return conn
     }
