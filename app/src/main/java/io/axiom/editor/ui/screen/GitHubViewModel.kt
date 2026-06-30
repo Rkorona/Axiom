@@ -10,6 +10,7 @@ import androidx.compose.runtime.setValue
 import androidx.core.net.toUri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import io.axiom.editor.data.GitHubFileChangeScanner
 import io.axiom.editor.data.GitHubOAuthBus
 import io.axiom.editor.data.GitHubOAuthService
 import io.axiom.editor.data.GitHubRepoScanner
@@ -75,8 +76,10 @@ class GitHubViewModel(application: Application) : AndroidViewModel(application) 
         accessToken   = saved.accessToken
 
         viewModelScope.launch(Dispatchers.IO) {
-            val scanned = GitHubRepoScanner.scan(application)
+            val scanned = GitHubRepoScanner.scan(getApplication())
             withContext(Dispatchers.Main) { localRepos = scanned }
+            // 后台扫描所有本地仓库的变更
+            refreshAllChangedFiles(scanned)
         }
 
         if (isLoggedIn && accessToken.isNotEmpty()) {
@@ -101,46 +104,11 @@ class GitHubViewModel(application: Application) : AndroidViewModel(application) 
     var localRepos by mutableStateOf<List<LocalRepo>>(emptyList())
         private set
 
-    var changedFiles by mutableStateOf(
-        mapOf(
-            "codemirror6" to listOf(
-                ChangedFile("src/extensions/search.ts", FileChangeStatus.MODIFIED),
-                ChangedFile("src/view/editorView.ts", FileChangeStatus.MODIFIED)
-            ),
-            "axiom-editor" to listOf(
-                ChangedFile(
-                    "app/src/main/java/io/axiom/editor/ui/screen/GitHubScreen.kt",
-                    FileChangeStatus.ADDED, isStaged = true
-                ),
-                ChangedFile(
-                    "app/src/main/java/io/axiom/editor/ui/screen/GitHubViewModel.kt",
-                    FileChangeStatus.ADDED, isStaged = true
-                ),
-                ChangedFile("README.md", FileChangeStatus.MODIFIED, isStaged = false)
-            ),
-            "kotlin-compiler" to emptyList()
-        )
-    )
+    // ── 变更文件（真实扫描，key = 仓库名）────────────────────────────
+    var changedFiles by mutableStateOf<Map<String, List<ChangedFile>>>(emptyMap())
         private set
 
-    var commitHistory by mutableStateOf(
-        mapOf(
-            "codemirror6" to listOf(
-                CommitRecord("a3f12bc", "Fix selection rendering bug", "YangHuaYong", "2 小时前"),
-                CommitRecord("9d2e4f1", "Add search extension API", "YangHuaYong", "昨天"),
-                CommitRecord("5c81a30", "Refactor viewport management", "contributor", "3 天前")
-            ),
-            "axiom-editor" to listOf(
-                CommitRecord("f7b3c92", "feat: GitHub integration screen", "YangHuaYong", "刚刚", isPushed = false),
-                CommitRecord("2a9d1e4", "refactor: theme system overhaul", "YangHuaYong", "1 天前"),
-                CommitRecord("8f4b730", "fix: editor crash on large files", "YangHuaYong", "3 天前")
-            ),
-            "kotlin-compiler" to listOf(
-                CommitRecord("1b4d8e2", "Update to Kotlin 2.1.0", "JetBrains", "1 周前"),
-                CommitRecord("c9f2a57", "Performance improvements", "JetBrains", "2 周前")
-            )
-        )
-    )
+    var commitHistory by mutableStateOf<Map<String, List<CommitRecord>>>(emptyMap())
         private set
 
     // ── 云端仓库 ──────────────────────────────────────────────────────
@@ -199,6 +167,36 @@ class GitHubViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    // ── 文件变更扫描 ──────────────────────────────────────────────────
+
+    private fun findProjectDir(repoName: String): File? {
+        val ctx: Application = getApplication()
+        val ext = ctx.getExternalFilesDir(null)?.let { File(it, "projects/$repoName") }
+        if (ext?.exists() == true) return ext
+        val int = File(ctx.filesDir, "projects/$repoName")
+        if (int.exists()) return int
+        return null
+    }
+
+    private suspend fun refreshAllChangedFiles(repos: List<LocalRepo>) {
+        val result = mutableMapOf<String, List<ChangedFile>>()
+        for (repo in repos) {
+            val dir = findProjectDir(repo.name) ?: continue
+            result[repo.name] = GitHubFileChangeScanner.scanChanges(dir)
+        }
+        withContext(Dispatchers.Main) { changedFiles = result }
+    }
+
+    private fun refreshChangedFilesForRepo(repoName: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val dir = findProjectDir(repoName) ?: return@launch
+            val changes = GitHubFileChangeScanner.scanChanges(dir)
+            withContext(Dispatchers.Main) {
+                changedFiles = changedFiles + (repoName to changes)
+            }
+        }
+    }
+
     // ── 克隆仓库 ──────────────────────────────────────────────────────
 
     fun cloneRepo(repo: RemoteRepo, context: Context) {
@@ -239,6 +237,8 @@ class GitHubViewModel(application: Application) : AndroidViewModel(application) 
 
                 withContext(Dispatchers.IO) {
                     setupGitDir(destDir, repo, branch, sha)
+                    // 克隆完成后写入文件快照，作为"干净状态"基线
+                    GitHubFileChangeScanner.writeIndex(destDir)
                 }
 
                 ProjectRepository(context).addProject(
@@ -254,7 +254,9 @@ class GitHubViewModel(application: Application) : AndroidViewModel(application) 
                 )
 
                 val scanned = withContext(Dispatchers.IO) { GitHubRepoScanner.scan(context) }
-                localRepos   = scanned
+                localRepos = scanned
+                // 新克隆的仓库变更为空（刚克隆，无改动）
+                changedFiles = changedFiles + (repo.name to emptyList())
                 cloneMessage = "✓ '${repo.name}' 克隆成功"
                 cloneIsError = false
             } catch (e: Exception) {
@@ -278,15 +280,15 @@ class GitHubViewModel(application: Application) : AndroidViewModel(application) 
         File(gitDir, "HEAD").writeText("ref: refs/heads/$branch\n")
         File(gitDir, "config").writeText("""
 [core]
-        repositoryformatversion = 0
-        filemode = false
-        bare = false
+	repositoryformatversion = 0
+	filemode = false
+	bare = false
 [remote "origin"]
-        url = https://github.com/${repo.fullName}.git
-        fetch = +refs/heads/*:refs/remotes/origin/*
+	url = https://github.com/${repo.fullName}.git
+	fetch = +refs/heads/*:refs/remotes/origin/*
 [branch "$branch"]
-        remote = origin
-        merge = refs/heads/$branch
+	remote = origin
+	merge = refs/heads/$branch
 """.trimIndent())
         if (sha.length == 40) {
             File(gitDir, "refs/heads").mkdirs()
@@ -319,8 +321,13 @@ class GitHubViewModel(application: Application) : AndroidViewModel(application) 
     // ── 仓库操作 ──────────────────────────────────────────────────────
 
     fun toggleRepoExpansion(repoName: String) {
-        expandedRepoName = if (expandedRepoName == repoName) null else repoName
+        val wasExpanded = expandedRepoName == repoName
+        expandedRepoName = if (wasExpanded) null else repoName
         expandedTabIndex = 0
+        // 展开时触发真实文件扫描（在 IO 线程）
+        if (!wasExpanded) {
+            refreshChangedFilesForRepo(repoName)
+        }
     }
 
     fun switchExpandedTab(index: Int) {
@@ -342,6 +349,15 @@ class GitHubViewModel(application: Application) : AndroidViewModel(application) 
     fun unstageAll(repoName: String) {
         val files = changedFiles[repoName] ?: return
         changedFiles = changedFiles + (repoName to files.map { it.copy(isStaged = false) })
+    }
+
+    // 提交或还原后刷新该仓库变更
+    fun revertChanges(repoName: String) {
+        val dir = findProjectDir(repoName) ?: return
+        viewModelScope.launch(Dispatchers.IO) {
+            GitHubFileChangeScanner.resetIndex(dir)
+            refreshChangedFilesForRepo(repoName)
+        }
     }
 
     fun updateSearchQuery(query: String) {
