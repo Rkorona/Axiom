@@ -4,7 +4,6 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.ContentValues
 import android.content.Context
-import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.provider.DocumentsContract
@@ -79,7 +78,6 @@ private val SHEET_CONTEXT_ACTIONS = listOf(
     SheetContextAction("重命名",       Icons.Outlined.Edit),
     SheetContextAction("新建文件",     Icons.Outlined.NoteAdd,          forFolder = true),
     SheetContextAction("新建文件夹",   Icons.Outlined.CreateNewFolder,  forFolder = true),
-    SheetContextAction("在此打开终端", Icons.Outlined.Terminal,         forFolder = true),
     SheetContextAction("复制路径",     Icons.Outlined.ContentCopy),
     SheetContextAction("删除",         Icons.Outlined.Delete,           isDestructive = true),
 )
@@ -343,73 +341,7 @@ private fun addFileToZip(file: File, zip: ZipOutputStream, pathInZip: String) {
     }
 }
 
-private fun openTerminalAt(context: Context, dirPath: String): Pair<Boolean, String> {
-    val fsPath: String = if (dirPath.startsWith("content://")) {
-        val uri = try { Uri.parse(dirPath) } catch (e: Exception) { null }
-        val lastSeg = uri?.lastPathSegment
-        if (lastSeg != null) {
-            val relative = lastSeg.substringAfter(':')
-            if (relative.isNotBlank()) "/storage/emulated/0/$relative" else ""
-        } else ""
-    } else {
-        dirPath
-    }
 
-    if (fsPath.isBlank()) {
-        return Pair(false, "SAF 路径无法直接传递给终端，请使用本地路径导入的项目")
-    }
-
-    val termuxPackage = "com.termux"
-    val pm = context.packageManager
-    val termuxInstalled = try { pm.getPackageInfo(termuxPackage, 0); true } catch (e: Exception) { false }
-
-    if (termuxInstalled) {
-        val runCmdSuccess = try {
-            val runCmdIntent = Intent().apply {
-                setClassName(termuxPackage, "$termuxPackage.app.RunCommandService")
-                action = "$termuxPackage.RUN_COMMAND"
-                putExtra("$termuxPackage.RUN_COMMAND_PATH", "/data/data/$termuxPackage/files/usr/bin/bash")
-                putExtra("$termuxPackage.RUN_COMMAND_WORKDIR", fsPath)
-                putExtra("$termuxPackage.RUN_COMMAND_TERMINAL", true)
-            }
-            context.startService(runCmdIntent)
-            true
-        } catch (e: Exception) {
-            false
-        }
-
-        if (runCmdSuccess) return Pair(true, "已在 Termux 中打开目录：$fsPath")
-
-        return try {
-            val cdCommand = "cd \"$fsPath\""
-            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-            clipboard.setPrimaryClip(ClipData.newPlainText("terminal_cd", cdCommand))
-            val launchIntent = pm.getLaunchIntentForPackage(termuxPackage)?.apply {
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
-            }
-            context.startActivity(launchIntent)
-            Pair(true, "cd 命令已复制，打开 Termux 后请长按粘贴执行")
-        } catch (e: Exception) {
-            Pair(false, "启动 Termux 失败：${e.localizedMessage}")
-        }
-    }
-
-    val androidTerminalPkg = "com.android.terminal"
-    val androidTerminalInstalled = try { pm.getPackageInfo(androidTerminalPkg, 0); true } catch (e: Exception) { false }
-
-    if (androidTerminalInstalled) {
-        return try {
-            val intent = pm.getLaunchIntentForPackage(androidTerminalPkg)?.apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK }
-            if (intent != null) {
-                context.startActivity(intent)
-                Pair(true, "已打开系统终端（请手动 cd）")
-            } else Pair(false, "无法启动系统终端")
-        } catch (e: Exception) {
-            Pair(false, "启动系统终端失败")
-        }
-    }
-    return Pair(false, "未找到终端 App，请先从 F-Droid 或商店安装 Termux")
-}
 
 private fun validateFileName(name: String): String? {
     if (name.isBlank()) return "名称不能为空"
@@ -817,10 +749,6 @@ fun FileExplorerSheet(
                                 "重命名" -> { dialogTargetNode = node; showRenameDialog = true }
                                 "新建文件" -> { newItemTargetPath = node.path; showNewFileDialog = true }
                                 "新建文件夹" -> { newItemTargetPath = node.path; showNewFolderDialog = true }
-                                "在此打开终端" -> {
-                                    val (_, msg) = openTerminalAt(context, node.path)
-                                    scope.launch { snackbarHostState.showSnackbar(msg) }
-                                }
                                 "复制路径" -> {
                                     val pathStr = if (node.path.startsWith("content://")) {
                                         val uri = Uri.parse(node.path)
