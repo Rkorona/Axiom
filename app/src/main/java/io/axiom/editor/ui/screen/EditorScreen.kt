@@ -312,6 +312,7 @@ fun EditorScreen(
     var fileContent by remember { mutableStateOf("") }
     var isFileLoaded by remember { mutableStateOf(false) }
     var isEditorReady by remember { mutableStateOf(false) }
+    var isWebViewLoading by remember { mutableStateOf(true) }
 
     // 状态统计与光标位置
     var linesCount by rememberSaveable { mutableIntStateOf(0) }
@@ -363,6 +364,7 @@ fun EditorScreen(
     // ─────────────────────────────────────────────────────────
     LaunchedEffect(filePath) {
         isFileLoaded = false
+        isWebViewLoading = true
 
         // 快照：记录本次 Effect 启动时的路径，防止旧协程注入新文件内容
         val targetPath = filePath
@@ -847,6 +849,7 @@ fun EditorScreen(
                         webViewRef = this
 
                         setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                        setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null)
 
                         this.settings.apply {
                             javaScriptEnabled = true
@@ -906,6 +909,7 @@ fun EditorScreen(
 
                             override fun onPageFinished(view: WebView, url: String) {
                                 super.onPageFinished(view, url)
+                                isWebViewLoading = false
                                 view.evaluateJavascript(
                                     "window.editorAPI && window.editorAPI.notifyReady()",
                                     null
@@ -971,9 +975,11 @@ fun EditorScreen(
                 }
             )
 
-            if (!isEditorReady) {
+            if (isWebViewLoading) {
                 Box(
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(if (isDarkTheme) Color(0xFF141729) else Color.White),
                     contentAlignment = Alignment.Center
                 ) {
                     CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
