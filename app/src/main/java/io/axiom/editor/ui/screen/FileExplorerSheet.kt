@@ -844,10 +844,10 @@ fun FileExplorerSheet(
 @Composable
 private fun SheetFileTreeRow(row: SheetDisplayRow, isExpanded: Boolean, isLoading: Boolean, onClick: () -> Unit, onContextMenu: () -> Unit) {
     val node = row.node
-    val indentDp = (row.depth * 18 + 8).dp
+    val indentDp = (row.depth * 12 + 4).dp
     val chevronDeg by animateFloatAsState(targetValue = if (isExpanded) 90f else 0f, label = "chevron_${node.path}")
 
-    Row(modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(start = indentDp, end = 4.dp, top = 5.dp, bottom = 5.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(start = indentDp, end = 4.dp, top = 4.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
         if (node.isDirectory) {
             if (isLoading) {
                 CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 1.5.dp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))

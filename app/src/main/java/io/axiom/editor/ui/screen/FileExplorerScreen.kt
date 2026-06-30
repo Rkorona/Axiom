@@ -359,13 +359,13 @@ private fun FileTreeRow(
     onClick: () -> Unit
 ) {
     val node = row.node
-    val indentDp = (row.depth * 18 + 8).dp
+    val indentDp = (row.depth * 12 + 4).dp
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(start = indentDp, end = 12.dp, top = 7.dp, bottom = 7.dp),
+            .padding(start = indentDp, end = 12.dp, top = 6.dp, bottom = 6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         if (node.isDirectory) {
