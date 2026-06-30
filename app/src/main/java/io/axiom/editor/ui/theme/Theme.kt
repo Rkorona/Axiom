@@ -5,6 +5,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.compositionLocalOf
 
 private val DarkColorScheme = darkColorScheme(
     primary = DarkPrimary,
@@ -58,6 +60,8 @@ private val LightColorScheme = lightColorScheme(
     onError = LightOnError
 )
 
+val LocalIsDarkTheme = compositionLocalOf { false }
+
 @Composable
 fun AxiomTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
@@ -65,9 +69,11 @@ fun AxiomTheme(
 ) {
     val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
 
-    MaterialTheme(
-        colorScheme = colorScheme,
-        typography = Typography,
-        content = content
-    )
+    CompositionLocalProvider(LocalIsDarkTheme provides darkTheme) {
+        MaterialTheme(
+            colorScheme = colorScheme,
+            typography = Typography,
+            content = content
+        )
+    }
 }

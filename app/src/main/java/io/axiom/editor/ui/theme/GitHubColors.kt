@@ -1,6 +1,5 @@
 package io.axiom.editor.ui.theme
 
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
@@ -80,4 +79,4 @@ val LocalGitHubColors = staticCompositionLocalOf<GitHubColorScheme> {
 
 @Composable
 fun gitHubColors(): GitHubColorScheme =
-    if (isSystemInDarkTheme()) DarkGitHubColorScheme else LightGitHubColorScheme
+    if (LocalIsDarkTheme.current) DarkGitHubColorScheme else LightGitHubColorScheme
