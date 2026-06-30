@@ -120,7 +120,9 @@ fun GitHubScreen(
             } else {
                 viewModel.remoteRepos.filter {
                     it.name.contains(viewModel.searchQuery, ignoreCase = true) ||
-                        it.language.contains(viewModel.searchQuery, ignoreCase = true)
+                        it.fullName.contains(viewModel.searchQuery, ignoreCase = true) ||
+                        it.language.contains(viewModel.searchQuery, ignoreCase = true) ||
+                        it.description.contains(viewModel.searchQuery, ignoreCase = true)
                 }
             }
 
@@ -175,8 +177,36 @@ fun GitHubScreen(
                     )
                 }
 
-                items(filteredRepos, key = { it.name }) { repo ->
-                    RemoteRepoCard(repo = repo, modifier = Modifier.animateItem())
+                if (viewModel.reposLoading) {
+                    item {
+                        Box(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(28.dp),
+                                color = colors.accentBlue,
+                                strokeWidth = 2.5.dp
+                            )
+                        }
+                    }
+                } else if (viewModel.isLoggedIn && filteredRepos.isEmpty() && viewModel.searchQuery.isBlank()) {
+                    item {
+                        Box(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "暂无云端仓库",
+                                fontSize = 13.sp,
+                                color = colors.textMuted
+                            )
+                        }
+                    }
+                } else {
+                    items(filteredRepos, key = { it.fullName }) { repo ->
+                        RemoteRepoCard(repo = repo, modifier = Modifier.animateItem())
+                    }
                 }
 
                 item { Spacer(modifier = Modifier.height(32.dp)) }
@@ -880,23 +910,56 @@ private fun RemoteRepoCard(repo: RemoteRepo, modifier: Modifier = Modifier) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(14.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.Top
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = repo.name,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = colors.textPrimary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Spacer(modifier = Modifier.height(4.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text(
+                        text = repo.fullName.ifEmpty { repo.name },
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = colors.textPrimary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
+                    if (repo.isPrivate) {
+                        Text(
+                            text = "私有",
+                            fontSize = 10.sp,
+                            color = colors.textMuted,
+                            fontWeight = FontWeight.Medium,
+                            modifier = Modifier
+                                .background(colors.accentBlueAlpha, RoundedCornerShape(4.dp))
+                                .padding(horizontal = 5.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+                if (repo.description.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(3.dp))
+                    Text(
+                        text = repo.description,
+                        fontSize = 12.sp,
+                        color = colors.textSecondary,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        lineHeight = 16.sp
+                    )
+                }
+                Spacer(modifier = Modifier.height(6.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text("★ ${formatStars(repo.stars)}", fontSize = 12.sp, color = colors.textSecondary)
-                    Text(repo.language, fontSize = 12.sp, color = colors.textSecondary)
+                    if (repo.stars > 0) {
+                        Text("★ ${formatStars(repo.stars)}", fontSize = 12.sp, color = colors.textSecondary)
+                    }
+                    if (repo.language.isNotEmpty()) {
+                        Text(repo.language, fontSize = 12.sp, color = colors.textSecondary)
+                    }
                 }
             }
+            Spacer(modifier = Modifier.width(10.dp))
             Button(
                 onClick = {},
                 shape = RoundedCornerShape(20.dp),

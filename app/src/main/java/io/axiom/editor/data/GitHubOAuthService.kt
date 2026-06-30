@@ -77,6 +77,34 @@ object GitHubOAuthService {
         )
     }
 
+    fun getUserRepos(token: String): List<io.axiom.editor.ui.model.RemoteRepo> {
+        val url = java.net.URL("https://api.github.com/user/repos?sort=updated&per_page=100&visibility=all")
+        val conn = url.openConnection() as HttpURLConnection
+        conn.apply {
+            requestMethod = "GET"
+            setRequestProperty("Authorization", "Bearer $token")
+            setRequestProperty("Accept", "application/vnd.github+json")
+            setRequestProperty("X-GitHub-Api-Version", "2022-11-28")
+            connectTimeout = 15000
+            readTimeout = 15000
+        }
+        val responseCode = conn.responseCode
+        if (responseCode != 200) throw Exception("GitHub API returned $responseCode")
+        val response = conn.inputStream.bufferedReader().readText()
+        val jsonArray = org.json.JSONArray(response)
+        return (0 until jsonArray.length()).map { i ->
+            val repo = jsonArray.getJSONObject(i)
+            io.axiom.editor.ui.model.RemoteRepo(
+                name        = repo.getString("name"),
+                fullName    = repo.getString("full_name"),
+                stars       = repo.getInt("stargazers_count"),
+                language    = repo.optString("language", ""),
+                description = repo.optString("description", ""),
+                isPrivate   = repo.getBoolean("private")
+            )
+        }
+    }
+
     private fun encode(value: String): String =
         java.net.URLEncoder.encode(value, "UTF-8")
 }

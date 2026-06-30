@@ -26,6 +26,7 @@ enum class GitHubLoginState { Idle, Loading, Error }
 class GitHubViewModel(application: Application) : AndroidViewModel(application) {
 
     private val store = GitHubStore(application)
+    private var accessToken: String = ""
 
     // ── 登录状态 ──────────────────────────────────────────────────────
     var loginState by mutableStateOf(GitHubLoginState.Idle)
@@ -43,11 +44,19 @@ class GitHubViewModel(application: Application) : AndroidViewModel(application) 
     var userAvatarUrl by mutableStateOf<String?>(null)
         private set
 
+    var reposLoading by mutableStateOf(false)
+        private set
+
     init {
         val saved = store.load()
         isLoggedIn    = saved.isLoggedIn
         userName      = saved.username
         userAvatarUrl = saved.avatarUrl.ifEmpty { null }
+        accessToken   = saved.accessToken
+
+        if (isLoggedIn && accessToken.isNotEmpty()) {
+            fetchUserRepos()
+        }
 
         viewModelScope.launch {
             GitHubOAuthBus.codeFlow.collect { code ->
@@ -63,7 +72,7 @@ class GitHubViewModel(application: Application) : AndroidViewModel(application) 
     var expandedTabIndex by mutableStateOf(0)
         private set
 
-    // ── 本地仓库数据 ──────────────────────────────────────────────────
+    // ── 本地仓库数据（占位，后续接入 libgit2） ────────────────────────
     var localRepos by mutableStateOf(
         listOf(
             LocalRepo("codemirror6", "main", uncommittedChanges = 2),
@@ -115,15 +124,8 @@ class GitHubViewModel(application: Application) : AndroidViewModel(application) 
     )
         private set
 
-    // ── 云端仓库数据 ──────────────────────────────────────────────────
-    var remoteRepos by mutableStateOf(
-        listOf(
-            RemoteRepo("Free-SS-NODES", 142, "Python"),
-            RemoteRepo("awesome-kotlin", 12400, "Kotlin"),
-            RemoteRepo("JetBrains/kotlin", 48000, "Kotlin"),
-            RemoteRepo("flutter/flutter", 168000, "Dart")
-        )
-    )
+    // ── 云端仓库数据（真实 API） ───────────────────────────────────────
+    var remoteRepos by mutableStateOf<List<RemoteRepo>>(emptyList())
         private set
 
     var searchQuery by mutableStateOf("")
@@ -143,18 +145,38 @@ class GitHubViewModel(application: Application) : AndroidViewModel(application) 
             loginError = ""
             try {
                 val (token, userInfo) = withContext(Dispatchers.IO) {
-                    val token = GitHubOAuthService.exchangeCodeForToken(code)
-                    val userInfo = GitHubOAuthService.getUserInfo(token)
-                    token to userInfo
+                    val t = GitHubOAuthService.exchangeCodeForToken(code)
+                    val u = GitHubOAuthService.getUserInfo(t)
+                    t to u
                 }
+                accessToken   = token
                 isLoggedIn    = true
                 userName      = userInfo.login
                 userAvatarUrl = userInfo.avatarUrl
                 store.save(userInfo.login, userInfo.avatarUrl, token)
                 loginState    = GitHubLoginState.Idle
+                fetchUserRepos()
             } catch (e: Exception) {
                 loginState = GitHubLoginState.Error
                 loginError = e.message ?: "登录失败，请重试"
+            }
+        }
+    }
+
+    private fun fetchUserRepos() {
+        val token = accessToken
+        if (token.isEmpty()) return
+        viewModelScope.launch {
+            reposLoading = true
+            try {
+                val repos = withContext(Dispatchers.IO) {
+                    GitHubOAuthService.getUserRepos(token)
+                }
+                remoteRepos = repos
+            } catch (_: Exception) {
+                // 保持现有列表，静默失败
+            } finally {
+                reposLoading = false
             }
         }
     }
@@ -170,6 +192,8 @@ class GitHubViewModel(application: Application) : AndroidViewModel(application) 
         isLoggedIn    = false
         userName      = ""
         userAvatarUrl = null
+        accessToken   = ""
+        remoteRepos   = emptyList()
         loginState    = GitHubLoginState.Idle
         loginError    = ""
         store.clear()

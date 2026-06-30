@@ -9,9 +9,11 @@ data class LocalRepo(
 
 data class RemoteRepo(
     val name: String,
+    val fullName: String,
     val stars: Int,
     val language: String,
-    val description: String = ""
+    val description: String = "",
+    val isPrivate: Boolean = false
 )
 
 enum class FileChangeStatus(val label: String) {
