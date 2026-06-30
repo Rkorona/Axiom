@@ -243,6 +243,15 @@ class GitHubViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    /** 重新扫描所有本地仓库目录，删除项目后调用以同步 GitHub 页面列表 */
+    fun refreshLocalRepos() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val scanned = GitHubRepoScanner.scan(getApplication())
+            withContext(Dispatchers.Main) { localRepos = scanned }
+            refreshAllChangedFiles(scanned)
+        }
+    }
+
     fun refreshChangedFilesForRepo(repoName: String) {
         viewModelScope.launch(Dispatchers.IO) {
             val dir = findProjectDir(repoName) ?: return@launch

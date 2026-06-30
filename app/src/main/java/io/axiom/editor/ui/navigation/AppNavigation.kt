@@ -16,6 +16,7 @@ import io.axiom.editor.ui.model.Project
 import io.axiom.editor.ui.model.ProjectLanguage
 import io.axiom.editor.ui.model.ProjectType
 import io.axiom.editor.ui.screen.EditorScreen
+import io.axiom.editor.ui.screen.GitHubViewModel
 import io.axiom.editor.ui.screen.HomeScreen
 import io.axiom.editor.ui.screen.TerminalScreen
 import kotlinx.coroutines.launch
@@ -47,7 +48,10 @@ data class EditorTab(
 // 导航状态机
 // ─────────────────────────────────────────────
 @Composable
-fun AppNavigation(settingsViewModel: SettingsViewModel = viewModel()) {
+fun AppNavigation(
+    settingsViewModel: SettingsViewModel = viewModel(),
+    gitHubViewModel: GitHubViewModel = viewModel()
+) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
@@ -193,7 +197,10 @@ fun AppNavigation(settingsViewModel: SettingsViewModel = viewModel()) {
                     scope.launch { repository.updateProjectName(project.id, newName) }
                 },
                 onDeleteProject = { project ->
-                    scope.launch { repository.deleteProject(project) }
+                    scope.launch {
+                        repository.deleteProject(project)
+                        gitHubViewModel.refreshLocalRepos()
+                    }
                 },
                 onCopyProject = { project ->
                     scope.launch { repository.copyProject(project) }
