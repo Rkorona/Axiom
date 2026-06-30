@@ -20,6 +20,10 @@ android {
         ndk {
             abiFilters += listOf("arm64-v8a", "x86_64")
         }
+
+        buildConfigField("String", "GITHUB_CLIENT_ID", "\"Ov23licbOCCPhMEQLg37\"")
+        buildConfigField("String", "GITHUB_CLIENT_SECRET", "\"bdfcce2166a1b383df7a395ee4258118ece1764b\"")
+        buildConfigField("String", "GITHUB_CALLBACK_URL", "\"axiomide://callback\"")
     }
 
     externalNativeBuild {
@@ -31,7 +35,6 @@ android {
     
     signingConfigs {
         create("release") {
-            // 从环境变量中读取路径和密码
             val keystorePath = System.getenv("KEYSTORE_PATH")
             if (!keystorePath.isNullOrEmpty()) {
                 storeFile = file(keystorePath)
@@ -56,6 +59,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
     buildToolsVersion = "37.0.0"
 
@@ -74,8 +78,6 @@ dependencies {
     implementation("androidx.room:room-ktx:$room_version")
     ksp("androidx.room:room-compiler:$room_version")
 
-    
-    
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.lifecycle.runtime.ktx)
@@ -105,6 +107,5 @@ dependencies {
     implementation("org.tukaani:xz:1.9")
     implementation("io.coil-kt.coil3:coil-compose:3.5.0")
 
-
-    
+    implementation("androidx.browser:browser:1.8.0")
 }

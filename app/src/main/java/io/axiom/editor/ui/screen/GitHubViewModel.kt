@@ -1,19 +1,25 @@
 package io.axiom.editor.ui.screen
 
 import android.app.Application
+import android.content.Context
+import androidx.browser.customtabs.CustomTabsIntent
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.core.net.toUri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import io.axiom.editor.data.GitHubOAuthBus
+import io.axiom.editor.data.GitHubOAuthService
 import io.axiom.editor.data.GitHubStore
 import io.axiom.editor.ui.model.ChangedFile
 import io.axiom.editor.ui.model.CommitRecord
 import io.axiom.editor.ui.model.FileChangeStatus
 import io.axiom.editor.ui.model.LocalRepo
 import io.axiom.editor.ui.model.RemoteRepo
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 enum class GitHubLoginState { Idle, Loading, Error }
 
@@ -39,9 +45,15 @@ class GitHubViewModel(application: Application) : AndroidViewModel(application) 
 
     init {
         val saved = store.load()
-        isLoggedIn   = saved.isLoggedIn
-        userName     = saved.username
+        isLoggedIn    = saved.isLoggedIn
+        userName      = saved.username
         userAvatarUrl = saved.avatarUrl.ifEmpty { null }
+
+        viewModelScope.launch {
+            GitHubOAuthBus.codeFlow.collect { code ->
+                exchangeCodeAndLogin(code)
+            }
+        }
     }
 
     // ── 展开卡片 ──────────────────────────────────────────────────────
@@ -117,33 +129,33 @@ class GitHubViewModel(application: Application) : AndroidViewModel(application) 
     var searchQuery by mutableStateOf("")
         private set
 
-    // ── 登录操作 ──────────────────────────────────────────────────────
+    // ── OAuth 登录 ────────────────────────────────────────────────────
 
-    fun login(username: String, token: String) {
-        val trimmedUsername = username.trim()
-        val trimmedToken    = token.trim()
+    fun startOAuthFlow(context: Context) {
+        val authUrl = GitHubOAuthService.buildAuthUrl()
+        val customTabsIntent = CustomTabsIntent.Builder().build()
+        customTabsIntent.launchUrl(context, authUrl.toUri())
+    }
 
-        if (trimmedUsername.isBlank()) {
-            loginState = GitHubLoginState.Error
-            loginError = "请输入 GitHub 用户名"
-            return
-        }
-        if (!isValidToken(trimmedToken)) {
-            loginState = GitHubLoginState.Error
-            loginError = "令牌格式不正确，应以 ghp_、github_pat_ 或 gho_ 开头"
-            return
-        }
-
+    private fun exchangeCodeAndLogin(code: String) {
         viewModelScope.launch {
             loginState = GitHubLoginState.Loading
             loginError = ""
-            delay(1500L)
-            val avatarUrl = "https://avatars.githubusercontent.com/${trimmedUsername.lowercase()}"
-            isLoggedIn    = true
-            userName      = trimmedUsername
-            userAvatarUrl = avatarUrl
-            store.save(trimmedUsername, avatarUrl)
-            loginState = GitHubLoginState.Idle
+            try {
+                val (token, userInfo) = withContext(Dispatchers.IO) {
+                    val token = GitHubOAuthService.exchangeCodeForToken(code)
+                    val userInfo = GitHubOAuthService.getUserInfo(token)
+                    token to userInfo
+                }
+                isLoggedIn    = true
+                userName      = userInfo.login
+                userAvatarUrl = userInfo.avatarUrl
+                store.save(userInfo.login, userInfo.avatarUrl, token)
+                loginState    = GitHubLoginState.Idle
+            } catch (e: Exception) {
+                loginState = GitHubLoginState.Error
+                loginError = e.message ?: "登录失败，请重试"
+            }
         }
     }
 
@@ -162,13 +174,6 @@ class GitHubViewModel(application: Application) : AndroidViewModel(application) 
         loginError    = ""
         store.clear()
     }
-
-    private fun isValidToken(token: String): Boolean =
-        token.isNotBlank() && (
-            token.startsWith("ghp_") ||
-            token.startsWith("github_pat_") ||
-            token.startsWith("gho_")
-        )
 
     // ── 仓库操作 ──────────────────────────────────────────────────────
 

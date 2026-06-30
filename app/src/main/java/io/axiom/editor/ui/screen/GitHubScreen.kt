@@ -41,8 +41,7 @@ import androidx.compose.material.icons.rounded.Downloading
 import androidx.compose.material.icons.rounded.ExitToApp
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Search
-import androidx.compose.material.icons.rounded.Visibility
-import androidx.compose.material.icons.rounded.VisibilityOff
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -73,8 +72,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
+
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -184,6 +182,7 @@ fun GitHubScreen(
                 item { Spacer(modifier = Modifier.height(32.dp)) }
             }
 
+            val context = LocalContext.current
             if (showLoginSheet) {
                 LoginBottomSheet(
                     sheetState = sheetState,
@@ -193,7 +192,7 @@ fun GitHubScreen(
                         viewModel.clearLoginError()
                         onLoginSheetDismiss()
                     },
-                    onLogin = { username, token -> viewModel.login(username, token) }
+                    onStartOAuth = { viewModel.startOAuthFlow(context) }
                 )
             }
         }
@@ -914,7 +913,7 @@ private fun formatStars(stars: Int): String =
     if (stars >= 1000) String.format("%.1fK", stars / 1000.0) else stars.toString()
 
 // ═══════════════════════════════════════════════════════════════════
-// 登录弹窗（完整版）
+// 登录弹窗（GitHub OAuth）
 // ═══════════════════════════════════════════════════════════════════
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -924,12 +923,9 @@ private fun LoginBottomSheet(
     loginState: GitHubLoginState,
     loginError: String,
     onDismiss: () -> Unit,
-    onLogin: (username: String, token: String) -> Unit
+    onStartOAuth: () -> Unit
 ) {
     val colors = LocalGitHubColors.current
-    var username by remember { mutableStateOf("") }
-    var token by remember { mutableStateOf("") }
-    var tokenVisible by remember { mutableStateOf(false) }
     val isLoading = loginState == GitHubLoginState.Loading
 
     ModalBottomSheet(
@@ -950,13 +946,15 @@ private fun LoginBottomSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp)
-                .padding(bottom = 36.dp)
+                .padding(horizontal = 24.dp)
+                .padding(bottom = 40.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
             // 标题区
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier.fillMaxWidth()
             ) {
                 Box(
                     modifier = Modifier
@@ -979,229 +977,101 @@ private fun LoginBottomSheet(
                         color = colors.textPrimary
                     )
                     Text(
-                        text = "使用 Personal Access Token 安全访问仓库",
+                        text = "通过 GitHub OAuth 安全授权",
                         fontSize = 12.sp,
                         color = colors.textSecondary
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(28.dp))
 
-            // 用户名
-            Text(
-                text = "GitHub 用户名",
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Medium,
-                color = colors.textMutedLight
-            )
-            Spacer(modifier = Modifier.height(6.dp))
-            LoginTextField(
-                value = username,
-                onValueChange = { username = it },
-                placeholder = "例如: YangHuaYong",
-                isPassword = false,
-                enabled = !isLoading
-            )
-
-            Spacer(modifier = Modifier.height(14.dp))
-
-            // Token 行标题 + 显示/隐藏说明
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "个人访问令牌 (PAT)",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = colors.textMutedLight
-                )
-                Text(
-                    text = if (tokenVisible) "隐藏" else "显示",
-                    fontSize = 11.sp,
-                    color = colors.accentBlue,
-                    fontWeight = FontWeight.Medium,
-                    modifier = Modifier
-                        .clickable { tokenVisible = !tokenVisible }
-                        .padding(horizontal = 4.dp, vertical = 2.dp)
-                )
-            }
-            Spacer(modifier = Modifier.height(6.dp))
-
-            // Token 输入框（带眼睛图标）
+            // 说明提示框
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(colors.input, RoundedCornerShape(8.dp))
-                    .border(1.dp, colors.loginBorder, RoundedCornerShape(8.dp)),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                BasicTextField(
-                    value = token,
-                    onValueChange = { token = it },
-                    textStyle = TextStyle(fontSize = 14.sp, color = colors.textPrimary),
-                    cursorBrush = SolidColor(colors.accentBlue),
-                    visualTransformation = if (tokenVisible) VisualTransformation.None
-                    else PasswordVisualTransformation(),
-                    enabled = !isLoading,
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(start = 12.dp, top = 12.dp, bottom = 12.dp, end = 4.dp),
-                    decorationBox = { innerTextField ->
-                        Box {
-                            if (token.isEmpty()) {
-                                Text(
-                                    text = "ghp_xxxxxxxxxxxxxxxxxxxx",
-                                    fontSize = 14.sp,
-                                    color = colors.textSecondary
-                                )
-                            }
-                            innerTextField()
-                        }
-                    }
-                )
-                IconButton(
-                    onClick = { tokenVisible = !tokenVisible },
-                    modifier = Modifier.size(40.dp)
-                ) {
-                    Icon(
-                        imageVector = if (tokenVisible) Icons.Rounded.VisibilityOff
-                        else Icons.Rounded.Visibility,
-                        contentDescription = if (tokenVisible) "隐藏令牌" else "显示令牌",
-                        tint = colors.textMuted,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // 帮助提示框
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(colors.accentBlueAlpha2, RoundedCornerShape(8.dp))
-                    .padding(10.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    .background(colors.accentBlueAlpha2, RoundedCornerShape(10.dp))
+                    .padding(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalAlignment = Alignment.Top
             ) {
                 Icon(
                     imageVector = Icons.Rounded.Info,
                     contentDescription = null,
                     tint = colors.accentBlueLight,
-                    modifier = Modifier
-                        .size(14.dp)
-                        .padding(top = 1.dp)
+                    modifier = Modifier.size(15.dp).padding(top = 1.dp)
                 )
                 Text(
-                    text = "前往 GitHub → Settings → Developer settings → Personal access tokens → 生成包含 repo 权限的令牌",
-                    fontSize = 11.sp,
+                    text = "点击下方按钮将跳转到 GitHub 授权页面，授权后自动返回完成登录。",
+                    fontSize = 12.sp,
                     color = colors.accentBlueLight,
-                    lineHeight = 16.sp
+                    lineHeight = 18.sp
                 )
             }
 
             // 错误提示
             if (loginState == GitHubLoginState.Error && loginError.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(12.dp))
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(colors.accentRedAlpha, RoundedCornerShape(8.dp))
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = "●",
-                        fontSize = 8.sp,
-                        color = colors.accentRed
-                    )
-                    Text(
-                        text = loginError,
-                        fontSize = 12.sp,
-                        color = colors.accentRed
-                    )
+                    Text(text = "●", fontSize = 8.sp, color = colors.accentRed)
+                    Text(text = loginError, fontSize = 12.sp, color = colors.accentRed)
                 }
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(24.dp))
 
-            // 操作按钮
-            Row(
+            // 登录按钮
+            Button(
+                onClick = { if (!isLoading) onStartOAuth() },
+                enabled = !isLoading,
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End,
-                verticalAlignment = Alignment.CenterVertically
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = colors.accentBlue,
+                    disabledContainerColor = colors.accentBlueAlpha
+                ),
+                contentPadding = PaddingValues(vertical = 14.dp)
             ) {
-                TextButton(
-                    onClick = { if (!isLoading) onDismiss() },
-                    enabled = !isLoading
-                ) {
-                    Text(
-                        text = "取消",
-                        color = if (isLoading) colors.textMuted else colors.textSecondary,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.SemiBold
+                if (isLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        color = Color.White,
+                        strokeWidth = 2.dp
                     )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text("正在登录...", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                } else {
+                    Icon(
+                        imageVector = Icons.Outlined.Hub,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                        tint = Color.White
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("使用 GitHub 登录", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
                 }
-                Spacer(modifier = Modifier.width(8.dp))
-                Button(
-                    onClick = { onLogin(username, token) },
-                    enabled = !isLoading,
-                    shape = RoundedCornerShape(20.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = colors.accentBlue,
-                        disabledContainerColor = colors.accentBlueAlpha
-                    ),
-                    contentPadding = PaddingValues(horizontal = 20.dp, vertical = 10.dp)
-                ) {
-                    if (isLoading) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(16.dp),
-                            color = Color.White,
-                            strokeWidth = 2.dp
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("验证中...", fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                    } else {
-                        Text("验证并登录", fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                    }
-                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            TextButton(
+                onClick = { if (!isLoading) onDismiss() },
+                enabled = !isLoading,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = "取消",
+                    color = if (isLoading) colors.textMuted else colors.textSecondary,
+                    fontSize = 14.sp
+                )
             }
         }
     }
-}
-
-@Composable
-private fun LoginTextField(
-    value: String,
-    onValueChange: (String) -> Unit,
-    placeholder: String,
-    isPassword: Boolean,
-    enabled: Boolean = true
-) {
-    val colors = LocalGitHubColors.current
-    BasicTextField(
-        value = value,
-        onValueChange = onValueChange,
-        enabled = enabled,
-        textStyle = TextStyle(fontSize = 14.sp, color = colors.textPrimary),
-        cursorBrush = SolidColor(colors.accentBlue),
-        visualTransformation = if (isPassword) PasswordVisualTransformation() else VisualTransformation.None,
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(colors.input, RoundedCornerShape(8.dp))
-            .border(1.dp, colors.loginBorder, RoundedCornerShape(8.dp))
-            .padding(12.dp),
-        decorationBox = { innerTextField ->
-            Box {
-                if (value.isEmpty()) {
-                    Text(text = placeholder, fontSize = 14.sp, color = colors.textSecondary)
-                }
-                innerTextField()
-            }
-        }
-    )
 }
