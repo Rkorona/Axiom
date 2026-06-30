@@ -59,6 +59,7 @@ import io.axiom.editor.ui.component.AppTopBar
 import io.axiom.editor.ui.model.Project
 import io.axiom.editor.ui.model.ProjectLanguage
 import io.axiom.editor.ui.model.ProjectType
+import io.axiom.editor.ui.theme.gitHubColors
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
@@ -268,6 +269,7 @@ fun HomeScreen(
                         }
                     )
                 } else {
+                    val ghColors = gitHubColors()
                     AppTopBar(
                         selectedTab = selectedTab,
                         sortOrder = sortOrder,
@@ -277,6 +279,7 @@ fun HomeScreen(
                         searchQuery = searchQuery,
                         onSearchQueryChange = { searchQuery = it },
                         isScrolled = isScrolled,
+                        baseBackgroundColor = if (selectedTab == 1) ghColors.background else Color.Unspecified,
                         githubTrailingAction = {
                             if (gitHubViewModel.isLoggedIn) {
                                 AsyncImage(

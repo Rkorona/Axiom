@@ -48,6 +48,7 @@ fun AppTopBar(
     searchQuery: String = "",
     onSearchQueryChange: (String) -> Unit = {},
     isScrolled: Boolean = false,
+    baseBackgroundColor: Color = Color.Unspecified,
     githubTrailingAction: (@Composable RowScope.() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
@@ -55,12 +56,16 @@ fun AppTopBar(
     val keyboardController = LocalSoftwareKeyboardController.current
     var sortMenuExpanded by remember { mutableStateOf(false) }
 
-    // 未滚动时与页面背景（Scaffold background）保持一致，滚动后加深
+    // 未滚动时与页面背景保持一致（支持自定义背景色），滚动后加深
+    val resolvedBase = if (baseBackgroundColor == Color.Unspecified)
+        MaterialTheme.colorScheme.background
+    else
+        baseBackgroundColor
     val barBgColor by animateColorAsState(
         targetValue = if (isScrolled)
             MaterialTheme.colorScheme.surfaceContainerHigh
         else
-            MaterialTheme.colorScheme.background,
+            resolvedBase,
         animationSpec = tween(durationMillis = 250),
         label = "topBarBg"
     )
