@@ -496,9 +496,9 @@ class GitHubViewModel(application: Application) : AndroidViewModel(application) 
                 }
 
                 withContext(Dispatchers.IO) {
-                    // 同步本地双侧引用
-                    File(dir, ".git/refs/heads/$branch").writeText("$newSha\n")
-                    File(dir, ".git/refs/remotes/origin/$branch").writeText("$newSha\n")
+                    // 同步本地双侧引用（确保父目录存在，避免 ENOENT）
+                    File(dir, ".git/refs/heads/$branch").apply { parentFile?.mkdirs() }.writeText("$newSha\n")
+                    File(dir, ".git/refs/remotes/origin/$branch").apply { parentFile?.mkdirs() }.writeText("$newSha\n")
                     // 将已提交快照（AXIOM_INDEX）复制为新的远端基线（AXIOM_REMOTE_INDEX）
                     // 注意：不重建自工作区，这样未提交的工作区修改不会影响下次 Push 的基线
                     GitHubFileChangeScanner.syncRemoteIndexFromCommitted(dir)
