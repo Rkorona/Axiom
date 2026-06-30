@@ -67,6 +67,7 @@ object GitHubFileChangeScanner {
             return walkFiles(projectDir)
                 .take(200)
                 .map { ChangedFile(it.relativeTo(projectDir).path, FileChangeStatus.UNTRACKED) }
+                .toList()
         }
 
         return diffIndexVsCurrent(readIndexMap(indexFile), projectDir)
