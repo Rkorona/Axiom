@@ -104,11 +104,11 @@ fun TerminalScreen(
     var showSecondaryPanel by remember { mutableStateOf(false) }
     val terminalLines = vm.terminalLines
 
-    // WebView 引用（用于向 xterm.js 写入 PTY 输出）
+    // WebView 引用（用于向 index.js 写入 PTY 输出）
     val webViewRef = remember { mutableStateOf<WebView?>(null) }
     var pageReady by remember { mutableStateOf(false) }
 
-    // ── 收集 PTY 输出 → 推送到 xterm.js ──────────────────────────
+    // ── 收集 PTY 输出 → 推送到 index.js ──────────────────────────
     LaunchedEffect(Unit) {
         vm.ptyOutput.collect { chunk ->
             if (!pageReady) return@collect
