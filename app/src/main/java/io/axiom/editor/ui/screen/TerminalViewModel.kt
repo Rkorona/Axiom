@@ -95,19 +95,18 @@ class TerminalViewModel(application: Application) : AndroidViewModel(application
                 "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 Chrome/120.0.0.0 Mobile Safari/537.36")
             if (connection.responseCode != HttpURLConnection.HTTP_OK) return@withContext null
 
-            // index-user 每行格式（制表符分隔）：
-            // distro  release  arch  variant  version  path
-            // debian  trixie   arm64 default  20260701_05:24  /images/debian/trixie/arm64/default/20260701_05:24/
+            // index-user 每行格式（分号分隔）：
+            // debian;trixie;arm64;default;20260701_05:24;/images/debian/trixie/arm64/default/20260701_05:24/
             val latestPath = connection.inputStream.bufferedReader().useLines { lines ->
                 lines.filter { line ->
-                    val parts = line.split("\t")
+                    val parts = line.split(";")
                     parts.size >= 6 &&
                     parts[0] == "debian" &&
                     parts[1] == "trixie" &&
                     parts[2] == "arm64" &&
                     parts[3] == "default"
                 }.map { line ->
-                    val parts = line.split("\t")
+                    val parts = line.split(";")
                     Pair(parts[4], parts[5]) // (version, path)
                 }.maxByOrNull { (version, _) ->
                     version // lexicographic 排序足够（YYYYMMDD_HH:MM 格式）
