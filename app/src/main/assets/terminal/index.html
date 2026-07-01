@@ -6,13 +6,17 @@
     <title>Terminal</title>
     <link rel="stylesheet" href="./assets/index.css">
     <style>
-        html, body, #terminal-container {
+        html, body {
             width: 100%;
             height: 100%;
             margin: 0;
             padding: 0;
-            background: #000;
+            background: #1e1e1e;
             overflow: hidden;
+        }
+        #terminal-container {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
         }
     </style>
 </head>
@@ -21,38 +25,79 @@
     <script src="./assets/index.js"></script>
     <script>
     (function () {
-        function ready(fn) {
-            if (document.readyState !== 'loading') { fn(); }
-            else { document.addEventListener('DOMContentLoaded', fn); }
-        }
-        ready(function () {
-            if (typeof a === 'undefined') return;
+        if (typeof a === 'undefined') return;
 
-            a.onResize(function (size) {
-                if (window.AndroidBridge && window.AndroidBridge.onResize) {
-                    window.AndroidBridge.onResize(size.rows, size.cols);
-                }
-            });
-
-            window.writeOutput = function (b64) {
-                if (!window.TerminalBridge) return;
-                try {
-                    var s = atob(b64);
-                    var bytes = new Uint8Array(s.length);
-                    for (var i = 0; i < s.length; i++) bytes[i] = s.charCodeAt(i);
-                    window.TerminalBridge.writeToTerminal(bytes);
-                } catch (e) {}
-            };
-
-            window.setFontSize = function (size) {
-                a.options.fontSize = size;
-                if (window.TerminalBridge) window.TerminalBridge.resizeTerminal();
-            };
-
-            window.setTheme = function (bg, fg) {
-                a.options.theme = { background: bg, foreground: fg };
-            };
+        // ── xterm resize 事件 → 通知 Android ──────────────
+        a.onResize(function (size) {
+            if (window.AndroidBridge && window.AndroidBridge.onResize) {
+                window.AndroidBridge.onResize(size.rows, size.cols);
+            }
         });
+
+        // ── PTY 字节 → xterm ────────────────────────────
+        window.writeOutput = function (b64) {
+            if (!window.TerminalBridge) return;
+            try {
+                var s = atob(b64);
+                var bytes = new Uint8Array(s.length);
+                for (var i = 0; i < s.length; i++) bytes[i] = s.charCodeAt(i);
+                window.TerminalBridge.writeToTerminal(bytes);
+            } catch (e) {}
+        };
+
+        // ── 字体大小 / 主题 API ──────────────────────────
+        window.setFontSize = function (size) {
+            a.options.fontSize = size;
+            scheduleFit();
+        };
+
+        window.setTheme = function (bg, fg) {
+            a.options.theme = { background: bg, foreground: fg };
+        };
+
+        // ── 带重试的 fit 调度器 ─────────────────────────
+        var fitScheduled = false;
+        var fitAttempts  = 0;
+
+        function doFit() {
+            fitScheduled = false;
+            if (!window.TerminalBridge) return;
+            var el = document.getElementById('terminal-container');
+            if (!el) return;
+            var h = el.getBoundingClientRect().height;
+            if (h <= 0) {
+                // 容器还没尺寸，100ms 后重试
+                if (fitAttempts < 30) {
+                    fitAttempts++;
+                    setTimeout(scheduleFit, 100);
+                }
+                return;
+            }
+            fitAttempts = 0;
+            window.TerminalBridge.resizeTerminal();
+        }
+
+        function scheduleFit() {
+            if (fitScheduled) return;
+            fitScheduled = true;
+            requestAnimationFrame(doFit);
+        }
+
+        // 公开给 Kotlin 的 resizeTerminal（覆盖 bundle 中的版本）
+        window.TerminalBridge.resizeTerminal = function () {
+            scheduleFit();
+        };
+
+        // 页面加载完成后立即尝试一次
+        scheduleFit();
+        // 100 / 300 / 600ms 额外保险重试
+        setTimeout(scheduleFit, 100);
+        setTimeout(scheduleFit, 300);
+        setTimeout(scheduleFit, 600);
+
+        // window resize 时重新 fit
+        window.addEventListener('resize', scheduleFit);
+
     })();
     </script>
 </body>

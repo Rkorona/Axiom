@@ -233,6 +233,12 @@ fun TerminalScreen(
                                     super.onPageFinished(view, url)
                                     Log.d("TerminalScreen", "page finished: $url")
                                     pageReady = true
+                                    // 延迟触发 fit，确保 WebView 完成布局后 xterm 获得正确尺寸
+                                    view?.postDelayed({
+                                        view.evaluateJavascript(
+                                            "if(window.TerminalBridge) window.TerminalBridge.resizeTerminal()", null
+                                        )
+                                    }, 300)
                                 }
 
                                 override fun onReceivedError(
