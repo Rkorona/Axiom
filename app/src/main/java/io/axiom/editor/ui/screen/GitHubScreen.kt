@@ -924,6 +924,7 @@ private fun HistoryTab(
     LazyColumn(
         modifier = Modifier
             .fillMaxWidth()
+            .heightIn(max = 480.dp)
             .background(colors.commitWrap, RoundedCornerShape(10.dp)),
         state = listState
     ) {
