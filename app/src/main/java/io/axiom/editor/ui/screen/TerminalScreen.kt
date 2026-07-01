@@ -15,9 +15,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.rememberCoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import io.axiom.editor.data.AppSettings
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
@@ -48,25 +45,20 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 
 // ─────────────────────────────────────────────
 // JavaScript ↔ Kotlin 桥接
+// 接口名称 "AndroidBridge" 对应 xterm bundle 中 window.AndroidBridge
 // ─────────────────────────────────────────────
 private class TerminalJsBridge(
     private val onInput: (ByteArray) -> Unit,
-    private val onResizeCallback: (Int, Int) -> Unit,
-    private val onCtrlConsumed: () -> Unit
+    private val onResizeCallback: (Int, Int) -> Unit
 ) {
     @JavascriptInterface
-    fun sendInput(base64: String) {
-        try { onInput(Base64.decode(base64, Base64.NO_WRAP)) } catch (_: Exception) {}
+    fun onTerminalInput(data: String) {
+        try { onInput(data.toByteArray(Charsets.UTF_8)) } catch (_: Exception) {}
     }
 
     @JavascriptInterface
     fun onResize(rows: Int, cols: Int) {
         onResizeCallback(rows, cols)
-    }
-
-    @JavascriptInterface
-    fun ctrlConsumed() {
-        onCtrlConsumed()
     }
 }
 
@@ -83,10 +75,10 @@ fun TerminalScreen(
 ) {
     BackHandler { onNavigateBack() }
 
-    val envState           = vm.envState
-    val downloadProgress   = vm.downloadProgress
+    val envState             = vm.envState
+    val downloadProgress     = vm.downloadProgress
     val currentStatusMessage = vm.currentStatusMessage
-    val context            = LocalContext.current
+    val context              = LocalContext.current
 
     // 屏幕常亮
     val activity = context as? android.app.Activity
@@ -102,13 +94,12 @@ fun TerminalScreen(
     // Ctrl 键工具栏状态
     var isCtrlPressed      by remember { mutableStateOf(false) }
     var showSecondaryPanel by remember { mutableStateOf(false) }
-    val terminalLines = vm.terminalLines
 
-    // WebView 引用（用于向 index.js 写入 PTY 输出）
+    // WebView 引用
     val webViewRef = remember { mutableStateOf<WebView?>(null) }
-    var pageReady by remember { mutableStateOf(false) }
+    var pageReady  by remember { mutableStateOf(false) }
 
-    // ── 收集 PTY 输出 → 推送到 index.js ──────────────────────────
+    // ── 收集 PTY 输出 → 推送到 xterm.js ────────────────────────────
     LaunchedEffect(Unit) {
         vm.ptyOutput.collect { chunk ->
             if (!pageReady) return@collect
@@ -126,8 +117,6 @@ fun TerminalScreen(
     }
 
     // ── 设置同步到终端 ──────────────────────────────────────────
-    val coroutineScope = rememberCoroutineScope()
-
     fun applyTerminalSettings() {
         val wv = webViewRef.value ?: return
         val fs = settings.terminalFontSize.toInt()
@@ -140,48 +129,12 @@ fun TerminalScreen(
         }
     }
 
-    fun applyTerminalFont() {
-        val fontUri = settings.terminalFontUri
-        val wv = webViewRef.value ?: return
-        if (fontUri.isEmpty()) {
-            wv.post {
-                wv.evaluateJavascript(
-                    "if(window.setFontFamily) window.setFontFamily('')", null
-                )
-            }
-            return
-        }
-        coroutineScope.launch(Dispatchers.IO) {
-            try {
-                val bytes = context.contentResolver.openInputStream(
-                    android.net.Uri.parse(fontUri)
-                )?.use { it.readBytes() } ?: return@launch
-                val b64 = Base64.encodeToString(bytes, Base64.NO_WRAP)
-                val ext = fontUri.substringAfterLast('.').lowercase()
-                val mime = if (ext == "otf") "font/otf" else "font/ttf"
-                launch(Dispatchers.Main) {
-                    wv.post {
-                        wv.evaluateJavascript(
-                            "if(window.setFontFamily) window.setFontFamily('$mime','$b64')", null
-                        )
-                    }
-                }
-            } catch (_: Exception) {}
-        }
-    }
-
     LaunchedEffect(pageReady) {
-        if (pageReady) {
-            applyTerminalSettings()
-            applyTerminalFont()
-        }
+        if (pageReady) applyTerminalSettings()
     }
 
     LaunchedEffect(settings) {
-        if (pageReady) {
-            applyTerminalSettings()
-            applyTerminalFont()
-        }
+        if (pageReady) applyTerminalSettings()
     }
 
     // ── 工具栏按键 → 转义序列写入 PTY ────────────────────────────
@@ -190,10 +143,6 @@ fun TerminalScreen(
             "Esc"  -> byteArrayOf(0x1B)
             "Ctrl" -> {
                 isCtrlPressed = !isCtrlPressed
-                // term.onData (real keyboard input) lives in JS and never goes through
-                // this function, so the toggle has to be pushed over the bridge too —
-                // otherwise Ctrl only ever combines with toolbar symbol buttons.
-                webViewRef.value?.evaluateJavascript("window.setCtrlArmed(${isCtrlPressed})", null)
                 return
             }
             "Tab"  -> byteArrayOf(0x09)
@@ -218,7 +167,6 @@ fun TerminalScreen(
                 val raw = key.toByteArray(Charsets.UTF_8)
                 if (isCtrlPressed && raw.size == 1 && raw[0] in 0x40..0x7E) {
                     isCtrlPressed = false
-                    webViewRef.value?.evaluateJavascript("window.setCtrlArmed(false)", null)
                     byteArrayOf((raw[0].toInt() xor 0x40).toByte())
                 } else { raw }
             }
@@ -226,9 +174,7 @@ fun TerminalScreen(
         vm.sendInput(bytes)
     }
 
-    Scaffold(
-        modifier = modifier
-    ) { innerPadding ->
+    Scaffold(modifier = modifier) { innerPadding ->
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -259,21 +205,17 @@ fun TerminalScreen(
 
                             webChromeClient = object : android.webkit.WebChromeClient() {
                                 override fun onConsoleMessage(consoleMessage: android.webkit.ConsoleMessage): Boolean {
-                                    android.util.Log.d(
-                                        "TerminalScreen",
-                                        "WV: ${consoleMessage.message()}"
-                                    )
+                                    Log.d("TerminalScreen", "WV: ${consoleMessage.message()}")
                                     return true
                                 }
                             }
 
                             addJavascriptInterface(
                                 TerminalJsBridge(
-                                    onInput  = { data -> vm.sendInput(data) },
-                                    onResizeCallback = { rows, cols -> vm.resizePty(rows, cols) },
-                                    onCtrlConsumed = { isCtrlPressed = false }
+                                    onInput          = { data -> vm.sendInput(data) },
+                                    onResizeCallback = { rows, cols -> vm.resizePty(rows, cols) }
                                 ),
-                                "Android"
+                                "AndroidBridge"
                             )
 
                             val assetLoader = WebViewAssetLoader.Builder()
@@ -289,17 +231,8 @@ fun TerminalScreen(
 
                                 override fun onPageFinished(view: WebView?, url: String?) {
                                     super.onPageFinished(view, url)
-                                    Log.d("TerminalScreen", "page finished: $url w=${view?.width} h=${view?.height}")
+                                    Log.d("TerminalScreen", "page finished: $url")
                                     pageReady = true
-                                    view?.let { wv ->
-                                        val density = ctx.resources.displayMetrics.density
-                                        val cssW = wv.width  / density
-                                        val cssH = wv.height / density
-                                        Log.d("TerminalScreen", "passing to JS: cssW=$cssW cssH=$cssH density=$density")
-                                        wv.evaluateJavascript(
-                                            "if(window.setViewportSize) window.setViewportSize($cssW,$cssH)", null
-                                        )
-                                    }
                                 }
 
                                 override fun onReceivedError(
@@ -321,26 +254,12 @@ fun TerminalScreen(
                                 }
                             }
 
-                            // Re-pass exact dimensions whenever the WebView is resized
-                            // (e.g. keyboard appears/hides, orientation change)
+                            // 布局变化时触发 xterm FitAddon 重新适配
                             viewTreeObserver.addOnGlobalLayoutListener {
-                                val density = ctx.resources.displayMetrics.density
-                                val cssW = this.width  / density
-                                val cssH = this.height / density
-                                if (cssW > 0f && cssH > 0f) {
+                                if (this.width > 0 && this.height > 0) {
                                     evaluateJavascript(
-                                        "if(window.setViewportSize) window.setViewportSize($cssW,$cssH)", null
+                                        "if(window.TerminalBridge) window.TerminalBridge.resizeTerminal()", null
                                     )
-                                    // Multiple scroll calls to cover keyboard animation (300-400 ms)
-                                    postDelayed({
-                                        evaluateJavascript("if(window.scrollTerm) window.scrollTerm()", null)
-                                    }, 300)
-                                    postDelayed({
-                                        evaluateJavascript("if(window.scrollTerm) window.scrollTerm()", null)
-                                    }, 550)
-                                    postDelayed({
-                                        evaluateJavascript("if(window.scrollTerm) window.scrollTerm()", null)
-                                    }, 800)
                                 }
                             }
 
@@ -354,43 +273,60 @@ fun TerminalScreen(
                         .weight(1f)
                 )
 
-                // B. Termius 风格工具栏（仅键盘弹出时显示）
-                if (terminalLines.isNotEmpty()) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(Color(0xAA000000))
-                            .padding(12.dp)
-                    ) {
-                        Column {
-                            Text(
-                                text = "终端调试信息:",
-                                style = TextStyle(color = Color(0xFFFFFFFF), fontWeight = FontWeight.Bold)
-                            )
-                            terminalLines.forEach { line ->
-                                Text(
-                                    text = line,
-                                    style = TextStyle(color = Color(0xFFFAFAFA), fontFamily = FontFamily.Monospace, fontSize = 12.sp)
-                                )
-                            }
-                        }
-                    }
-                }
-
-                // B. M3 风格工具栏（始终显示）
-                val toolbarBg = MaterialTheme.colorScheme.surfaceContainerHigh
+                // B. M3 风格工具栏
+                val toolbarBg      = MaterialTheme.colorScheme.surfaceContainerHigh
                 val toolbarDivider = MaterialTheme.colorScheme.outlineVariant
-                val toolbarAccent = MaterialTheme.colorScheme.primary
+                val toolbarAccent  = MaterialTheme.colorScheme.primary
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(toolbarBg)
                 ) {
-                        // 主工具行
-                        Row(
+                    // 主工具行
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp)
+                            .drawBehind {
+                                drawLine(
+                                    color = toolbarDivider,
+                                    start = Offset(0f, 0f),
+                                    end = Offset(size.width, 0f),
+                                    strokeWidth = 1.dp.toPx()
+                                )
+                            },
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        TerminalKeyButton(text = "Esc") { handleToolbarKeyPress("Esc") }
+                        TerminalKeyDivider()
+                        TerminalKeyButton(
+                            text = "Ctrl",
+                            isActive = isCtrlPressed,
+                            accentColor = toolbarAccent
+                        ) { handleToolbarKeyPress("Ctrl") }
+                        TerminalKeyDivider()
+                        TerminalKeyButton(icon = Icons.Default.KeyboardArrowUp)    { handleToolbarKeyPress("↑") }
+                        TerminalKeyDivider()
+                        TerminalKeyButton(icon = Icons.Default.KeyboardArrowDown)  { handleToolbarKeyPress("↓") }
+                        TerminalKeyDivider()
+                        TerminalKeyButton(icon = Icons.Default.KeyboardArrowLeft)  { handleToolbarKeyPress("←") }
+                        TerminalKeyDivider()
+                        TerminalKeyButton(icon = Icons.Default.KeyboardArrowRight) { handleToolbarKeyPress("→") }
+                        TerminalKeyDivider()
+                        TerminalKeyButton(
+                            icon = Icons.Default.MoreHoriz,
+                            isActive = showSecondaryPanel,
+                            accentColor = toolbarAccent
+                        ) { showSecondaryPanel = !showSecondaryPanel }
+                    }
+
+                    // 次级符号面板
+                    if (showSecondaryPanel) {
+                        val panelBg = MaterialTheme.colorScheme.surface
+                        FlowRow(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(48.dp)
+                                .background(panelBg)
                                 .drawBehind {
                                     drawLine(
                                         color = toolbarDivider,
@@ -398,80 +334,40 @@ fun TerminalScreen(
                                         end = Offset(size.width, 0f),
                                         strokeWidth = 1.dp.toPx()
                                     )
-                                },
-                            verticalAlignment = Alignment.CenterVertically
+                                }
+                                .padding(vertical = 2.dp)
                         ) {
-                            TerminalKeyButton(text = "Esc") { handleToolbarKeyPress("Esc") }
-                            TerminalKeyDivider()
-                            TerminalKeyButton(
-                                text = "Ctrl",
-                                isActive = isCtrlPressed,
-                                accentColor = toolbarAccent
-                            ) { handleToolbarKeyPress("Ctrl") }
-                            TerminalKeyDivider()
-                            TerminalKeyButton(icon = Icons.Default.KeyboardArrowUp) { handleToolbarKeyPress("↑") }
-                            TerminalKeyDivider()
-                            TerminalKeyButton(icon = Icons.Default.KeyboardArrowDown) { handleToolbarKeyPress("↓") }
-                            TerminalKeyDivider()
-                            TerminalKeyButton(icon = Icons.Default.KeyboardArrowLeft) { handleToolbarKeyPress("←") }
-                            TerminalKeyDivider()
-                            TerminalKeyButton(icon = Icons.Default.KeyboardArrowRight) { handleToolbarKeyPress("→") }
-                            TerminalKeyDivider()
-                            TerminalKeyButton(
-                                icon = Icons.Default.MoreHoriz,
-                                isActive = showSecondaryPanel,
-                                accentColor = toolbarAccent
-                            ) { showSecondaryPanel = !showSecondaryPanel }
-                        }
-
-                        // 次级符号面板
-                        if (showSecondaryPanel) {
-                            val panelBg = MaterialTheme.colorScheme.surface
-                            FlowRow(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .background(panelBg)
-                                    .drawBehind {
-                                        drawLine(
-                                            color = toolbarDivider,
-                                            start = Offset(0f, 0f),
-                                            end = Offset(size.width, 0f),
-                                            strokeWidth = 1.dp.toPx()
+                            val symbols = listOf(
+                                "Tab", "{ }", "[ ]", "( )", "Home", "End",
+                                "|", "/", "\\", "_", "-", "&", "$",
+                                "F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8"
+                            )
+                            val symbolColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                            symbols.forEach { sym ->
+                                Box(
+                                    modifier = Modifier
+                                        .width(58.dp)
+                                        .height(44.dp)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .clickable(
+                                            interactionSource = remember { MutableInteractionSource() },
+                                            indication = null
+                                        ) { handleToolbarKeyPress(sym) },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = sym,
+                                        style = TextStyle(
+                                            color = symbolColor,
+                                            fontFamily = FontFamily.Monospace,
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Medium
                                         )
-                                    }
-                                    .padding(vertical = 2.dp)
-                            ) {
-                                val symbols = listOf(
-                                    "Tab", "{ }", "[ ]", "( )", "Home", "End",
-                                    "|", "/", "\\", "_", "-", "&", "$",
-                                    "F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8"
-                                )
-                                val symbolColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                                symbols.forEach { sym ->
-                                    Box(
-                                        modifier = Modifier
-                                            .width(58.dp)
-                                            .height(44.dp)
-                                            .clip(RoundedCornerShape(8.dp))
-                                            .clickable(
-                                                interactionSource = remember { MutableInteractionSource() },
-                                                indication = null
-                                            ) { handleToolbarKeyPress(sym) },
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text(
-                                            text = sym,
-                                            style = TextStyle(
-                                                color = symbolColor,
-                                                fontFamily = FontFamily.Monospace,
-                                                fontSize = 12.sp,
-                                                fontWeight = FontWeight.Medium
-                                            )
-                                        )
-                                    }
+                                    )
                                 }
                             }
                         }
+                    }
                 }
             }
         }
@@ -586,23 +482,29 @@ fun TerminalScreen(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Text(text = currentStatusMessage,
+                                Text(
+                                    text = currentStatusMessage,
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                Text(text = "${(downloadProgress * 100).toInt()}%",
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    text = "${(downloadProgress * 100).toInt()}%",
                                     style = MaterialTheme.typography.bodySmall,
                                     fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.primary)
+                                    color = MaterialTheme.colorScheme.primary
+                                )
                             }
                         } else {
                             CircularProgressIndicator(
                                 modifier = Modifier.size(36.dp).align(Alignment.CenterHorizontally),
                                 color = MaterialTheme.colorScheme.primary
                             )
-                            Text(text = currentStatusMessage,
+                            Text(
+                                text = currentStatusMessage,
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.align(Alignment.CenterHorizontally))
+                                modifier = Modifier.align(Alignment.CenterHorizontally)
+                            )
                             if (envState == EnvironmentState.Initializing) {
                                 val steps = listOf(
                                     "APT 镜像源（USTC）", "DNS 解析（阿里/腾讯）",
