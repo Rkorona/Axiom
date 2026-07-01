@@ -1,5 +1,6 @@
 package io.axiom.editor.ui.screen
 
+import android.net.Uri
 import android.util.Base64
 import android.util.Log
 import android.webkit.JavascriptInterface
@@ -8,6 +9,8 @@ import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.webkit.WebViewAssetLoader
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -117,7 +120,7 @@ fun TerminalScreen(
     }
 
     // ── 设置同步到终端 ──────────────────────────────────────────
-    fun applyTerminalSettings() {
+    suspend fun applyTerminalSettings() {
         val wv = webViewRef.value ?: return
         val fs = settings.terminalFontSize.toInt()
         wv.post { wv.evaluateJavascript("if(window.setFontSize) window.setFontSize($fs)", null) }
@@ -126,6 +129,31 @@ fun TerminalScreen(
             wv.evaluateJavascript(
                 "if(window.setTheme) window.setTheme('${theme.bg}','${theme.fg}')", null
             )
+        }
+        // 自定义字体：从 content URI 读取字节 → Base64 → 注入 xterm @font-face
+        val fontUri = settings.terminalFontUri
+        if (fontUri.isNotEmpty()) {
+            try {
+                val uri = Uri.parse(fontUri)
+                val bytes = withContext(Dispatchers.IO) {
+                    context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                }
+                if (bytes != null && bytes.isNotEmpty()) {
+                    val b64 = Base64.encodeToString(bytes, Base64.NO_WRAP)
+                    val mime = context.contentResolver.getType(uri) ?: "font/ttf"
+                    wv.post {
+                        wv.evaluateJavascript(
+                            "if(window.setFont) window.setFont('$b64','$mime')", null
+                        )
+                    }
+                } else {
+                    Log.w("TerminalScreen", "Custom font file is empty or unreadable")
+                }
+            } catch (e: Exception) {
+                Log.w("TerminalScreen", "Failed to load custom terminal font: $e")
+            }
+        } else {
+            wv.post { wv.evaluateJavascript("if(window.clearFont) window.clearFont()", null) }
         }
     }
 

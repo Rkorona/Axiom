@@ -56,13 +56,27 @@
             } catch (e) {}
         };
 
-        // ── 字体大小 / 主题 ──────────────────────────────
+        // ── 字体大小 / 主题 / 自定义字体 ────────────────────
         window.setFontSize = function (size) {
             a.options.fontSize = size;
             doFit();
         };
         window.setTheme = function (bg, fg) {
             a.options.theme = { background: bg, foreground: fg };
+        };
+        window.setFont = function (b64, mime) {
+            var fontName = 'AxiomTermFont';
+            var el = document.getElementById('axiom-font-style');
+            if (!el) { el = document.createElement('style'); el.id = 'axiom-font-style'; document.head.appendChild(el); }
+            el.textContent = '@font-face{font-family:"' + fontName + '";src:url("data:' + mime + ';base64,' + b64 + '");}';
+            a.options.fontFamily = '"' + fontName + '", monospace';
+            doFit();
+        };
+        window.clearFont = function () {
+            var el = document.getElementById('axiom-font-style');
+            if (el) el.remove();
+            a.options.fontFamily = 'monospace';
+            doFit();
         };
 
         // ── fit：先更新容器尺寸，再调真正的 o.fit() ─────────
