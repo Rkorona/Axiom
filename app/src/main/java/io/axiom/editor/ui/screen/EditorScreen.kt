@@ -1247,7 +1247,8 @@ private fun ToolbarDivider() {
 }
 
 // ═════════════════════════════════════════════════════════════
-// 工具栏（键盘收起时替代符号栏显示）
+// 工具栏（键盘收起时替代符号栏显示）—— Replit 风格三段式布局
+// 左：启动按钮占位符  中：四个占位符分组  右：软键盘 + 文件树
 // ═════════════════════════════════════════════════════════════
 @Composable
 private fun EditorActionsBar(
@@ -1270,15 +1271,59 @@ private fun EditorActionsBar(
                 .padding(horizontal = 4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // ── 左侧：保存 + 软键盘 ──
-            IconButton(onClick = onSave) {
+            // ── 左侧：启动图标（占位符）──
+            IconButton(onClick = { /* TODO: 启动 */ }) {
                 Icon(
-                    imageVector = Icons.Default.Save,
-                    contentDescription = "保存文件",
+                    imageVector = Icons.Default.PlayArrow,
+                    contentDescription = "启动",
                     modifier = Modifier.size(22.dp),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
+
+            Spacer(modifier = Modifier.weight(1f))
+
+            // ── 中间：占位符图标分组（四个）──
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = { /* TODO */ }) {
+                    Icon(
+                        imageVector = Icons.Default.DesktopWindows,
+                        contentDescription = null,
+                        modifier = Modifier.size(22.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                IconButton(onClick = { /* TODO */ }) {
+                    Icon(
+                        imageVector = Icons.Default.Extension,
+                        contentDescription = null,
+                        modifier = Modifier.size(22.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                IconButton(onClick = { /* TODO */ }) {
+                    Icon(
+                        imageVector = Icons.Default.Public,
+                        contentDescription = null,
+                        modifier = Modifier.size(22.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                IconButton(onClick = { /* TODO */ }) {
+                    Icon(
+                        imageVector = Icons.Default.Hub,
+                        contentDescription = null,
+                        modifier = Modifier.size(22.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.weight(1f))
+
+            // ── 右侧：软键盘 + 文件树 ──
             IconButton(onClick = onToggleKeyboard) {
                 Icon(
                     imageVector = if (isKeyboardEnabled)
@@ -1291,10 +1336,6 @@ private fun EditorActionsBar(
                         MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-
-            Spacer(modifier = Modifier.weight(1f))
-
-            // ── 右侧：文件树入口 ──
             if (hasFileTree) {
                 IconButton(onClick = onOpenFileTree) {
                     Icon(
