@@ -78,7 +78,8 @@ private fun SettingsContent(
     var showAutoSaveDialog      by remember { mutableStateOf(false) }
     var showEncodingDialog      by remember { mutableStateOf(false) }
     var showTerminalThemeDialog by remember { mutableStateOf(false) }
-    var showEditorThemeDialog   by remember { mutableStateOf(false) }
+    var showEditorThemeLightDialog by remember { mutableStateOf(false) }
+    var showEditorThemeDarkDialog  by remember { mutableStateOf(false) }
     var showDefaultSortDialog   by remember { mutableStateOf(false) }
     var showFontWeightDialog    by remember { mutableStateOf(false) }
     var showClearCacheDialog    by remember { mutableStateOf(false) }
@@ -226,9 +227,19 @@ private fun SettingsContent(
                 CardRowClickable(
                     icon = Icons.Filled.Palette,
                     iconBg = IconBgDefault,
-                    title = "编辑器主题",
-                    value = s.editorTheme.label,
-                    onClick = { showEditorThemeDialog = true }
+                    title = "浅色编辑器主题",
+                    subtitle = "浅色模式下使用",
+                    value = s.editorThemeLight.label,
+                    onClick = { showEditorThemeLightDialog = true }
+                )
+                CardDivider()
+                CardRowClickable(
+                    icon = Icons.Filled.Palette,
+                    iconBg = IconBgDefault,
+                    title = "深色编辑器主题",
+                    subtitle = "深色模式下使用",
+                    value = s.editorThemeDark.label,
+                    onClick = { showEditorThemeDarkDialog = true }
                 )
                 CardDivider()
                 CardRowClickable(
@@ -503,13 +514,23 @@ private fun SettingsContent(
         )
     }
 
-    if (showEditorThemeDialog) {
+    if (showEditorThemeLightDialog) {
         SingleChoiceDialog(
-            title = "编辑器主题",
-            options = io.axiom.editor.data.EditorThemeMode.entries.map { it.label },
-            selectedIndex = io.axiom.editor.data.EditorThemeMode.entries.indexOf(s.editorTheme),
-            onSelect = { viewModel.setEditorTheme(io.axiom.editor.data.EditorThemeMode.entries[it]) },
-            onDismiss = { showEditorThemeDialog = false }
+            title = "浅色编辑器主题",
+            options = EditorThemeMode.entries.map { it.label },
+            selectedIndex = EditorThemeMode.entries.indexOf(s.editorThemeLight),
+            onSelect = { viewModel.setEditorThemeLight(EditorThemeMode.entries[it]) },
+            onDismiss = { showEditorThemeLightDialog = false }
+        )
+    }
+
+    if (showEditorThemeDarkDialog) {
+        SingleChoiceDialog(
+            title = "深色编辑器主题",
+            options = EditorThemeMode.entries.map { it.label },
+            selectedIndex = EditorThemeMode.entries.indexOf(s.editorThemeDark),
+            onSelect = { viewModel.setEditorThemeDark(EditorThemeMode.entries[it]) },
+            onDismiss = { showEditorThemeDarkDialog = false }
         )
     }
 

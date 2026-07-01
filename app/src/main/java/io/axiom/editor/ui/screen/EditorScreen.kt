@@ -337,6 +337,8 @@ fun EditorScreen(
         ThemeMode.LIGHT  -> false
         ThemeMode.DARK   -> true
     }
+    // 根据当前深浅模式选取对应的编辑器主题
+    val activeEditorTheme = if (isDarkTheme) settings.editorThemeDark else settings.editorThemeLight
     var isKeyboardEnabled by rememberSaveable { mutableStateOf(false) }
 
     // 文件树底部抽屉状态
@@ -423,7 +425,7 @@ fun EditorScreen(
                         executeJs("window.editorAPI.setContentBase64('${text.toBase64()}')")
                         executeJs("window.editorAPI.setLanguage('$targetExt')")
                         executeJs("window.editorAPI.setTheme($isDark)")
-                        executeJs("window.editorAPI.setEditorTheme('${settings.editorTheme.id}')")
+                        executeJs("window.editorAPI.setEditorTheme('${activeEditorTheme.id}')")
                         applyEditorSettings(isDark)
                     }
                 }
@@ -440,14 +442,14 @@ fun EditorScreen(
             val bg = if (isDarkTheme) "#141729" else "#ffffff"
             executeJs("document.documentElement.style.setProperty('--editor-bg','$bg')")
             executeJs("window.editorAPI.setTheme($isDarkTheme)")
-            executeJs("window.editorAPI.setEditorTheme('${settings.editorTheme.id}')")
+            executeJs("window.editorAPI.setEditorTheme('${activeEditorTheme.id}')")
         }
     }
 
-    // 编辑器主题切换时实时同步到 WebView
-    LaunchedEffect(settings.editorTheme) {
+    // 编辑器主题切换（或深浅模式变化导致 activeEditorTheme 改变）时实时同步到 WebView
+    LaunchedEffect(activeEditorTheme) {
         if (isEditorReady) {
-            executeJs("window.editorAPI.setEditorTheme('${settings.editorTheme.id}')")
+            executeJs("window.editorAPI.setEditorTheme('${activeEditorTheme.id}')")
         }
     }
     
@@ -462,7 +464,7 @@ fun EditorScreen(
             executeJs("window.editorAPI.setContentBase64('${fileContent.toBase64()}')")
             executeJs("window.editorAPI.setLanguage('$fileExtension')")
             executeJs("window.editorAPI.setTheme($isDarkTheme)")
-            executeJs("window.editorAPI.setEditorTheme('${settings.editorTheme.id}')")
+            executeJs("window.editorAPI.setEditorTheme('${activeEditorTheme.id}')")
             applyEditorSettings(isDarkTheme)
             applyEditorFont()
             webViewRef?.postDelayed({

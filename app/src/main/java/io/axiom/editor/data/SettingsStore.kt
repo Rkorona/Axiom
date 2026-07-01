@@ -27,6 +27,12 @@ class SettingsStore(context: Context) {
         },
         fileEncoding       = EncodingMode.entries.getOrElse(prefs.getInt("fileEncoding", 0)) { EncodingMode.AUTO },
         enableFileTabs     = prefs.getBoolean("enableFileTabs", true),
+        editorThemeLight   = EditorThemeMode.entries.firstOrNull {
+                                 it.name == prefs.getString("editorThemeLight", EditorThemeMode.GITHUB_LIGHT.name)
+                             } ?: EditorThemeMode.GITHUB_LIGHT,
+        editorThemeDark    = EditorThemeMode.entries.firstOrNull {
+                                 it.name == prefs.getString("editorThemeDark", EditorThemeMode.GITHUB_DARK.name)
+                             } ?: EditorThemeMode.GITHUB_DARK,
         terminalFontSize   = prefs.getFloat("terminalFontSize", 13f),
         terminalFontUri    = prefs.getString("terminalFontUri", "") ?: "",
         terminalFontName   = prefs.getString("terminalFontName", "") ?: "",
@@ -51,6 +57,8 @@ class SettingsStore(context: Context) {
             putString("autoSaveInterval", s.autoSaveInterval.name)
             putInt("fileEncoding",       s.fileEncoding.ordinal)
             putBoolean("enableFileTabs", s.enableFileTabs)
+            putString("editorThemeLight", s.editorThemeLight.name)
+            putString("editorThemeDark",  s.editorThemeDark.name)
             putFloat("terminalFontSize", s.terminalFontSize)
             putString("terminalFontUri",  s.terminalFontUri)
             putString("terminalFontName", s.terminalFontName)
