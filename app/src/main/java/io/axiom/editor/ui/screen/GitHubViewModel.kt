@@ -5,6 +5,7 @@ import android.content.Context
 import androidx.browser.customtabs.CustomTabsIntent
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.core.net.toUri
@@ -307,7 +308,7 @@ class GitHubViewModel(application: Application) : AndroidViewModel(application) 
             val history = GitHubFileChangeScanner.readCommits(dir, limit = 5)
             withContext(Dispatchers.Main) {
                 commitHistory = commitHistory + (repoName to history)
-                hasMoreCommits = hasMoreCommits + (repoName to history.size >= 5)
+                hasMoreCommits = hasMoreCommits + (repoName to (history.size >= 5))
                 commitPageCount[repoName] = 1
             }
         }
@@ -324,8 +325,8 @@ class GitHubViewModel(application: Application) : AndroidViewModel(application) 
             val moreCommits = GitHubFileChangeScanner.readCommits(dir, limit = pageSize, skip = skip)
             withContext(Dispatchers.Main) {
                 val existing = commitHistory[repoName] ?: emptyList()
-                commitHistory = commitHistory + (repoName to existing + moreCommits)
-                hasMoreCommits = hasMoreCommits + (repoName to moreCommits.size >= pageSize)
+                commitHistory = commitHistory + (repoName to (existing + moreCommits))
+                hasMoreCommits = hasMoreCommits + (repoName to (moreCommits.size >= pageSize))
                 commitPageCount[repoName] = currentPage + 1
             }
         }
