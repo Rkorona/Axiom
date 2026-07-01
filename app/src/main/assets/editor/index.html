@@ -24,7 +24,7 @@
          初始值为深色兜底；Kotlin bridge 就绪后会立刻覆盖为正确值。
          注意：不再使用 prefers-color-scheme media query 做反转补偿——
          那是对旧版强制反色的临时 hack，禁用强制反色后不再需要且会造成背景错乱。 */
-      :root { --editor-bg: #141729; }
+      :root { --editor-bg: transparent; }
 
       html,
       body {
