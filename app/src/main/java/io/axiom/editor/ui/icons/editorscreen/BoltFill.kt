@@ -1,4 +1,4 @@
-package com.example.test
+package io.axiom.editor.ui.icons.editorscreen
 
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathFillType

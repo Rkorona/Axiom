@@ -1,4 +1,4 @@
-package io.axiom.editor.ui.icons
+package io.axiom.editor.ui.icons.editorscreen
 
 
 import androidx.compose.ui.graphics.Color

@@ -66,18 +66,7 @@ import io.axiom.editor.ui.model.ProjectType
 
 // icons
 import io.axiom.editor.ui.icons.AppIcons
-import io.axiom.editor.ui.icons.ArrowBack
-import io.axiom.editor.ui.icons.BoltNoFill
-import io.axiom.editor.ui.icons.BookmarkStacksNoFill
-import io.axiom.editor.ui.icons.BookmarkStacksFill
-import io.axiom.editor.ui.icons.FolderOpen
-import io.axiom.editor.ui.icons.KeyboardHide
-import io.axiom.editor.ui.icons.KeyboardLock
-import io.axiom.editor.ui.icons.MoreVert
-import io.axiom.editor.ui.icons.PlayArrow
-import io.axiom.editor.ui.icons.Undo
-import io.axiom.editor.ui.icons.Redo
-import io.axiom.editor.ui.icons.Format
+import io.axiom.editor.ui.icons.editorscreen.*
 // ═════════════════════════════════════════════════════════════
 // 安全编解码工具函数与双通道编码自动检测
 // 规避 Kotlin 与 Javascript 通讯时的特殊字符、换行、单双引号转义问题
