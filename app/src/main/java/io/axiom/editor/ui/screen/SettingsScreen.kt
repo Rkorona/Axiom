@@ -15,7 +15,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -30,19 +30,9 @@ import androidx.compose.ui.unit.sp
 import io.axiom.editor.data.*
 
 // ─────────────────────────────────────────────────────────────────
-// 固定强调色（主题无关，仅用于图标背景）
+// 标签蓝色（Section 标题）
 // ─────────────────────────────────────────────────────────────────
-private val LabelBlue     = Color(0xFF4D9FFF)
-private val IconBgDefault = Color(0xFF3A3F55)
-private val IconBgGreen   = Color(0xFF153D2E)
-private val IconBgOrange  = Color(0xFF3D2A15)
-private val IconBgPurple  = Color(0xFF2D1E3E)
-private val IconBgRed     = Color(0xFF3E1E1E)
-private val IconTintGreen  = Color(0xFF2ECC8E)
-private val IconTintOrange = Color(0xFFE89A3C)
-private val IconTintPurple = Color(0xFFBB86FC)
-private val IconTintRed    = Color(0xFFEF4444)
-private val IconTintDefault = Color(0xFFCCCCCC)
+private val LabelBlue = Color(0xFF4D9FFF)
 
 // ─────────────────────────────────────────────────────────────────
 // 主入口
@@ -140,8 +130,7 @@ private fun SettingsContent(
             SectionLabel("外观")
             SettingsCard {
                 CardRowClickable(
-                    icon = Icons.Filled.Palette,
-                    iconBg = IconBgDefault,
+                    icon = Icons.Outlined.Palette,
                     title = "主题",
                     value = s.themeOption.label,
                     isLast = true,
@@ -156,16 +145,14 @@ private fun SettingsContent(
             SectionLabel("编辑器")
             SettingsCard {
                 CardRowClickable(
-                    icon = Icons.Filled.FormatSize,
-                    iconBg = IconBgDefault,
+                    icon = Icons.Outlined.FormatSize,
                     title = "字体大小",
                     value = "${s.editorFontSize.toInt()} sp",
                     onClick = { showEditorFontDialog = true }
                 )
                 CardDivider()
                 CardRowClickable(
-                    icon = Icons.Filled.FontDownload,
-                    iconBg = IconBgDefault,
+                    icon = Icons.Outlined.FontDownload,
                     title = "自定义字体",
                     value = if (s.editorFontName.isNotEmpty()) s.editorFontName else "系统默认",
                     onClick = { editorFontLauncher.launch(arrayOf("*/*")) },
@@ -176,24 +163,21 @@ private fun SettingsContent(
                 )
                 CardDivider()
                 CardRowClickable(
-                    icon = Icons.Filled.Translate,
-                    iconBg = IconBgDefault,
+                    icon = Icons.Outlined.Translate,
                     title = "文件编码",
                     value = s.fileEncoding.label,
                     onClick = { showEncodingDialog = true }
                 )
                 CardDivider()
                 CardRowClickable(
-                    icon = Icons.Filled.FormatBold,
-                    iconBg = IconBgDefault,
+                    icon = Icons.Outlined.FormatBold,
                     title = "字体粗细",
                     value = s.editorFontWeight.label,
                     onClick = { showFontWeightDialog = true }
                 )
                 CardDivider()
                 CardRowSwitch(
-                    icon = Icons.Filled.Tab,
-                    iconBg = IconBgDefault,
+                    icon = Icons.Outlined.Tab,
                     title = "文件选项卡",
                     subtitle = "在文件树中点击文件时以新选项卡打开",
                     checked = s.enableFileTabs,
@@ -201,32 +185,28 @@ private fun SettingsContent(
                 )
                 CardDivider()
                 CardRowSwitch(
-                    icon = Icons.Filled.AutoAwesome,
-                    iconBg = IconBgDefault,
+                    icon = Icons.Outlined.AutoAwesome,
                     title = "自动补全",
                     checked = s.autoComplete,
                     onCheckedChange = { viewModel.setAutoComplete(it) }
                 )
                 CardDivider()
                 CardRowSwitch(
-                    icon = Icons.Filled.FormatListNumbered,
-                    iconBg = IconBgDefault,
+                    icon = Icons.Outlined.FormatListNumbered,
                     title = "显示行号",
                     checked = s.showLineNumbers,
                     onCheckedChange = { viewModel.setShowLineNumbers(it) }
                 )
                 CardDivider()
                 CardRowSwitch(
-                    icon = Icons.Filled.WrapText,
-                    iconBg = IconBgDefault,
+                    icon = Icons.Outlined.WrapText,
                     title = "自动换行",
                     checked = s.wordWrap,
                     onCheckedChange = { viewModel.setWordWrap(it) }
                 )
                 CardDivider()
                 CardRowClickable(
-                    icon = Icons.Filled.Palette,
-                    iconBg = IconBgDefault,
+                    icon = Icons.Outlined.LightMode,
                     title = "浅色编辑器主题",
                     subtitle = "浅色模式下使用",
                     value = s.editorThemeLight.label,
@@ -234,8 +214,7 @@ private fun SettingsContent(
                 )
                 CardDivider()
                 CardRowClickable(
-                    icon = Icons.Filled.Palette,
-                    iconBg = IconBgDefault,
+                    icon = Icons.Outlined.DarkMode,
                     title = "深色编辑器主题",
                     subtitle = "深色模式下使用",
                     value = s.editorThemeDark.label,
@@ -243,17 +222,14 @@ private fun SettingsContent(
                 )
                 CardDivider()
                 CardRowClickable(
-                    icon = Icons.Filled.SpaceBar,
-                    iconBg = IconBgDefault,
+                    icon = Icons.Outlined.SpaceBar,
                     title = "Tab 宽度",
                     value = s.tabWidth.label,
                     onClick = { showTabWidthDialog = true }
                 )
                 CardDivider()
                 CardRowSwitch(
-                    icon = Icons.Filled.Save,
-                    iconBg = IconBgGreen,
-                    iconTint = IconTintGreen,
+                    icon = Icons.Outlined.Save,
                     title = "自动保存",
                     checked = s.autoSave,
                     onCheckedChange = { viewModel.setAutoSave(it) }
@@ -261,9 +237,7 @@ private fun SettingsContent(
                 if (s.autoSave) {
                     CardDivider()
                     CardRowClickable(
-                        icon = Icons.Filled.Timer,
-                        iconBg = IconBgGreen,
-                        iconTint = IconTintGreen,
+                        icon = Icons.Outlined.Timer,
                         title = "保存间隔",
                         value = s.autoSaveInterval.label,
                         isLast = true,
@@ -279,18 +253,14 @@ private fun SettingsContent(
             SectionLabel("终端")
             SettingsCard {
                 CardRowClickable(
-                    icon = Icons.Filled.Terminal,
-                    iconBg = IconBgGreen,
-                    iconTint = IconTintGreen,
+                    icon = Icons.Outlined.Terminal,
                     title = "字体大小",
                     value = "${s.terminalFontSize.toInt()} sp",
                     onClick = { showTerminalFontDialog = true }
                 )
                 CardDivider()
                 CardRowClickable(
-                    icon = Icons.Filled.FontDownload,
-                    iconBg = IconBgGreen,
-                    iconTint = IconTintGreen,
+                    icon = Icons.Outlined.FontDownload,
                     title = "自定义字体",
                     value = if (s.terminalFontName.isNotEmpty()) s.terminalFontName else "系统默认",
                     onClick = { terminalFontLauncher.launch(arrayOf("*/*")) },
@@ -301,18 +271,14 @@ private fun SettingsContent(
                 )
                 CardDivider()
                 CardRowClickable(
-                    icon = Icons.Filled.ColorLens,
-                    iconBg = IconBgGreen,
-                    iconTint = IconTintGreen,
+                    icon = Icons.Outlined.ColorLens,
                     title = "配色方案",
                     value = s.terminalTheme.label,
                     onClick = { showTerminalThemeDialog = true }
                 )
                 CardDivider()
                 CardRowSwitch(
-                    icon = Icons.Filled.PhoneAndroid,
-                    iconBg = IconBgGreen,
-                    iconTint = IconTintGreen,
+                    icon = Icons.Outlined.PhoneAndroid,
                     title = "屏幕常亮",
                     subtitle = "终端运行时保持屏幕不息屏",
                     checked = s.keepScreenOn,
@@ -328,18 +294,14 @@ private fun SettingsContent(
             SectionLabel("项目")
             SettingsCard {
                 CardRowClickable(
-                    icon = Icons.Filled.Sort,
-                    iconBg = IconBgOrange,
-                    iconTint = IconTintOrange,
+                    icon = Icons.Outlined.Sort,
                     title = "默认排序",
                     value = s.defaultSort.label,
                     onClick = { showDefaultSortDialog = true }
                 )
                 CardDivider()
                 CardRowSwitch(
-                    icon = Icons.Filled.DeleteForever,
-                    iconBg = IconBgRed,
-                    iconTint = IconTintRed,
+                    icon = Icons.Outlined.DeleteForever,
                     title = "删除前确认",
                     subtitle = "删除项目时弹出确认对话框",
                     checked = s.confirmDelete,
@@ -355,17 +317,13 @@ private fun SettingsContent(
             SectionLabel("存储")
             SettingsCard {
                 CardRowInfo(
-                    icon = Icons.Filled.Memory,
-                    iconBg = IconBgPurple,
-                    iconTint = IconTintPurple,
+                    icon = Icons.Outlined.Memory,
                     title = "Debian 环境",
                     badge = "已安装"
                 )
                 CardDivider()
                 CardRowClickable(
-                    icon = Icons.Filled.CleaningServices,
-                    iconBg = IconBgRed,
-                    iconTint = IconTintRed,
+                    icon = Icons.Outlined.CleaningServices,
                     title = "清理终端缓存",
                     value = "",
                     isLast = true,
@@ -380,23 +338,20 @@ private fun SettingsContent(
             SectionLabel("关于")
             SettingsCard {
                 CardRowInfo(
-                    icon = Icons.Filled.Info,
-                    iconBg = IconBgDefault,
+                    icon = Icons.Outlined.Info,
                     title = "版本",
                     badge = "1.0.0"
                 )
                 CardDivider()
                 CardRowClickable(
-                    icon = Icons.Filled.SystemUpdate,
-                    iconBg = IconBgDefault,
+                    icon = Icons.Outlined.SystemUpdate,
                     title = "检查更新",
                     value = "",
                     onClick = { showUpdateDialog = true }
                 )
                 CardDivider()
                 CardRowClickable(
-                    icon = Icons.Filled.Article,
-                    iconBg = IconBgDefault,
+                    icon = Icons.Outlined.Article,
                     title = "开源许可",
                     value = "",
                     isLast = true,
@@ -412,12 +367,12 @@ private fun SettingsContent(
     if (showClearCacheDialog) {
         AlertDialog(
             onDismissRequest = { showClearCacheDialog = false },
-            icon = { Icon(Icons.Filled.CleaningServices, contentDescription = null, tint = IconTintRed) },
+            icon = { Icon(Icons.Outlined.CleaningServices, contentDescription = null) },
             title = { Text("清理终端缓存") },
             text = { Text("将清除终端历史记录和临时文件，不会影响已安装的 Debian 环境。") },
             confirmButton = {
                 TextButton(onClick = { showClearCacheDialog = false; showCacheClearedDialog = true }) {
-                    Text("清理", color = IconTintRed)
+                    Text("清理", color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = { TextButton(onClick = { showClearCacheDialog = false }) { Text("取消") } }
@@ -427,7 +382,7 @@ private fun SettingsContent(
     if (showCacheClearedDialog) {
         AlertDialog(
             onDismissRequest = { showCacheClearedDialog = false },
-            icon = { Icon(Icons.Filled.CheckCircle, contentDescription = null, tint = IconTintGreen) },
+            icon = { Icon(Icons.Outlined.CheckCircle, contentDescription = null) },
             title = { Text("清理完成") },
             text = { Text("终端缓存已清除。") },
             confirmButton = { TextButton(onClick = { showCacheClearedDialog = false }) { Text("好的") } }
@@ -437,7 +392,7 @@ private fun SettingsContent(
     if (showUpdateDialog) {
         AlertDialog(
             onDismissRequest = { showUpdateDialog = false },
-            icon = { Icon(Icons.Filled.SystemUpdate, contentDescription = null) },
+            icon = { Icon(Icons.Outlined.SystemUpdate, contentDescription = null) },
             title = { Text("检查更新") },
             text = { Text("当前已是最新版本 1.0.0") },
             confirmButton = { TextButton(onClick = { showUpdateDialog = false }) { Text("好的") } }
@@ -447,7 +402,7 @@ private fun SettingsContent(
     if (showLicenseDialog) {
         AlertDialog(
             onDismissRequest = { showLicenseDialog = false },
-            icon = { Icon(Icons.Filled.Article, contentDescription = null) },
+            icon = { Icon(Icons.Outlined.Article, contentDescription = null) },
             title = { Text("开源许可") },
             text = {
                 Text(
@@ -621,8 +576,6 @@ private fun CardDivider() {
 @Composable
 private fun CardRowClickable(
     icon: ImageVector,
-    iconBg: Color,
-    iconTint: Color = IconTintDefault,
     title: String,
     value: String,
     subtitle: String = "",
@@ -645,7 +598,7 @@ private fun CardRowClickable(
             .padding(horizontal = 16.dp, vertical = if (subtitle.isNotEmpty()) 10.dp else 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        IconBox(icon, iconBg, iconTint)
+        IconBox(icon)
         Spacer(Modifier.width(14.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(title,
@@ -664,7 +617,7 @@ private fun CardRowClickable(
                 maxLines = 1)
             Spacer(Modifier.width(4.dp))
         }
-        Icon(Icons.Filled.ChevronRight, contentDescription = null,
+        Icon(Icons.Outlined.ChevronRight, contentDescription = null,
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.size(20.dp))
     }
@@ -676,8 +629,6 @@ private fun CardRowClickable(
 @Composable
 private fun CardRowInfo(
     icon: ImageVector,
-    iconBg: Color,
-    iconTint: Color = IconTintDefault,
     title: String,
     badge: String
 ) {
@@ -687,7 +638,7 @@ private fun CardRowInfo(
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        IconBox(icon, iconBg, iconTint)
+        IconBox(icon)
         Spacer(Modifier.width(14.dp))
         Text(title,
             style = MaterialTheme.typography.bodyLarge,
@@ -705,8 +656,6 @@ private fun CardRowInfo(
 @Composable
 private fun CardRowSwitch(
     icon: ImageVector,
-    iconBg: Color,
-    iconTint: Color = IconTintDefault,
     title: String,
     subtitle: String = "",
     checked: Boolean,
@@ -725,7 +674,7 @@ private fun CardRowSwitch(
             .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        IconBox(icon, iconBg, iconTint)
+        IconBox(icon)
         Spacer(Modifier.width(14.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(title,
@@ -743,18 +692,20 @@ private fun CardRowSwitch(
 }
 
 // ─────────────────────────────────────────────────────────────────
-// 图标盒子
+// 图标盒子（无背景，M3 onSurfaceVariant 色调）
 // ─────────────────────────────────────────────────────────────────
 @Composable
-private fun IconBox(icon: ImageVector, bg: Color, tint: Color) {
+private fun IconBox(icon: ImageVector) {
     Box(
-        modifier = Modifier
-            .size(34.dp)
-            .clip(RoundedCornerShape(8.dp))
-            .background(bg),
+        modifier = Modifier.size(34.dp),
         contentAlignment = Alignment.Center
     ) {
-        Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(18.dp))
+        Icon(
+            icon,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(22.dp)
+        )
     }
 }
 
