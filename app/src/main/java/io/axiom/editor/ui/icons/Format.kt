@@ -11,7 +11,7 @@ import androidx.compose.ui.graphics.vector.path
 import androidx.compose.ui.unit.dp
 
 @Suppress("CheckReturnValue")
-public val AppIcons.FormatIndentIncrease: ImageVector
+public val AppIcons.Format: ImageVector
   get() {
     if (_format_indent_increase != null) {
       return _format_indent_increase!!
