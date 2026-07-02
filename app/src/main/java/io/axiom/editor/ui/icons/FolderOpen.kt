@@ -1,5 +1,4 @@
-package io.axiom.editor.ui.icons
-
+package com.example.test
 
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathFillType
@@ -19,10 +18,10 @@ public val AppIcons.FolderOpen: ImageVector
     _folder_open =
       ImageVector.Builder(
           name = "folder_open",
-          defaultWidth = 40.dp,
-          defaultHeight = 40.dp,
-          viewportWidth = 40f,
-          viewportHeight = 40f,
+          defaultWidth = 24.dp,
+          defaultHeight = 24.dp,
+          viewportWidth = 24f,
+          viewportHeight = 24f,
         )
         .apply {
           path(
@@ -36,51 +35,41 @@ public val AppIcons.FolderOpen: ImageVector
             strokeLineMiter = 1f,
             pathFillType = PathFillType.Companion.NonZero,
           ) {
-            moveTo(6.11f, 33.33f)
-            quadToRelative(-1.1f, 0f, -1.94f, -0.84f)
-            reflectiveQuadTo(3.33f, 30.56f)
-            verticalLineTo(9.44f)
-            quadToRelative(0f, -1.1f, 0.84f, -1.94f)
-            reflectiveQuadTo(6.11f, 6.67f)
-            horizontalLineTo(16.1f)
-            quadToRelative(0.57f, 0f, 1.08f, 0.22f)
-            reflectiveQuadToRelative(0.89f, 0.6f)
-            lineToRelative(1.96f, 1.96f)
-            horizontalLineTo(35.28f)
-            quadToRelative(0.59f, 0f, 0.99f, 0.4f)
-            reflectiveQuadToRelative(0.4f, 0.99f)
-            reflectiveQuadToRelative(-0.4f, 0.99f)
-            reflectiveQuadToRelative(-0.99f, 0.4f)
-            horizontalLineTo(18.85f)
-            lineTo(16.07f, 9.44f)
-            horizontalLineTo(6.11f)
-            verticalLineTo(30.56f)
-            lineTo(9.71f, 17.04f)
-            quadToRelative(0.25f, -0.92f, 1.02f, -1.48f)
-            reflectiveQuadTo(12.42f, 15f)
-            horizontalLineTo(35.53f)
-            quadToRelative(1.37f, 0f, 2.22f, 1.09f)
-            reflectiveQuadToRelative(0.47f, 2.42f)
-            lineTo(34.76f, 31.26f)
-            quadToRelative(-0.28f, 1.03f, -1.02f, 1.55f)
-            reflectiveQuadToRelative(-1.8f, 0.52f)
-            horizontalLineTo(6.11f)
+            moveTo(4f, 20f)
+            quadTo(3.18f, 20f, 2.59f, 19.41f)
+            reflectiveQuadTo(2f, 18f)
+            verticalLineTo(6f)
+            quadTo(2f, 5.18f, 2.59f, 4.59f)
+            reflectiveQuadTo(4f, 4f)
+            horizontalLineToRelative(6f)
+            lineToRelative(2f, 2f)
+            horizontalLineToRelative(8f)
+            quadToRelative(0.83f, 0f, 1.41f, 0.59f)
+            quadTo(22f, 7.18f, 22f, 8f)
+            horizontalLineTo(11.18f)
+            lineToRelative(-2f, -2f)
+            horizontalLineTo(4f)
+            verticalLineTo(18f)
+            lineTo(6.4f, 10f)
+            horizontalLineTo(23.5f)
+            lineToRelative(-2.57f, 8.57f)
+            quadToRelative(-0.2f, 0.65f, -0.74f, 1.04f)
+            reflectiveQuadTo(19f, 20f)
+            horizontalLineTo(4f)
             close()
-            moveTo(9.03f, 30.56f)
-            horizontalLineTo(32.08f)
-            lineTo(35.42f, 17.78f)
-            horizontalLineTo(12.36f)
-            lineTo(9.03f, 30.56f)
+            moveTo(6.1f, 18f)
+            horizontalLineTo(19f)
+            lineToRelative(1.8f, -6f)
+            horizontalLineTo(7.9f)
+            lineTo(6.1f, 18f)
             close()
-            moveTo(6.11f, 17.11f)
-            verticalLineTo(9.44f)
-            verticalLineToRelative(2.78f)
-            quadToRelative(0f, 0f, 0f, 1.32f)
-            reflectiveQuadToRelative(0f, 3.57f)
+            moveToRelative(0f, 0f)
+            lineTo(7.9f, 12f)
+            lineTo(6.1f, 18f)
             close()
-            moveTo(9.03f, 30.56f)
-            lineTo(12.36f, 17.78f)
-            lineTo(9.03f, 30.56f)
+            moveTo(4f, 8f)
+            verticalLineTo(6f)
+            verticalLineTo(8f)
             close()
           }
         }
