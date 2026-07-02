@@ -1560,22 +1560,28 @@ private fun EditorActionsBar(
                 .fillMaxWidth()
                 .navigationBarsPadding()
                 .height(81.dp)
-                .padding(horizontal = 4.dp),
+                .padding(horizontal = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // ── 左侧：启动图标（占位符）──
-            IconButton(modifier = Modifier.size(41.dp), onClick = { /* TODO: 启动 */ }) {
-                Icon(
-                    imageVector = AppIcons.PlayArrow,
-                    contentDescription = "启动",
-                    modifier = Modifier.size(24.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+            // ── 左侧：启动图标（键帽包裹，单独一组）──
+            Surface(
+                color = MaterialTheme.colorScheme.surfaceColorAtElevation(10.dp),
+                shape = RoundedCornerShape(10.dp),
+                tonalElevation = 0.dp
+            ) {
+                IconButton(modifier = Modifier.size(41.dp), onClick = { /* TODO: 启动 */ }) {
+                    Icon(
+                        imageVector = AppIcons.PlayArrow,
+                        contentDescription = "启动",
+                        modifier = Modifier.size(24.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.weight(1f))
 
-            // ── 中间：占位符图标分组（四个，背景包裹）──
+            // ── 中间：占位符图标分组（两个，背景包裹）──
             Surface(
                 color = MaterialTheme.colorScheme.surfaceColorAtElevation(10.dp),
                 shape = RoundedCornerShape(10.dp),
@@ -1610,27 +1616,37 @@ private fun EditorActionsBar(
 
             Spacer(modifier = Modifier.weight(1f))
 
-            // ── 右侧：软键盘 + 文件树 ──
-            IconButton(onClick = onToggleKeyboard, modifier = Modifier.size(41.dp)) {
-                Icon(
-                    imageVector = if (isKeyboardEnabled)
-                        AppIcons.KeyboardHide else AppIcons.KeyboardLock,
-                    contentDescription = "软键盘",
-                    modifier = Modifier.size(24.dp),
-                    tint = if (isKeyboardEnabled)
-                        MaterialTheme.colorScheme.primary
-                    else
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            if (hasFileTree) {
-                IconButton(onClick = onOpenFileTree, modifier = Modifier.size(41.dp)) {
-                    Icon(
-                        imageVector = AppIcons.FolderOpen,
-                        contentDescription = "文件树",
-                        modifier = Modifier.size(24.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+            // ── 右侧：软键盘 + 文件树（键帽包裹，同一组）──
+            Surface(
+                color = MaterialTheme.colorScheme.surfaceColorAtElevation(10.dp),
+                shape = RoundedCornerShape(10.dp),
+                tonalElevation = 0.dp
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = onToggleKeyboard, modifier = Modifier.size(41.dp)) {
+                        Icon(
+                            imageVector = if (isKeyboardEnabled)
+                                AppIcons.KeyboardHide else AppIcons.KeyboardLock,
+                            contentDescription = "软键盘",
+                            modifier = Modifier.size(24.dp),
+                            tint = if (isKeyboardEnabled)
+                                MaterialTheme.colorScheme.primary
+                            else
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    if (hasFileTree) {
+                        IconButton(onClick = onOpenFileTree, modifier = Modifier.size(41.dp)) {
+                            Icon(
+                                imageVector = AppIcons.FolderOpen,
+                                contentDescription = "文件树",
+                                modifier = Modifier.size(24.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
                 }
             }
         }
