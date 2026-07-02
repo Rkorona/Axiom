@@ -384,6 +384,12 @@ const view = new EditorView({
           const indentLabel = `${isTab ? "Tab" : "Spaces"}: ${indentSize}`
 
           AndroidBridge.onStatsChanged(doc.lines, doc.length, indentLabel)
+
+          // 撤销 / 重做可用状态同步（文档变更时深度会改变）
+          AndroidBridge.onUndoRedoStateChanged(
+            undoDepth(update.state) > 0,
+            redoDepth(update.state) > 0
+          )
         }
         
         if (update.selectionSet) {

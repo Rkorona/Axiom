@@ -147,7 +147,8 @@ class WebAppInterface(
     private val onStatsChangedCallback: (lines: Int, length: Int, indentLabel: String) -> Unit,
     private val onCursorChangedCallback: (line: Int, col: Int) -> Unit,
     private val onDiagnosticsChangedCallback: (errors: Int, warnings: Int) -> Unit,
-    private val onFormatResultCallback: (success: Boolean, message: String) -> Unit = { _, _ -> }
+    private val onFormatResultCallback: (success: Boolean, message: String) -> Unit = { _, _ -> },
+    private val onUndoRedoStateChangedCallback: (canUndo: Boolean, canRedo: Boolean) -> Unit = { _, _ -> }
 ) {
     @JavascriptInterface
     fun onReady() {
@@ -172,6 +173,11 @@ class WebAppInterface(
     @JavascriptInterface
     fun onFormatResult(success: Boolean, message: String) {
         onFormatResultCallback(success, message)
+    }
+
+    @JavascriptInterface
+    fun onUndoRedoStateChanged(canUndo: Boolean, canRedo: Boolean) {
+        onUndoRedoStateChangedCallback(canUndo, canRedo)
     }
 
     @JavascriptInterface
@@ -393,6 +399,10 @@ fun EditorScreen(
     // 根据当前深浅模式选取对应的编辑器主题
     val activeEditorTheme = if (isDarkTheme) settings.editorThemeDark else settings.editorThemeLight
     var isKeyboardEnabled by rememberSaveable { mutableStateOf(false) }
+
+    // 撤销 / 重做按钮可用状态（由 JS 回调驱动）
+    var canUndo by remember { mutableStateOf(false) }
+    var canRedo by remember { mutableStateOf(false) }
 
     // 文件树底部抽屉状态
     var showFileTree by remember { mutableStateOf(false) }
@@ -971,9 +981,9 @@ fun EditorScreen(
                     BoltActionBar(
                         onUndo   = { executeJs("window.editorAPI.undo()") },
                         onRedo   = { executeJs("window.editorAPI.redo()") },
-                        onFormat = {
-                            executeJs("window.editorAPI.format()")
-                        }
+                        onFormat = { executeJs("window.editorAPI.format()") },
+                        canUndo  = canUndo,
+                        canRedo  = canRedo
                     )
                 }
 
@@ -1128,6 +1138,12 @@ fun EditorScreen(
                                             val tip = if (message.isNotBlank()) "格式化失败：代码存在语法错误" else "格式化失败"
                                             Toast.makeText(context, tip, Toast.LENGTH_SHORT).show()
                                         }
+                                    }
+                                },
+                                onUndoRedoStateChangedCallback = { undoAvail, redoAvail ->
+                                    coroutineScope.launch(Dispatchers.Main) {
+                                        canUndo = undoAvail
+                                        canRedo = redoAvail
                                     }
                                 }
                             ),
@@ -1501,6 +1517,8 @@ private fun BoltActionBar(
     onUndo: () -> Unit = {},
     onRedo: () -> Unit = {},
     onFormat: () -> Unit = {},
+    canUndo: Boolean = true,
+    canRedo: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     Surface(
@@ -1517,6 +1535,7 @@ private fun BoltActionBar(
             // 撤销
             EditorKeyButton(
                 onClick = onUndo,
+                enabled = canUndo,
                 modifier = Modifier.size(38.dp)
             ) {
                 Icon(
@@ -1524,11 +1543,13 @@ private fun BoltActionBar(
                     contentDescription = "撤销",
                     modifier = Modifier.size(18.dp),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        .copy(alpha = if (canUndo) 1f else 0.35f)
                 )
             }
             // 重做
             EditorKeyButton(
                 onClick = onRedo,
+                enabled = canRedo,
                 modifier = Modifier.size(38.dp)
             ) {
                 Icon(
@@ -1536,6 +1557,7 @@ private fun BoltActionBar(
                     contentDescription = "重做",
                     modifier = Modifier.size(18.dp),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        .copy(alpha = if (canRedo) 1f else 0.35f)
                 )
             }
             // 格式化
@@ -1678,6 +1700,7 @@ private fun EditorKeyButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     isActive: Boolean = false,
+    enabled: Boolean = true,
     content: @Composable BoxScope.() -> Unit
 ) {
     val bgColor = if (isActive)
@@ -1690,6 +1713,7 @@ private fun EditorKeyButton(
         color = bgColor,
         shape = RoundedCornerShape(7.dp),
         tonalElevation = 0.dp,
+        enabled = enabled,
         modifier = modifier
     ) {
         Box(
