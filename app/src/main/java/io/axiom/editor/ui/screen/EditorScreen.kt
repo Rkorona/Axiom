@@ -12,7 +12,6 @@ import androidx.webkit.WebViewAssetLoader
 import androidx.webkit.WebViewFeature
 import androidx.webkit.WebSettingsCompat
 import androidx.compose.foundation.isSystemInDarkTheme
-import android.content.Context
 import android.util.Base64
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
@@ -25,7 +24,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -53,6 +51,8 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.isImeVisible
+import com.example.test.BoltFill
+
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.io.File
@@ -62,7 +62,16 @@ import io.axiom.editor.data.ThemeMode
 import io.axiom.editor.ui.model.Project
 import io.axiom.editor.ui.model.ProjectLanguage
 import io.axiom.editor.ui.model.ProjectType
-import io.axiom.editor.ui.icons.*
+import io.axiom.editor.ui.icons.AppIcons
+import io.axiom.editor.ui.icons.ArrowBack
+import io.axiom.editor.ui.icons.BoltNoFill
+import io.axiom.editor.ui.icons.BookmarkStacksNoFill
+import io.axiom.editor.ui.icons.BookmarkStacksFill
+import io.axiom.editor.ui.icons.FolderOpen
+import io.axiom.editor.ui.icons.KeyboardHide
+import io.axiom.editor.ui.icons.KeyboardLock
+import io.axiom.editor.ui.icons.MoreVert
+import io.axiom.editor.ui.icons.PlayArrow
 
 // ═════════════════════════════════════════════════════════════
 // 安全编解码工具函数与双通道编码自动检测
@@ -796,7 +805,7 @@ fun EditorScreen(
                 navigationIcon = {
                     IconButton(onClick = { showExitDialog = true }) {
                         Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            imageVector = AppIcons.ArrowBack,
                             contentDescription = "返回"
                         )
                     }
@@ -804,7 +813,7 @@ fun EditorScreen(
                 actions = {
                     IconButton(onClick = { /* TODO: 菜单 */ }) {
                         Icon(
-                            imageVector = Icons.Default.MoreVert,
+                            imageVector = AppIcons.MoreVert,
                             contentDescription = "菜单",
                             tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -1492,7 +1501,8 @@ private fun EditorActionsBar(
                 ) {
                     IconButton(modifier = Modifier.size(41.dp), onClick = { /* TODO */ }) {
                         Icon(
-                            imageVector = Icons.Default.DesktopWindows,
+                            imageVector = if (isKeyboardEnabled)
+                                AppIcons.BoltFill else AppIcons.BoltNoFill,
                             contentDescription = null,
                             modifier = Modifier.size(41.dp),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant
@@ -1500,23 +1510,8 @@ private fun EditorActionsBar(
                     }
                     IconButton(modifier = Modifier.size(41.dp), onClick = { /* TODO */ }) {
                         Icon(
-                            imageVector = Icons.Default.Extension,
-                            contentDescription = null,
-                            modifier = Modifier.size(41.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    IconButton(modifier = Modifier.size(41.dp), onClick = { /* TODO */ }) {
-                        Icon(
-                            imageVector = Icons.Default.Public,
-                            contentDescription = null,
-                            modifier = Modifier.size(41.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    IconButton(modifier = Modifier.size(41.dp), onClick = { /* TODO */ }) {
-                        Icon(
-                            imageVector = Icons.Default.Hub,
+                            imageVector = if (isKeyboardEnabled)
+                                AppIcons.BookmarkStacksFill else AppIcons.BookmarkStacksNoFill,
                             contentDescription = null,
                             modifier = Modifier.size(41.dp),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant
