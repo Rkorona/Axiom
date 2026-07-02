@@ -7,7 +7,7 @@ import { indentWithTab,
          undo, redo,
          undoDepth, redoDepth,
          indentSelection }              from "@codemirror/commands"
-import { clearHistory }                from "@codemirror/history"
+
 import { openSearchPanel,
          closeSearchPanel }            from "@codemirror/search"
 import { StreamLanguage }              from "@codemirror/language"
@@ -356,71 +356,71 @@ const container = document.getElementById("editor")
 // 初始明暗状态：跟随系统偏好，供 auto 主题回退计算
 currentIsDark = window.matchMedia('(prefers-color-scheme: dark)').matches
 
-const view = new EditorView({
-  state: EditorState.create({
-    doc: "",
-    extensions: [
-      basicSetup,
-      keymap.of([indentWithTab]),
-      syntaxErrorLinter,
-      lintGutter(),
+// ── 编辑器 extensions（提取为独立变量，供 resetState 重建 State 时复用）──
+const baseExtensions = [
+  basicSetup,
+  keymap.of([indentWithTab]),
+  syntaxErrorLinter,
+  lintGutter(),
 
-      // ── 动态 Compartment 初始值 ──
-      languageConf.of(getLang("js")),
-      themeConf.of(resolveThemeExtension()),
-      inputModeConf.of(ATTR_NO_KEYBOARD),
-      editableConf.of(EditorView.editable.of(true)),
-      indentConf.of([indentUnit.of("    "), EditorState.tabSize.of(4)]), // 默认4空格对齐
+  // ── 动态 Compartment 初始值 ──
+  languageConf.of(getLang("js")),
+  themeConf.of(resolveThemeExtension()),
+  inputModeConf.of(ATTR_NO_KEYBOARD),
+  editableConf.of(EditorView.editable.of(true)),
+  indentConf.of([indentUnit.of("    "), EditorState.tabSize.of(4)]), // 默认4空格对齐
 
-      // ── 变更 / 选区/ 重构事件 → 通知 Android ──
-      EditorView.updateListener.of((update) => {
-        if (!window.AndroidBridge) return
-        
-        if (update.docChanged || update.transactions.some(tr => tr.reconfigured)) {
-          const doc = update.state.doc
-          
-          const indentVal = update.state.facet(indentUnit)
-          const isTab = indentVal.includes("\t")
-          const indentSize = isTab ? update.state.tabSize : indentVal.length
-          const indentLabel = `${isTab ? "Tab" : "Spaces"}: ${indentSize}`
+  // ── 变更 / 选区/ 重构事件 → 通知 Android ──
+  EditorView.updateListener.of((update) => {
+    if (!window.AndroidBridge) return
 
-          AndroidBridge.onStatsChanged(doc.lines, doc.length, indentLabel)
+    if (update.docChanged || update.transactions.some(tr => tr.reconfigured)) {
+      const doc = update.state.doc
 
-          // 撤销 / 重做可用状态同步（文档变更时深度会改变）
-          AndroidBridge.onUndoRedoStateChanged(
-            undoDepth(update.state) > 0,
-            redoDepth(update.state) > 0
-          )
-        }
-        
-        if (update.selectionSet) {
-          const sel  = update.state.selection.main
-          const line = update.state.doc.lineAt(sel.head)
-          AndroidBridge.onCursorChanged(
-            line.number,
-            sel.head - line.from + 1
-          )
-        }
-      }),
+      const indentVal = update.state.facet(indentUnit)
+      const isTab = indentVal.includes("\t")
+      const indentSize = isTab ? update.state.tabSize : indentVal.length
+      const indentLabel = `${isTab ? "Tab" : "Spaces"}: ${indentSize}`
 
-      EditorView.theme({
-        "&": {
-          height: "100%",
-          fontSize: "14px",
-        },
-        ".cm-scroller": {
-          overflow: "auto",
-          fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace",
-        },
-        ".cm-tooltip": { maxWidth: "90vw" },
-        ".cm-tooltip-autocomplete > ul": { maxHeight: "40vh" },
-        ".cm-diagnostic": {
-          fontSize: "12px",
-          fontFamily: "system-ui, sans-serif"
-        }
-      }),
-    ],
+      AndroidBridge.onStatsChanged(doc.lines, doc.length, indentLabel)
+
+      // 撤销 / 重做可用状态同步（文档变更时深度会改变）
+      AndroidBridge.onUndoRedoStateChanged(
+        undoDepth(update.state) > 0,
+        redoDepth(update.state) > 0
+      )
+    }
+
+    if (update.selectionSet) {
+      const sel  = update.state.selection.main
+      const line = update.state.doc.lineAt(sel.head)
+      AndroidBridge.onCursorChanged(
+        line.number,
+        sel.head - line.from + 1
+      )
+    }
   }),
+
+  EditorView.theme({
+    "&": {
+      height: "100%",
+      fontSize: "14px",
+    },
+    ".cm-scroller": {
+      overflow: "auto",
+      fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace",
+    },
+    ".cm-tooltip": { maxWidth: "90vw" },
+    ".cm-tooltip-autocomplete > ul": { maxHeight: "40vh" },
+    ".cm-diagnostic": {
+      fontSize: "12px",
+      fontFamily: "system-ui, sans-serif"
+    }
+  }),
+]
+
+const view = new EditorView({
+  state: EditorState.create({ doc: "", extensions: baseExtensions }),
   parent: container,
 })
 
@@ -559,11 +559,15 @@ window.editorAPI = {
   // 这里额外暴露显式 API，供 Android 端工具栏按钮调用。
 
   // ── 历史记录清除 ────────────────────────────────────────────
-  // 切换文件时由 Android 调用，清除上一个文件遗留的撤销/重做栈，
-  // 并立即通知 Android 更新按钮可用状态。
+  // 切换文件时由 Android 调用。
+  // 官方推荐做法：用 EditorState.create() 生成全新 State 并替换，
+  // 新 State 的历史堆栈天然为空，无需任何额外 effect。
 
   clearHistory: () => {
-    view.dispatch({ effects: clearHistory.of(null) })
+    view.setState(EditorState.create({
+      doc: view.state.doc,
+      extensions: baseExtensions,
+    }))
     if (window.AndroidBridge?.onUndoRedoStateChanged) {
       AndroidBridge.onUndoRedoStateChanged(false, false)
     }
