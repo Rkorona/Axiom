@@ -6,7 +6,8 @@ import { basicSetup }                  from "codemirror"
 import { indentWithTab,
          undo, redo,
          undoDepth, redoDepth,
-         indentSelection }              from "@codemirror/commands"
+         indentSelection,
+         clearHistory }                 from "@codemirror/commands"
 import { openSearchPanel,
          closeSearchPanel }            from "@codemirror/search"
 import { StreamLanguage }              from "@codemirror/language"
@@ -556,6 +557,17 @@ window.editorAPI = {
   // ── 撤销 / 重做 ─────────────────────────────────────────────
   // basicSetup 已内置 history() 扩展及 Mod-z / Mod-y 快捷键，
   // 这里额外暴露显式 API，供 Android 端工具栏按钮调用。
+
+  // ── 历史记录清除 ────────────────────────────────────────────
+  // 切换文件时由 Android 调用，清除上一个文件遗留的撤销/重做栈，
+  // 并立即通知 Android 更新按钮可用状态。
+
+  clearHistory: () => {
+    view.dispatch({ effects: clearHistory.of(null) })
+    if (window.AndroidBridge?.onUndoRedoStateChanged) {
+      AndroidBridge.onUndoRedoStateChanged(false, false)
+    }
+  },
 
   undo: () => {
     const applied = undo(view)

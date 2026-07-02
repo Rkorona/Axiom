@@ -439,6 +439,10 @@ fun EditorScreen(
         // filePath 为空时是空编辑器状态（项目刚进入、无历史选项卡），跳过文件加载
         if (filePath.isEmpty()) return@LaunchedEffect
 
+        // 切换文件时立即重置撤销/重做按钮状态，避免旧文件的历史栈状态残留
+        canUndo = false
+        canRedo = false
+
         // ── 步骤 1：切走前先把旧 tab 的编辑器内容缓存到内存 ──────────────────
         // 只对「有未保存修改」的 tab 做缓存，避免每次切换都有额外 JS 开销
         val switchingFrom = prevFilePathRef.value
@@ -477,6 +481,7 @@ fun EditorScreen(
                 suppressModFor(800L)
                 executeJs("document.documentElement.style.setProperty('--editor-bg','$bg')")
                 executeJs("window.editorAPI.setContentBase64('${cachedContent.toBase64()}')")
+                executeJs("window.editorAPI.clearHistory()")
                 executeJs("window.editorAPI.setLanguage('$targetExt')")
                 executeJs("window.editorAPI.setTheme($isDark)")
                 executeJs("window.editorAPI.setEditorTheme('${activeEditorTheme.id}')")
@@ -550,6 +555,7 @@ fun EditorScreen(
                         suppressModFor(800L)  // 注入内容会触发 onStatsChanged
                         executeJs("document.documentElement.style.setProperty('--editor-bg','$bg')")
                         executeJs("window.editorAPI.setContentBase64('${text.toBase64()}')")
+                        executeJs("window.editorAPI.clearHistory()")
                         executeJs("window.editorAPI.setLanguage('$targetExt')")
                         executeJs("window.editorAPI.setTheme($isDark)")
                         executeJs("window.editorAPI.setEditorTheme('${activeEditorTheme.id}')")
@@ -589,6 +595,7 @@ fun EditorScreen(
             suppressModFor(800L)  // 初始注入内容也要抑制
             executeJs("document.documentElement.style.setProperty('--editor-bg','$bg')")
             executeJs("window.editorAPI.setContentBase64('${fileContent.toBase64()}')")
+            executeJs("window.editorAPI.clearHistory()")
             executeJs("window.editorAPI.setLanguage('$fileExtension')")
             executeJs("window.editorAPI.setTheme($isDarkTheme)")
             executeJs("window.editorAPI.setEditorTheme('${activeEditorTheme.id}')")
