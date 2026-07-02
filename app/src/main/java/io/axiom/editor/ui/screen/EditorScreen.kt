@@ -1474,7 +1474,7 @@ private fun EditorActionsBar(
                 Icon(
                     imageVector = AppIcons.PlayArrow,
                     contentDescription = "启动",
-                    modifier = Modifier.size(24.dp),
+                    modifier = Modifier.size(40.dp),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
