@@ -962,7 +962,11 @@ fun EditorScreen(
                     enter = expandVertically(expandFrom = Alignment.Bottom) + fadeIn(),
                     exit = shrinkVertically(shrinkTowards = Alignment.Bottom) + fadeOut()
                 ) {
-                    BoltActionBar()
+                    BoltActionBar(
+                        onUndo   = { executeJs("window.editorAPI.undo()") },
+                        onRedo   = { executeJs("window.editorAPI.redo()") },
+                        onFormat = { executeJs("window.editorAPI.format()") }
+                    )
                 }
 
                 // ── 底部栏：键盘弹出→符号栏，键盘收起→工具栏 ───────────
@@ -1476,6 +1480,9 @@ private fun ToolbarDivider() {
 // ═════════════════════════════════════════════════════════════
 @Composable
 private fun BoltActionBar(
+    onUndo: () -> Unit = {},
+    onRedo: () -> Unit = {},
+    onFormat: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Surface(
@@ -1491,7 +1498,7 @@ private fun BoltActionBar(
         ) {
             // 撤销
             EditorKeyButton(
-                onClick = { /* TODO */ },
+                onClick = onUndo,
                 modifier = Modifier.size(38.dp)
             ) {
                 Icon(
@@ -1503,7 +1510,7 @@ private fun BoltActionBar(
             }
             // 重做
             EditorKeyButton(
-                onClick = { /* TODO */ },
+                onClick = onRedo,
                 modifier = Modifier.size(38.dp)
             ) {
                 Icon(
@@ -1515,7 +1522,7 @@ private fun BoltActionBar(
             }
             // 格式化
             EditorKeyButton(
-                onClick = { /* TODO */ },
+                onClick = onFormat,
                 modifier = Modifier.size(38.dp)
             ) {
                 Icon(
