@@ -77,7 +77,7 @@ import io.axiom.editor.ui.icons.MoreVert
 import io.axiom.editor.ui.icons.PlayArrow
 import io.axiom.editor.ui.icons.Undo
 import io.axiom.editor.ui.icons.Redo
-
+import io.axiom.editor.ui.icons.Format
 // ═════════════════════════════════════════════════════════════
 // 安全编解码工具函数与双通道编码自动检测
 // 规避 Kotlin 与 Javascript 通讯时的特殊字符、换行、单双引号转义问题
@@ -1513,26 +1513,14 @@ private fun BoltActionBar(
                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            // 占位符按钮 3
+            // 格式化
             EditorKeyButton(
                 onClick = { /* TODO */ },
                 modifier = Modifier.size(38.dp)
             ) {
                 Icon(
-                    imageVector = Icons.Default.Build,
-                    contentDescription = "操作3",
-                    modifier = Modifier.size(18.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            // 占位符按钮 4
-            EditorKeyButton(
-                onClick = { /* TODO */ },
-                modifier = Modifier.size(38.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Settings,
-                    contentDescription = "操作4",
+                    imageVector = AppIcons.Format,
+                    contentDescription = "格式化",
                     modifier = Modifier.size(18.dp),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
