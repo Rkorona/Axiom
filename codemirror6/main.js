@@ -559,25 +559,44 @@ window.editorAPI = {
 
 
   // ── 格式化 ──────────────────────────────────────────────────
-  // CM6 未内置通用格式化器，这里采用语言感知的重新缩进（indentSelection）
-  // 对全文重排，可覆盖绝大多数「格式不整齐」场景（如粘贴代码后缩进错乱）。
+  // 两遍处理：
+  // Pass 1 — 纯文本级别安全归一化（不依赖语法树）：
+  //   · 去除每行行尾多余空白
+  //   · 将连续 3 个以上空行压缩为最多 2 个空行
+  // Pass 2 — 语言感知缩进重排（indentSelection）：
+  //   · 按 Lezer 语法树对全文每一行重新计算期望缩进
 
   format: () => {
     const state = view.state
     if (state.doc.length === 0) return false
 
     const prevCursor = state.selection.main.head
+    let text = state.doc.toString()
 
-    // 先选中全文，indentSelection 会按语言规则重新计算每一行缩进
-    view.dispatch({ selection: { anchor: 0, head: state.doc.length } })
-    const applied = indentSelection(view)
+    // ── Pass 1: 文本级别归一化 ──────────────────────────────
+    const normalized = text
+      .split("\n")
+      .map(line => line.trimEnd())          // 去行尾空白
+      .join("\n")
+      .replace(/\n{4,}/g, "\n\n\n")         // 压缩超长空行（3+ → 2）
+
+    if (normalized !== text) {
+      view.dispatch({
+        changes: { from: 0, to: state.doc.length, insert: normalized },
+        selection: { anchor: Math.min(prevCursor, normalized.length) }
+      })
+    }
+
+    // ── Pass 2: 语言感知缩进重排 ────────────────────────────
+    view.dispatch({ selection: { anchor: 0, head: view.state.doc.length } })
+    indentSelection(view)
 
     // 恢复到原光标位置（受重新缩进导致的长度变化影响，做边界裁剪）
     const restored = Math.min(prevCursor, view.state.doc.length)
     view.dispatch({ selection: { anchor: restored }, scrollIntoView: true })
     view.focus()
 
-    return applied
+    return true
   },
 
 

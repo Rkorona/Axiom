@@ -965,7 +965,29 @@ fun EditorScreen(
                     BoltActionBar(
                         onUndo   = { executeJs("window.editorAPI.undo()") },
                         onRedo   = { executeJs("window.editorAPI.redo()") },
-                        onFormat = { executeJs("window.editorAPI.format()") }
+                        onFormat = {
+                            // Pass 1: 文本级别归一化（去行尾空白 + 压缩超长空行），
+                            // 与打包前 main.js 保持一致，无需重新打包即可生效。
+                            // Pass 2: 语言感知缩进重排（调用已打包的 editorAPI.format）
+                            val formatScript = """
+                                (function() {
+                                    var api = window.editorAPI;
+                                    if (!api) return;
+                                    var text = api.getContent();
+                                    var normalized = text
+                                        .split('\n')
+                                        .map(function(l) { return l.replace(/\s+${'$'}/, ''); })
+                                        .join('\n')
+                                        .replace(/\n{4,}/g, '\n\n\n');
+                                    if (normalized !== text) {
+                                        api.setContent(normalized);
+                                    }
+                                    api.format();
+                                })();
+                            """.trimIndent()
+                            executeJs(formatScript)
+                            Toast.makeText(context, "格式化完成", Toast.LENGTH_SHORT).show()
+                        }
                     )
                 }
 
