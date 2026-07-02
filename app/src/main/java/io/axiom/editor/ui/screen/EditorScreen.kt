@@ -144,9 +144,10 @@ fun detectEncoding(bytes: ByteArray): java.nio.charset.Charset {
 // ═════════════════════════════════════════════════════════════
 class WebAppInterface(
     private val onReadyCallback: () -> Unit,
-    private val onStatsChangedCallback: (lines: Int, length: Int, indentLabel: String) -> Unit, // 传入智能缩进标签
+    private val onStatsChangedCallback: (lines: Int, length: Int, indentLabel: String) -> Unit,
     private val onCursorChangedCallback: (line: Int, col: Int) -> Unit,
-    private val onDiagnosticsChangedCallback: (errors: Int, warnings: Int) -> Unit
+    private val onDiagnosticsChangedCallback: (errors: Int, warnings: Int) -> Unit,
+    private val onFormatResultCallback: (success: Boolean, message: String) -> Unit = { _, _ -> }
 ) {
     @JavascriptInterface
     fun onReady() {
@@ -166,6 +167,11 @@ class WebAppInterface(
     @JavascriptInterface
     fun onDiagnosticsChanged(errors: Int, warnings: Int) {
         onDiagnosticsChangedCallback(errors, warnings)
+    }
+
+    @JavascriptInterface
+    fun onFormatResult(success: Boolean, message: String) {
+        onFormatResultCallback(success, message)
     }
 
     @JavascriptInterface
@@ -967,7 +973,6 @@ fun EditorScreen(
                         onRedo   = { executeJs("window.editorAPI.redo()") },
                         onFormat = {
                             executeJs("window.editorAPI.format()")
-                            Toast.makeText(context, "格式化完成", Toast.LENGTH_SHORT).show()
                         }
                     )
                 }
@@ -1113,6 +1118,16 @@ fun EditorScreen(
                                     coroutineScope.launch(Dispatchers.Main) {
                                         errorCount = errors
                                         warningCount = warnings
+                                    }
+                                },
+                                onFormatResultCallback = { success, message ->
+                                    coroutineScope.launch(Dispatchers.Main) {
+                                        if (success) {
+                                            Toast.makeText(context, "格式化完成", Toast.LENGTH_SHORT).show()
+                                        } else {
+                                            val tip = if (message.isNotBlank()) "格式化失败：代码存在语法错误" else "格式化失败"
+                                            Toast.makeText(context, tip, Toast.LENGTH_SHORT).show()
+                                        }
                                     }
                                 }
                             ),

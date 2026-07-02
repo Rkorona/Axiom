@@ -608,18 +608,24 @@ window.editorAPI = {
     const useTabs   = indentVal.includes("\t")
     const tabWidth  = useTabs ? state.tabSize : indentVal.length
 
+    const notifyAndroid = (success, msg = "") => {
+      if (window.AndroidBridge?.onFormatResult) {
+        AndroidBridge.onFormatResult(success, msg)
+      }
+    }
+
     // ── Prettier 路径 ───────────────────────────────────────
     const conf = window.editorAPI._prettierMap[currentExt]
     if (conf) {
       try {
         const formatted = await prettier.format(text, {
-          parser:      conf.parser,
-          plugins:     conf.plugins(),
+          parser:        conf.parser,
+          plugins:       conf.plugins(),
           useTabs,
           tabWidth,
-          printWidth:  100,
-          semi:        true,
-          singleQuote: true,
+          printWidth:    100,
+          semi:          true,
+          singleQuote:   true,
           trailingComma: "es5",
         })
 
@@ -629,10 +635,13 @@ window.editorAPI = {
           scrollIntoView: true,
         })
         view.focus()
+        notifyAndroid(true)
         return true
       } catch (e) {
-        // 代码有语法错误时 Prettier 会抛出，降级到 indentSelection
+        // 代码有语法错误时 Prettier 会抛出，通知 Android 并降级到 indentSelection
         console.warn("[Prettier] format failed, falling back:", e.message)
+        notifyAndroid(false, e.message ?? "")
+        // 继续执行降级路径，至少把缩进修好
       }
     }
 
@@ -656,6 +665,9 @@ window.editorAPI = {
     const restored = Math.min(prevCursor, view.state.doc.length)
     view.dispatch({ selection: { anchor: restored }, scrollIntoView: true })
     view.focus()
+
+    // 没有 Prettier 解析器时（py/kt 等）也通知成功（降级已完成格式化）
+    if (!conf) notifyAndroid(true)
 
     return true
   },
