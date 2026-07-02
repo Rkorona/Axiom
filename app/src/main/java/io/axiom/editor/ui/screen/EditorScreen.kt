@@ -62,6 +62,7 @@ import io.axiom.editor.data.ThemeMode
 import io.axiom.editor.ui.model.Project
 import io.axiom.editor.ui.model.ProjectLanguage
 import io.axiom.editor.ui.model.ProjectType
+import io.axiom.editor.ui.icons.*
 
 // ═════════════════════════════════════════════════════════════
 // 安全编解码工具函数与双通道编码自动检测
@@ -1471,7 +1472,7 @@ private fun EditorActionsBar(
             // ── 左侧：启动图标（占位符）──
             IconButton(onClick = { /* TODO: 启动 */ }) {
                 Icon(
-                    imageVector = Icons.Default.PlayArrow,
+                    imageVector = AppIcons.PlayArrow,
                     contentDescription = "启动",
                     modifier = Modifier.size(24.dp),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant
