@@ -373,6 +373,8 @@ fun EditorScreen(
     // ── 修改状态 & 保存提示 ──────────────────────────────────
     var isModified by remember { mutableStateOf(false) }
     var savedIndicatorTick by remember { mutableStateOf(0) }
+    // 跨选项卡的未保存文件路径集合
+    var modifiedFilePaths by remember { mutableStateOf<Set<String>>(emptySet()) }
     val treeProject = remember(projectName, projectLocalPath) {
         if (projectLocalPath != null) {
             Project(
@@ -445,6 +447,7 @@ fun EditorScreen(
                     fileContent = text
                     fileEncoding = charset.name()
                     isModified = false
+                    modifiedFilePaths = modifiedFilePaths - filePath
                     isFileLoaded = true
 
                     // 若编辑器已就绪（文件切换场景），直接注入新内容，
@@ -543,6 +546,7 @@ fun EditorScreen(
                             fileContent = content
                             launch(Dispatchers.Main) {
                                 isModified = false
+                                modifiedFilePaths = modifiedFilePaths - filePath
                                 savedIndicatorTick++
                                 onFileSaved?.invoke()
                             }
@@ -717,7 +721,8 @@ fun EditorScreen(
                         tabFilePaths = tabFilePaths,
                         activeTabIndex = activeTabIndex,
                         onTabSelected = onTabSelected,
-                        onTabClose = onTabClose
+                        onTabClose = onTabClose,
+                        modifiedFilePaths = modifiedFilePaths
                     )
                 }
             }
@@ -950,6 +955,9 @@ fun EditorScreen(
                                         // 用户编辑才标记为已修改（程序注入时 suppressMod=true）
                                         if (!suppressMod.get() && isFileLoaded && isEditorReady) {
                                             isModified = true
+                                            if (filePath.isNotEmpty()) {
+                                                modifiedFilePaths = modifiedFilePaths + filePath
+                                            }
                                         }
                                     }
                                 },
@@ -1087,7 +1095,8 @@ private fun EditorTabStrip(
     tabFilePaths: List<String>,
     activeTabIndex: Int,
     onTabSelected: (Int) -> Unit,
-    onTabClose: (Int) -> Unit
+    onTabClose: (Int) -> Unit,
+    modifiedFilePaths: Set<String> = emptySet()
 ) {
     val scrollState = rememberScrollState()
     val tabBarBg = MaterialTheme.colorScheme.surfaceColorAtElevation(2.dp)
@@ -1121,6 +1130,7 @@ private fun EditorTabStrip(
                 val textColor = if (isActive) MaterialTheme.colorScheme.onSurface
                                else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
 
+                val isModifiedTab = path in modifiedFilePaths
                 Box(
                     modifier = Modifier
                         .fillMaxHeight()
@@ -1140,6 +1150,18 @@ private fun EditorTabStrip(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
+                        // 未保存圆点指示器
+                        if (isModifiedTab) {
+                            Box(
+                                modifier = Modifier
+                                    .size(6.dp)
+                                    .clip(androidx.compose.foundation.shape.CircleShape)
+                                    .background(
+                                        if (isActive) MaterialTheme.colorScheme.primary
+                                        else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                                    )
+                            )
+                        }
                         Text(
                             text = tabName,
                             style = MaterialTheme.typography.labelSmall.copy(
