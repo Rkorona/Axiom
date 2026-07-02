@@ -51,12 +51,9 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.isImeVisible
-import com.example.test.BoltFill
-
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.io.File
-
 import io.axiom.editor.data.AppSettings
 import io.axiom.editor.data.EncodingMode
 import io.axiom.editor.data.ThemeMode
