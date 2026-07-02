@@ -56,12 +56,15 @@ import com.example.test.BoltFill
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.io.File
+
 import io.axiom.editor.data.AppSettings
 import io.axiom.editor.data.EncodingMode
 import io.axiom.editor.data.ThemeMode
 import io.axiom.editor.ui.model.Project
 import io.axiom.editor.ui.model.ProjectLanguage
 import io.axiom.editor.ui.model.ProjectType
+
+// icons
 import io.axiom.editor.ui.icons.AppIcons
 import io.axiom.editor.ui.icons.ArrowBack
 import io.axiom.editor.ui.icons.BoltNoFill
@@ -72,6 +75,8 @@ import io.axiom.editor.ui.icons.KeyboardHide
 import io.axiom.editor.ui.icons.KeyboardLock
 import io.axiom.editor.ui.icons.MoreVert
 import io.axiom.editor.ui.icons.PlayArrow
+import io.axiom.editor.ui.icons.Undo
+import io.axiom.editor.ui.icons.Redo
 
 // ═════════════════════════════════════════════════════════════
 // 安全编解码工具函数与双通道编码自动检测
@@ -1484,26 +1489,26 @@ private fun BoltActionBar(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(3.dp)
         ) {
-            // 占位符按钮 1
+            // 撤销
             EditorKeyButton(
                 onClick = { /* TODO */ },
                 modifier = Modifier.size(38.dp)
             ) {
                 Icon(
-                    imageVector = Icons.Default.Star,
-                    contentDescription = "操作1",
+                    imageVector = AppIcons.Undo,
+                    contentDescription = "撤销",
                     modifier = Modifier.size(18.dp),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            // 占位符按钮 2
+            // 重做
             EditorKeyButton(
                 onClick = { /* TODO */ },
                 modifier = Modifier.size(38.dp)
             ) {
                 Icon(
-                    imageVector = Icons.Default.Search,
-                    contentDescription = "操作2",
+                    imageVector = AppIcons.Redo,
+                    contentDescription = "重做",
                     modifier = Modifier.size(18.dp),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
