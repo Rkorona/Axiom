@@ -192,6 +192,44 @@ fun EditorScreen(
     // 拦截硬件返回键，弹出确认对话框
     BackHandler { showExitDialog = true }
 
+    // 关闭含未保存修改选项卡的确认弹窗
+    val pendingIdx = pendingCloseTabIndex
+    if (pendingIdx != null) {
+        val closingPath = tabFilePaths.getOrNull(pendingIdx) ?: ""
+        val closingName = if (closingPath.startsWith("content://")) {
+            Uri.decode(Uri.parse(closingPath).lastPathSegment ?: "")
+                .substringAfterLast('/').ifBlank { "untitled" }
+        } else {
+            closingPath.substringAfterLast('/').ifBlank { "untitled" }
+        }
+        val isActiveTab = pendingIdx == activeTabIndex
+        AlertDialog(
+            onDismissRequest = { pendingCloseTabIndex = null },
+            title = { Text("未保存的修改") },
+            text = { Text("「$closingName」有未保存的修改，关闭后将丢失。") },
+            confirmButton = {
+                if (isActiveTab) {
+                    TextButton(onClick = {
+                        saveFile()
+                        pendingCloseTabIndex = null
+                        onTabClose(pendingIdx)
+                    }) { Text("保存并关闭") }
+                }
+            },
+            dismissButton = {
+                Row {
+                    TextButton(onClick = {
+                        pendingCloseTabIndex = null
+                        onTabClose(pendingIdx)
+                    }) { Text("不保存", color = MaterialTheme.colorScheme.error) }
+                    TextButton(onClick = { pendingCloseTabIndex = null }) {
+                        Text("取消")
+                    }
+                }
+            }
+        )
+    }
+
     // 退出确认弹窗
     if (showExitDialog) {
         AlertDialog(
@@ -375,6 +413,8 @@ fun EditorScreen(
     var savedIndicatorTick by remember { mutableStateOf(0) }
     // 跨选项卡的未保存文件路径集合
     var modifiedFilePaths by remember { mutableStateOf<Set<String>>(emptySet()) }
+    // 等待关闭确认的选项卡索引（null 表示无待确认）
+    var pendingCloseTabIndex by remember { mutableStateOf<Int?>(null) }
     val treeProject = remember(projectName, projectLocalPath) {
         if (projectLocalPath != null) {
             Project(
@@ -721,7 +761,15 @@ fun EditorScreen(
                         tabFilePaths = tabFilePaths,
                         activeTabIndex = activeTabIndex,
                         onTabSelected = onTabSelected,
-                        onTabClose = onTabClose,
+                        onTabClose = { index ->
+                            val path = tabFilePaths.getOrNull(index) ?: ""
+                            if (path in modifiedFilePaths) {
+                                // 有未保存修改，先弹确认弹窗
+                                pendingCloseTabIndex = index
+                            } else {
+                                onTabClose(index)
+                            }
+                        },
                         modifiedFilePaths = modifiedFilePaths
                     )
                 }
