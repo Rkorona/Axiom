@@ -1,4 +1,4 @@
-package com.example.test
+package io.axiom.editor.ui.icons
 
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathFillType
@@ -8,7 +8,6 @@ import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.path
 import androidx.compose.ui.unit.dp
-import io.axiom.editor.ui.icons.AppIcons
 
 @Suppress("CheckReturnValue")
 public val AppIcons.BoltFill: ImageVector
@@ -34,7 +33,7 @@ public val AppIcons.BoltFill: ImageVector
             strokeLineCap = StrokeCap.Butt,
             strokeLineJoin = StrokeJoin.Bevel,
             strokeLineMiter = 1f,
-            pathFillType = PathFillType.Companion.NonZero,
+            pathFillType = PathFillType.NonZero,
           ) {
             moveTo(9f, 15f)
             horizontalLineTo(5.9f)
