@@ -186,8 +186,33 @@ fun EditorScreen(
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
 
-    // 拦截硬件返回键，返回首页而不是退出应用
-    BackHandler { onNavigateBack() }
+    // 退出确认弹窗状态
+    var showExitDialog by remember { mutableStateOf(false) }
+
+    // 拦截硬件返回键，弹出确认对话框
+    BackHandler { showExitDialog = true }
+
+    // 退出确认弹窗
+    if (showExitDialog) {
+        AlertDialog(
+            onDismissRequest = { showExitDialog = false },
+            title = { Text("退出编辑器") },
+            text = { Text("确定要退出编辑器并返回首页吗？") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showExitDialog = false
+                    onNavigateBack()
+                }) {
+                    Text("退出")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showExitDialog = false }) {
+                    Text("取消")
+                }
+            }
+        )
+    }
 
     // ─────────────────────────────────────────────────────────
     // 1. 持有 WebView 引用及 JS 执行函数
@@ -366,6 +391,9 @@ fun EditorScreen(
     // 4. 异步读取本地文件内容 (已升级双通道编码自适应读取)
     // ─────────────────────────────────────────────────────────
     LaunchedEffect(filePath) {
+        // filePath 为空时是空编辑器状态（项目刚进入、无历史选项卡），跳过文件加载
+        if (filePath.isEmpty()) return@LaunchedEffect
+
         isFileLoaded = false
         // 只有编辑器 WebView 本身尚未就绪时才显示全屏 loading；
         // 文件切换时 WebView 不会重新加载页面，onPageFinished 不会再触发，
@@ -662,7 +690,7 @@ fun EditorScreen(
                     }
                 },
                 navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
+                    IconButton(onClick = { showExitDialog = true }) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "返回"
@@ -841,6 +869,37 @@ fun EditorScreen(
                 .padding(innerPadding)
                 .background(if (isDarkTheme) Color(0xFF141729) else Color.White)
         ) {
+            // 空编辑器状态：无历史选项卡时显示引导占位
+            if (filePath.isEmpty()) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(32.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Folder,
+                        contentDescription = null,
+                        modifier = Modifier.size(64.dp),
+                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f)
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = "没有打开的文件",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "点击底部工具栏中的文件树图标打开文件",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+                    )
+                }
+                return@Box
+            }
+
             AndroidView(
                 factory = { ctx ->
                     WebView(ctx).apply {

@@ -50,17 +50,14 @@ data class EditorTab(
 @Composable
 fun AppNavigation(
     settingsViewModel: SettingsViewModel = viewModel(),
-    gitHubViewModel: GitHubViewModel = viewModel()
+    gitHubViewModel: GitHubViewModel = viewModel(),
+    editorSessionViewModel: EditorSessionViewModel = viewModel()
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
     var currentScreen by remember { mutableStateOf<Screen>(Screen.Home) }
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
-
-    // 文件选项卡状态
-    var editorTabs by remember { mutableStateOf<List<EditorTab>>(emptyList()) }
-    var activeTabIndex by remember { mutableIntStateOf(0) }
 
     // 通过 Repository 从数据库加载项目列表
     val repository = remember { ProjectRepository(context) }
@@ -127,7 +124,6 @@ fun AppNavigation(
         scope.launch { repository.addProject(newProject) }
     }
 
-    var selectedProject by remember { mutableStateOf<Project?>(null) }
     val settings = settingsViewModel.settings
 
     // ── 打开文件：创建或复用选项卡 ──────────────────────────
@@ -138,19 +134,19 @@ fun AppNavigation(
         projectLocalPath: String?
     ) {
         val enableTabs = settingsViewModel.settings.enableFileTabs
-        if (!enableTabs || editorTabs.isEmpty()) {
-            // 无选项卡模式或首次打开：直接替换
+        val tabs = editorSessionViewModel.getTabs(projectId)
+        if (!enableTabs || tabs.isEmpty()) {
             val tab = EditorTab(filePath, projectId, projectName, projectLocalPath)
-            editorTabs = listOf(tab)
-            activeTabIndex = 0
+            editorSessionViewModel.setTabs(projectId, listOf(tab))
+            editorSessionViewModel.setActiveIndex(projectId, 0)
         } else {
-            // 查找是否已有此文件的选项卡
-            val existingIndex = editorTabs.indexOfFirst { it.filePath == filePath }
+            val existingIndex = tabs.indexOfFirst { it.filePath == filePath }
             if (existingIndex >= 0) {
-                activeTabIndex = existingIndex
+                editorSessionViewModel.setActiveIndex(projectId, existingIndex)
             } else {
-                editorTabs = editorTabs + EditorTab(filePath, projectId, projectName, projectLocalPath)
-                activeTabIndex = editorTabs.size - 1
+                val newTabs = tabs + EditorTab(filePath, projectId, projectName, projectLocalPath)
+                editorSessionViewModel.setTabs(projectId, newTabs)
+                editorSessionViewModel.setActiveIndex(projectId, newTabs.size - 1)
             }
         }
         currentScreen = Screen.Editor(
@@ -167,25 +163,30 @@ fun AppNavigation(
                 projects = projects,
                 selectedTab = selectedTab,
                 onTabSelected = { selectedTab = it },
-                selectedProject = selectedProject,
                 settingsViewModel = settingsViewModel,
                 onProjectClick = { project ->
+                    // 点击项目直接进编辑器：有历史选项卡则恢复，否则空编辑器
                     if (!project.localPath.isNullOrBlank()) {
-                        selectedProject = project
+                        val tabs = editorSessionViewModel.getTabs(project.id)
+                        if (tabs.isNotEmpty()) {
+                            val savedIndex = editorSessionViewModel.getActiveIndex(project.id)
+                            val clampedIndex = savedIndex.coerceIn(0, tabs.size - 1)
+                            val activeTab = tabs[clampedIndex]
+                            currentScreen = Screen.Editor(
+                                filePath = activeTab.filePath,
+                                projectId = project.id,
+                                projectName = project.name,
+                                projectLocalPath = project.localPath
+                            )
+                        } else {
+                            currentScreen = Screen.Editor(
+                                filePath = "",
+                                projectId = project.id,
+                                projectName = project.name,
+                                projectLocalPath = project.localPath
+                            )
+                        }
                     }
-                },
-                onProjectSheetDismiss = { selectedProject = null },
-                onOpenFile = { filePath ->
-                    val proj = selectedProject
-                    selectedProject = null
-                    // 从首页进入时，清空选项卡状态并重新开始
-                    editorTabs = emptyList()
-                    openFileInTab(
-                        filePath = filePath,
-                        projectId = proj?.id ?: "",
-                        projectName = proj?.name ?: "",
-                        projectLocalPath = proj?.localPath
-                    )
                 },
                 onNewLocalProject = { showNewLocalDialog = true },
                 onCloneGithub = {},
@@ -216,10 +217,18 @@ fun AppNavigation(
         }
 
         is Screen.Editor -> {
-            val activeTab = editorTabs.getOrNull(activeTabIndex)
+            val tabs = editorSessionViewModel.getTabs(screen.projectId)
+            val activeIdx = editorSessionViewModel.getActiveIndex(screen.projectId)
+                .coerceIn(0, maxOf(0, tabs.size - 1))
+            val activeTab = tabs.getOrNull(activeIdx)
+            val displayFilePath = activeTab?.filePath ?: screen.filePath
+
             EditorScreen(
-                filePath = activeTab?.filePath ?: screen.filePath,
-                onNavigateBack = { currentScreen = Screen.Home; editorTabs = emptyList() },
+                filePath = displayFilePath,
+                onNavigateBack = {
+                    // 返回首页但不清除选项卡，保留会话状态
+                    currentScreen = Screen.Home
+                },
                 onFileSaved = {
                     val pid = activeTab?.projectId ?: screen.projectId
                     if (pid.isNotEmpty()) {
@@ -229,29 +238,29 @@ fun AppNavigation(
                 settings = settings,
                 projectName = activeTab?.projectName ?: screen.projectName,
                 projectLocalPath = activeTab?.projectLocalPath ?: screen.projectLocalPath,
-                // 选项卡相关
-                tabFilePaths = editorTabs.map { it.filePath },
-                activeTabIndex = activeTabIndex,
+                tabFilePaths = tabs.map { it.filePath },
+                activeTabIndex = activeIdx,
                 onTabSelected = { index ->
-                    activeTabIndex = index
+                    editorSessionViewModel.setActiveIndex(screen.projectId, index)
                 },
                 onTabClose = { index ->
-                    if (editorTabs.size == 1) {
+                    val currentTabs = editorSessionViewModel.getTabs(screen.projectId)
+                    if (currentTabs.size == 1) {
+                        editorSessionViewModel.clearTabs(screen.projectId)
                         currentScreen = Screen.Home
-                        editorTabs = emptyList()
                     } else {
-                        val newTabs = editorTabs.toMutableList().also { it.removeAt(index) }
-                        editorTabs = newTabs
-                        activeTabIndex = (activeTabIndex).coerceAtMost(newTabs.size - 1)
+                        val newTabs = currentTabs.toMutableList().also { it.removeAt(index) }
+                        editorSessionViewModel.setTabs(screen.projectId, newTabs)
+                        val newActiveIdx = activeIdx.coerceAtMost(newTabs.size - 1)
+                        editorSessionViewModel.setActiveIndex(screen.projectId, newActiveIdx)
                     }
                 },
                 onOpenNewTab = { newFilePath ->
-                    val currentTab = editorTabs.getOrNull(activeTabIndex)
                     openFileInTab(
                         filePath = newFilePath,
-                        projectId = currentTab?.projectId ?: screen.projectId,
-                        projectName = currentTab?.projectName ?: screen.projectName,
-                        projectLocalPath = currentTab?.projectLocalPath ?: screen.projectLocalPath
+                        projectId = activeTab?.projectId ?: screen.projectId,
+                        projectName = activeTab?.projectName ?: screen.projectName,
+                        projectLocalPath = activeTab?.projectLocalPath ?: screen.projectLocalPath
                     )
                 }
             )
