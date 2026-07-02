@@ -386,6 +386,7 @@ fun EditorScreen(
     // 文件树底部抽屉状态
     var showFileTree by remember { mutableStateOf(false) }
     var showFileDropdown by remember { mutableStateOf(false) }
+    var isBoltActionBarVisible by remember { mutableStateOf(false) }
 
     // ── 修改状态 & 保存提示 ──────────────────────────────────
     var isModified by remember { mutableStateOf(false) }
@@ -950,6 +951,15 @@ fun EditorScreen(
                     }
                 }
 
+                // ── 闪电快捷操作栏：键盘收起时，点击闪电按钮后展开 ──────
+                AnimatedVisibility(
+                    visible = !isImeVisible && isBoltActionBarVisible,
+                    enter = expandVertically(expandFrom = Alignment.Bottom) + fadeIn(),
+                    exit = shrinkVertically(shrinkTowards = Alignment.Bottom) + fadeOut()
+                ) {
+                    BoltActionBar()
+                }
+
                 // ── 底部栏：键盘弹出→符号栏，键盘收起→工具栏 ───────────
                 AnimatedContent(
                     targetState = isImeVisible,
@@ -968,6 +978,8 @@ fun EditorScreen(
                     } else {
                         EditorActionsBar(
                             isKeyboardEnabled = isKeyboardEnabled,
+                            isBoltActive = isBoltActionBarVisible,
+                            onBoltClick = { isBoltActionBarVisible = !isBoltActionBarVisible },
                             onSave = saveFile,
                             onToggleKeyboard = {
                                 isKeyboardEnabled = !isKeyboardEnabled
@@ -1454,12 +1466,85 @@ private fun ToolbarDivider() {
 }
 
 // ═════════════════════════════════════════════════════════════
+// 闪电快捷操作栏（点击闪电按钮后，展示在状态栏与底部工具栏之间）
+// 样式与符号栏（QuickActionButtonBar）保持一致
+// ═════════════════════════════════════════════════════════════
+@Composable
+private fun BoltActionBar(
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        tonalElevation = 2.dp,
+        modifier = modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 5.dp, horizontal = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(3.dp)
+        ) {
+            // 占位符按钮 1
+            EditorKeyButton(
+                onClick = { /* TODO */ },
+                modifier = Modifier.size(38.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Star,
+                    contentDescription = "操作1",
+                    modifier = Modifier.size(18.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            // 占位符按钮 2
+            EditorKeyButton(
+                onClick = { /* TODO */ },
+                modifier = Modifier.size(38.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Search,
+                    contentDescription = "操作2",
+                    modifier = Modifier.size(18.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            // 占位符按钮 3
+            EditorKeyButton(
+                onClick = { /* TODO */ },
+                modifier = Modifier.size(38.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Build,
+                    contentDescription = "操作3",
+                    modifier = Modifier.size(18.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            // 占位符按钮 4
+            EditorKeyButton(
+                onClick = { /* TODO */ },
+                modifier = Modifier.size(38.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Settings,
+                    contentDescription = "操作4",
+                    modifier = Modifier.size(18.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+// ═════════════════════════════════════════════════════════════
 // 工具栏（键盘收起时替代符号栏显示）—— Replit 风格三段式布局
 // 左：启动按钮占位符  中：四个占位符分组  右：软键盘 + 文件树
 // ═════════════════════════════════════════════════════════════
 @Composable
 private fun EditorActionsBar(
     isKeyboardEnabled: Boolean,
+    isBoltActive: Boolean = false,
+    onBoltClick: () -> Unit = {},
     onSave: () -> Unit,
     onToggleKeyboard: () -> Unit,
     modifier: Modifier = Modifier,
@@ -1499,13 +1584,16 @@ private fun EditorActionsBar(
                 Row(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    IconButton(modifier = Modifier.size(41.dp), onClick = { /* TODO */ }) {
+                    IconButton(modifier = Modifier.size(41.dp), onClick = onBoltClick) {
                         Icon(
-                            imageVector = if (isKeyboardEnabled)
+                            imageVector = if (isBoltActive)
                                 AppIcons.BoltFill else AppIcons.BoltNoFill,
-                            contentDescription = null,
+                            contentDescription = "快捷操作",
                             modifier = Modifier.size(24.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            tint = if (isBoltActive)
+                                MaterialTheme.colorScheme.primary
+                            else
+                                MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                     IconButton(modifier = Modifier.size(41.dp), onClick = { /* TODO */ }) {
