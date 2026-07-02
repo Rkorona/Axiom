@@ -54,12 +54,15 @@ import androidx.compose.foundation.layout.isImeVisible
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.io.File
+
 import io.axiom.editor.data.AppSettings
 import io.axiom.editor.data.EncodingMode
 import io.axiom.editor.data.ThemeMode
 import io.axiom.editor.ui.model.Project
 import io.axiom.editor.ui.model.ProjectLanguage
 import io.axiom.editor.ui.model.ProjectType
+
+// icons
 import io.axiom.editor.ui.icons.AppIcons
 import io.axiom.editor.ui.icons.ArrowBack
 import io.axiom.editor.ui.icons.BoltNoFill
@@ -71,7 +74,9 @@ import io.axiom.editor.ui.icons.KeyboardHide
 import io.axiom.editor.ui.icons.KeyboardLock
 import io.axiom.editor.ui.icons.MoreVert
 import io.axiom.editor.ui.icons.PlayArrow
-
+import io.axiom.editor.ui.icons.Undo
+import io.axiom.editor.ui.icons.Redo
+import io.axiom.editor.ui.icons.Format
 // ═════════════════════════════════════════════════════════════
 // 安全编解码工具函数与双通道编码自动检测
 // 规避 Kotlin 与 Javascript 通讯时的特殊字符、换行、单双引号转义问题
@@ -138,9 +143,11 @@ fun detectEncoding(bytes: ByteArray): java.nio.charset.Charset {
 // ═════════════════════════════════════════════════════════════
 class WebAppInterface(
     private val onReadyCallback: () -> Unit,
-    private val onStatsChangedCallback: (lines: Int, length: Int, indentLabel: String) -> Unit, // 传入智能缩进标签
+    private val onStatsChangedCallback: (lines: Int, length: Int, indentLabel: String) -> Unit,
     private val onCursorChangedCallback: (line: Int, col: Int) -> Unit,
-    private val onDiagnosticsChangedCallback: (errors: Int, warnings: Int) -> Unit
+    private val onDiagnosticsChangedCallback: (errors: Int, warnings: Int) -> Unit,
+    private val onFormatResultCallback: (success: Boolean, message: String) -> Unit = { _, _ -> },
+    private val onUndoRedoStateChangedCallback: (canUndo: Boolean, canRedo: Boolean) -> Unit = { _, _ -> }
 ) {
     @JavascriptInterface
     fun onReady() {
@@ -160,6 +167,16 @@ class WebAppInterface(
     @JavascriptInterface
     fun onDiagnosticsChanged(errors: Int, warnings: Int) {
         onDiagnosticsChangedCallback(errors, warnings)
+    }
+
+    @JavascriptInterface
+    fun onFormatResult(success: Boolean, message: String) {
+        onFormatResultCallback(success, message)
+    }
+
+    @JavascriptInterface
+    fun onUndoRedoStateChanged(canUndo: Boolean, canRedo: Boolean) {
+        onUndoRedoStateChangedCallback(canUndo, canRedo)
     }
 
     @JavascriptInterface
@@ -382,9 +399,14 @@ fun EditorScreen(
     val activeEditorTheme = if (isDarkTheme) settings.editorThemeDark else settings.editorThemeLight
     var isKeyboardEnabled by rememberSaveable { mutableStateOf(false) }
 
+    // 撤销 / 重做按钮可用状态（由 JS 回调驱动）
+    var canUndo by remember { mutableStateOf(false) }
+    var canRedo by remember { mutableStateOf(false) }
+
     // 文件树底部抽屉状态
     var showFileTree by remember { mutableStateOf(false) }
     var showFileDropdown by remember { mutableStateOf(false) }
+    var isBoltActionBarVisible by remember { mutableStateOf(false) }
 
     // ── 修改状态 & 保存提示 ──────────────────────────────────
     var isModified by remember { mutableStateOf(false) }
@@ -415,6 +437,10 @@ fun EditorScreen(
     LaunchedEffect(filePath) {
         // filePath 为空时是空编辑器状态（项目刚进入、无历史选项卡），跳过文件加载
         if (filePath.isEmpty()) return@LaunchedEffect
+
+        // 切换文件时立即重置撤销/重做按钮状态，避免旧文件的历史栈状态残留
+        canUndo = false
+        canRedo = false
 
         // ── 步骤 1：切走前先把旧 tab 的编辑器内容缓存到内存 ──────────────────
         // 只对「有未保存修改」的 tab 做缓存，避免每次切换都有额外 JS 开销
@@ -454,6 +480,7 @@ fun EditorScreen(
                 suppressModFor(800L)
                 executeJs("document.documentElement.style.setProperty('--editor-bg','$bg')")
                 executeJs("window.editorAPI.setContentBase64('${cachedContent.toBase64()}')")
+                executeJs("window.editorAPI.clearHistory()")
                 executeJs("window.editorAPI.setLanguage('$targetExt')")
                 executeJs("window.editorAPI.setTheme($isDark)")
                 executeJs("window.editorAPI.setEditorTheme('${activeEditorTheme.id}')")
@@ -527,6 +554,7 @@ fun EditorScreen(
                         suppressModFor(800L)  // 注入内容会触发 onStatsChanged
                         executeJs("document.documentElement.style.setProperty('--editor-bg','$bg')")
                         executeJs("window.editorAPI.setContentBase64('${text.toBase64()}')")
+                        executeJs("window.editorAPI.clearHistory()")
                         executeJs("window.editorAPI.setLanguage('$targetExt')")
                         executeJs("window.editorAPI.setTheme($isDark)")
                         executeJs("window.editorAPI.setEditorTheme('${activeEditorTheme.id}')")
@@ -566,6 +594,7 @@ fun EditorScreen(
             suppressModFor(800L)  // 初始注入内容也要抑制
             executeJs("document.documentElement.style.setProperty('--editor-bg','$bg')")
             executeJs("window.editorAPI.setContentBase64('${fileContent.toBase64()}')")
+            executeJs("window.editorAPI.clearHistory()")
             executeJs("window.editorAPI.setLanguage('$fileExtension')")
             executeJs("window.editorAPI.setTheme($isDarkTheme)")
             executeJs("window.editorAPI.setEditorTheme('${activeEditorTheme.id}')")
@@ -949,6 +978,21 @@ fun EditorScreen(
                     }
                 }
 
+                // ── 闪电快捷操作栏：键盘收起时，点击闪电按钮后展开 ──────
+                AnimatedVisibility(
+                    visible = !isImeVisible && isBoltActionBarVisible,
+                    enter = expandVertically(expandFrom = Alignment.Bottom) + fadeIn(),
+                    exit = shrinkVertically(shrinkTowards = Alignment.Bottom) + fadeOut()
+                ) {
+                    BoltActionBar(
+                        onUndo   = { executeJs("window.editorAPI.undo()") },
+                        onRedo   = { executeJs("window.editorAPI.redo()") },
+                        onFormat = { executeJs("window.editorAPI.format()") },
+                        canUndo  = canUndo,
+                        canRedo  = canRedo
+                    )
+                }
+
                 // ── 底部栏：键盘弹出→符号栏，键盘收起→工具栏 ───────────
                 AnimatedContent(
                     targetState = isImeVisible,
@@ -967,6 +1011,8 @@ fun EditorScreen(
                     } else {
                         EditorActionsBar(
                             isKeyboardEnabled = isKeyboardEnabled,
+                            isBoltActive = isBoltActionBarVisible,
+                            onBoltClick = { isBoltActionBarVisible = !isBoltActionBarVisible },
                             onSave = saveFile,
                             onToggleKeyboard = {
                                 isKeyboardEnabled = !isKeyboardEnabled
@@ -1092,6 +1138,22 @@ fun EditorScreen(
                                     coroutineScope.launch(Dispatchers.Main) {
                                         errorCount = errors
                                         warningCount = warnings
+                                    }
+                                },
+                                onFormatResultCallback = { success, message ->
+                                    coroutineScope.launch(Dispatchers.Main) {
+                                        if (success) {
+                                            Toast.makeText(context, "格式化完成", Toast.LENGTH_SHORT).show()
+                                        } else {
+                                            val tip = if (message.isNotBlank()) "格式化失败：代码存在语法错误" else "格式化失败"
+                                            Toast.makeText(context, tip, Toast.LENGTH_SHORT).show()
+                                        }
+                                    }
+                                },
+                                onUndoRedoStateChangedCallback = { undoAvail, redoAvail ->
+                                    coroutineScope.launch(Dispatchers.Main) {
+                                        canUndo = undoAvail
+                                        canRedo = redoAvail
                                     }
                                 }
                             ),
@@ -1457,12 +1519,82 @@ private fun ToolbarDivider() {
 }
 
 // ═════════════════════════════════════════════════════════════
+// 闪电快捷操作栏（点击闪电按钮后，展示在状态栏与底部工具栏之间）
+// 样式与符号栏（QuickActionButtonBar）保持一致
+// ═════════════════════════════════════════════════════════════
+@Composable
+private fun BoltActionBar(
+    onUndo: () -> Unit = {},
+    onRedo: () -> Unit = {},
+    onFormat: () -> Unit = {},
+    canUndo: Boolean = true,
+    canRedo: Boolean = true,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        tonalElevation = 2.dp,
+        modifier = modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 5.dp, horizontal = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(3.dp)
+        ) {
+            // 撤销
+            EditorKeyButton(
+                onClick = onUndo,
+                enabled = canUndo,
+                modifier = Modifier.size(38.dp)
+            ) {
+                Icon(
+                    imageVector = AppIcons.Undo,
+                    contentDescription = "撤销",
+                    modifier = Modifier.size(18.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        .copy(alpha = if (canUndo) 1f else 0.35f)
+                )
+            }
+            // 重做
+            EditorKeyButton(
+                onClick = onRedo,
+                enabled = canRedo,
+                modifier = Modifier.size(38.dp)
+            ) {
+                Icon(
+                    imageVector = AppIcons.Redo,
+                    contentDescription = "重做",
+                    modifier = Modifier.size(18.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        .copy(alpha = if (canRedo) 1f else 0.35f)
+                )
+            }
+            // 格式化
+            EditorKeyButton(
+                onClick = onFormat,
+                modifier = Modifier.size(38.dp)
+            ) {
+                Icon(
+                    imageVector = AppIcons.Format,
+                    contentDescription = "格式化",
+                    modifier = Modifier.size(18.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+// ═════════════════════════════════════════════════════════════
 // 工具栏（键盘收起时替代符号栏显示）—— Replit 风格三段式布局
 // 左：启动按钮占位符  中：四个占位符分组  右：软键盘 + 文件树
 // ═════════════════════════════════════════════════════════════
 @Composable
 private fun EditorActionsBar(
     isKeyboardEnabled: Boolean,
+    isBoltActive: Boolean = false,
+    onBoltClick: () -> Unit = {},
     onSave: () -> Unit,
     onToggleKeyboard: () -> Unit,
     modifier: Modifier = Modifier,
@@ -1484,22 +1616,28 @@ private fun EditorActionsBar(
                 .fillMaxWidth()
                 .navigationBarsPadding()
                 .height(81.dp)
-                .padding(horizontal = 4.dp),
+                .padding(horizontal = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // ── 左侧：启动图标（占位符）──
-            IconButton(modifier = Modifier.size(41.dp), onClick = { /* TODO: 启动 */ }) {
-                Icon(
-                    imageVector = AppIcons.PlayArrow,
-                    contentDescription = "启动",
-                    modifier = Modifier.size(24.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+            // ── 左侧：启动图标（键帽包裹，单独一组）──
+            Surface(
+                color = MaterialTheme.colorScheme.surfaceColorAtElevation(10.dp),
+                shape = RoundedCornerShape(10.dp),
+                tonalElevation = 0.dp
+            ) {
+                IconButton(modifier = Modifier.size(41.dp), onClick = { /* TODO: 启动 */ }) {
+                    Icon(
+                        imageVector = AppIcons.PlayArrow,
+                        contentDescription = "启动",
+                        modifier = Modifier.size(24.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.weight(1f))
 
-            // ── 中间：占位符图标分组（四个，背景包裹）──
+            // ── 中间：占位符图标分组（两个，背景包裹）──
             Surface(
                 color = MaterialTheme.colorScheme.surfaceColorAtElevation(10.dp),
                 shape = RoundedCornerShape(10.dp),
@@ -1508,13 +1646,16 @@ private fun EditorActionsBar(
                 Row(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    IconButton(modifier = Modifier.size(41.dp), onClick = { /* TODO */ }) {
+                    IconButton(modifier = Modifier.size(41.dp), onClick = onBoltClick) {
                         Icon(
-                            imageVector = if (isKeyboardEnabled)
+                            imageVector = if (isBoltActive)
                                 AppIcons.BoltFill else AppIcons.BoltNoFill,
-                            contentDescription = null,
+                            contentDescription = "快捷操作",
                             modifier = Modifier.size(24.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            tint = if (isBoltActive)
+                                MaterialTheme.colorScheme.primary
+                            else
+                                MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                     Box {
@@ -1609,27 +1750,37 @@ private fun EditorActionsBar(
 
             Spacer(modifier = Modifier.weight(1f))
 
-            // ── 右侧：软键盘 + 文件树 ──
-            IconButton(onClick = onToggleKeyboard, modifier = Modifier.size(41.dp)) {
-                Icon(
-                    imageVector = if (isKeyboardEnabled)
-                        AppIcons.KeyboardHide else AppIcons.KeyboardLock,
-                    contentDescription = "软键盘",
-                    modifier = Modifier.size(24.dp),
-                    tint = if (isKeyboardEnabled)
-                        MaterialTheme.colorScheme.primary
-                    else
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            if (hasFileTree) {
-                IconButton(onClick = onOpenFileTree, modifier = Modifier.size(41.dp)) {
-                    Icon(
-                        imageVector = AppIcons.FolderOpen,
-                        contentDescription = "文件树",
-                        modifier = Modifier.size(24.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+            // ── 右侧：软键盘 + 文件树（键帽包裹，同一组）──
+            Surface(
+                color = MaterialTheme.colorScheme.surfaceColorAtElevation(10.dp),
+                shape = RoundedCornerShape(10.dp),
+                tonalElevation = 0.dp
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = onToggleKeyboard, modifier = Modifier.size(41.dp)) {
+                        Icon(
+                            imageVector = if (isKeyboardEnabled)
+                                AppIcons.KeyboardHide else AppIcons.KeyboardLock,
+                            contentDescription = "软键盘",
+                            modifier = Modifier.size(24.dp),
+                            tint = if (isKeyboardEnabled)
+                                MaterialTheme.colorScheme.primary
+                            else
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    if (hasFileTree) {
+                        IconButton(onClick = onOpenFileTree, modifier = Modifier.size(41.dp)) {
+                            Icon(
+                                imageVector = AppIcons.FolderOpen,
+                                contentDescription = "文件树",
+                                modifier = Modifier.size(24.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -1643,6 +1794,7 @@ private fun EditorKeyButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     isActive: Boolean = false,
+    enabled: Boolean = true,
     content: @Composable BoxScope.() -> Unit
 ) {
     val bgColor = if (isActive)
@@ -1655,6 +1807,7 @@ private fun EditorKeyButton(
         color = bgColor,
         shape = RoundedCornerShape(7.dp),
         tonalElevation = 0.dp,
+        enabled = enabled,
         modifier = modifier
     ) {
         Box(
