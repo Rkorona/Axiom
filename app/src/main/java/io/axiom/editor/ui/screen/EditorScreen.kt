@@ -1474,7 +1474,7 @@ private fun EditorActionsBar(
                 Icon(
                     imageVector = AppIcons.PlayArrow,
                     contentDescription = "启动",
-                    modifier = Modifier.size(24.dp),
+                    modifier = Modifier.size(41.dp),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
@@ -1494,7 +1494,7 @@ private fun EditorActionsBar(
                         Icon(
                             imageVector = Icons.Default.DesktopWindows,
                             contentDescription = null,
-                            modifier = Modifier.size(24.dp),
+                            modifier = Modifier.size(41.dp),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
@@ -1502,7 +1502,7 @@ private fun EditorActionsBar(
                         Icon(
                             imageVector = Icons.Default.Extension,
                             contentDescription = null,
-                            modifier = Modifier.size(24.dp),
+                            modifier = Modifier.size(41.dp),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
@@ -1510,7 +1510,7 @@ private fun EditorActionsBar(
                         Icon(
                             imageVector = Icons.Default.Public,
                             contentDescription = null,
-                            modifier = Modifier.size(24.dp),
+                            modifier = Modifier.size(41.dp),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
@@ -1518,7 +1518,7 @@ private fun EditorActionsBar(
                         Icon(
                             imageVector = Icons.Default.Hub,
                             contentDescription = null,
-                            modifier = Modifier.size(24.dp),
+                            modifier = Modifier.size(41.dp),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
@@ -1528,12 +1528,12 @@ private fun EditorActionsBar(
             Spacer(modifier = Modifier.weight(1f))
 
             // ── 右侧：软键盘 + 文件树 ──
-            IconButton(onClick = onToggleKeyboard, modifier = Modifier.size(48.dp)) {
+            IconButton(onClick = onToggleKeyboard, modifier = Modifier.size(41.dp)) {
                 Icon(
                     imageVector = if (isKeyboardEnabled)
                         AppIcons.KeyboardHide else AppIcons.KeyboardLock,
                     contentDescription = "软键盘",
-                    modifier = Modifier.size(24.dp),
+                    modifier = Modifier.size(41.dp),
                     tint = if (isKeyboardEnabled)
                         MaterialTheme.colorScheme.primary
                     else
@@ -1541,11 +1541,11 @@ private fun EditorActionsBar(
                 )
             }
             if (hasFileTree) {
-                IconButton(onClick = onOpenFileTree, modifier = Modifier.size(48.dp)) {
+                IconButton(onClick = onOpenFileTree, modifier = Modifier.size(41.dp)) {
                     Icon(
                         imageVector = AppIcons.FolderOpen,
                         contentDescription = "文件树",
-                        modifier = Modifier.size(24.dp),
+                        modifier = Modifier.size(41.dp),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
