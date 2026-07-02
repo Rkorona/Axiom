@@ -11,7 +11,7 @@ import androidx.compose.ui.graphics.vector.path
 import androidx.compose.ui.unit.dp
 
 @Suppress("CheckReturnValue")
-public val keyboard_lock: ImageVector
+public val AppIcons.KeyboardLock: ImageVector
   get() {
     if (_keyboard_lock != null) {
       return _keyboard_lock!!

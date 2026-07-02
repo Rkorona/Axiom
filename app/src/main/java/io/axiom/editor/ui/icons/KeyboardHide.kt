@@ -11,7 +11,7 @@ import androidx.compose.ui.graphics.vector.path
 import androidx.compose.ui.unit.dp
 
 @Suppress("CheckReturnValue")
-public val keyboard_hide: ImageVector
+public val AppIcons.KeyboardHide: ImageVector
   get() {
     if (_keyboard_hide != null) {
       return _keyboard_hide!!
