@@ -6,8 +6,8 @@ import { basicSetup }                  from "codemirror"
 import { indentWithTab,
          undo, redo,
          undoDepth, redoDepth,
-         indentSelection,
-         clearHistory }                 from "@codemirror/commands"
+         indentSelection }              from "@codemirror/commands"
+import { clearHistory }                from "@codemirror/history"
 import { openSearchPanel,
          closeSearchPanel }            from "@codemirror/search"
 import { StreamLanguage }              from "@codemirror/language"
