@@ -32,6 +32,15 @@ import { shell }       from "@codemirror/legacy-modes/mode/shell" // 🌟 新增
 import { syntaxTree, indentUnit }  from "@codemirror/language"
 import { linter, lintGutter }      from "@codemirror/lint"
 
+// ── Prettier 代码格式化（standalone 浏览器构建） ─────────────────
+import * as prettier       from "prettier/standalone"
+import * as pluginBabel    from "prettier/plugins/babel"
+import * as pluginEstree   from "prettier/plugins/estree"
+import * as pluginPostcss  from "prettier/plugins/postcss"
+import * as pluginHtml     from "prettier/plugins/html"
+import * as pluginMarkdown from "prettier/plugins/markdown"
+import * as pluginYaml     from "prettier/plugins/yaml"
+
 // ── 主题 ──────────────────────────────────────────────────────
 // 内置默认深色主题（当用户未选择具体主题、跟随 App 明暗模式时使用）
 import { oneDark }     from "@codemirror/theme-one-dark"
@@ -156,6 +165,8 @@ const THEME_MAP = {
 /** 当前生效的主题 id 与 App 明暗状态，用于 auto 模式回退计算 */
 let currentThemeId = "auto"
 let currentIsDark   = false
+/** 当前文件扩展名，供 format() 选择 Prettier 解析器 */
+let currentExt      = "js"
 
 /** 根据 currentThemeId / currentIsDark 计算出应生效的主题扩展 */
 function resolveThemeExtension() {
@@ -486,6 +497,7 @@ window.editorAPI = {
   // ── 语言 / 主题切换 ─────────────────────────────────────────
 
   setLanguage: (ext) => {
+    currentExt = ext?.toLowerCase() || "js"
     view.dispatch({ effects: languageConf.reconfigure(getLang(ext)) })
   },
 
@@ -559,39 +571,88 @@ window.editorAPI = {
 
 
   // ── 格式化 ──────────────────────────────────────────────────
-  // 两遍处理：
-  // Pass 1 — 纯文本级别安全归一化（不依赖语法树）：
-  //   · 去除每行行尾多余空白
-  //   · 将连续 3 个以上空行压缩为最多 2 个空行
-  // Pass 2 — 语言感知缩进重排（indentSelection）：
-  //   · 按 Lezer 语法树对全文每一行重新计算期望缩进
+  // 优先使用 Prettier（支持 JS/TS/JSX/TSX/JSON/CSS/SCSS/HTML/Vue/MD/YAML）。
+  // Prettier 失败时（如代码有语法错误）自动降级为：
+  //   Pass 1 — 文本归一化（去行尾空白 + 压缩超长空行）
+  //   Pass 2 — 语言感知缩进重排（indentSelection）
 
-  format: () => {
+  /** Prettier 解析器映射表：文件扩展名 → { parser, plugins } */
+  _prettierMap: {
+    js:   { parser: "babel",    plugins: () => [pluginBabel, pluginEstree] },
+    mjs:  { parser: "babel",    plugins: () => [pluginBabel, pluginEstree] },
+    cjs:  { parser: "babel",    plugins: () => [pluginBabel, pluginEstree] },
+    jsx:  { parser: "babel",    plugins: () => [pluginBabel, pluginEstree] },
+    ts:   { parser: "babel-ts", plugins: () => [pluginBabel, pluginEstree] },
+    tsx:  { parser: "babel-ts", plugins: () => [pluginBabel, pluginEstree] },
+    json: { parser: "json",     plugins: () => [pluginBabel, pluginEstree] },
+    jsonc:{ parser: "json",     plugins: () => [pluginBabel, pluginEstree] },
+    css:  { parser: "css",      plugins: () => [pluginPostcss] },
+    scss: { parser: "scss",     plugins: () => [pluginPostcss] },
+    less: { parser: "less",     plugins: () => [pluginPostcss] },
+    html: { parser: "html",     plugins: () => [pluginHtml] },
+    vue:  { parser: "vue",      plugins: () => [pluginHtml] },
+    md:   { parser: "markdown", plugins: () => [pluginMarkdown] },
+    yaml: { parser: "yaml",     plugins: () => [pluginYaml] },
+    yml:  { parser: "yaml",     plugins: () => [pluginYaml] },
+  },
+
+  format: async () => {
     const state = view.state
     if (state.doc.length === 0) return false
 
+    const text       = state.doc.toString()
     const prevCursor = state.selection.main.head
-    let text = state.doc.toString()
 
-    // ── Pass 1: 文本级别归一化 ──────────────────────────────
+    // 读取当前缩进规格（与 setIndentation 保持一致）
+    const indentVal = state.facet(indentUnit)
+    const useTabs   = indentVal.includes("\t")
+    const tabWidth  = useTabs ? state.tabSize : indentVal.length
+
+    // ── Prettier 路径 ───────────────────────────────────────
+    const conf = window.editorAPI._prettierMap[currentExt]
+    if (conf) {
+      try {
+        const formatted = await prettier.format(text, {
+          parser:      conf.parser,
+          plugins:     conf.plugins(),
+          useTabs,
+          tabWidth,
+          printWidth:  100,
+          semi:        true,
+          singleQuote: false,
+          trailingComma: "es5",
+        })
+
+        view.dispatch({
+          changes:        { from: 0, to: state.doc.length, insert: formatted },
+          selection:      { anchor: Math.min(prevCursor, formatted.length) },
+          scrollIntoView: true,
+        })
+        view.focus()
+        return true
+      } catch (e) {
+        // 代码有语法错误时 Prettier 会抛出，降级到 indentSelection
+        console.warn("[Prettier] format failed, falling back:", e.message)
+      }
+    }
+
+    // ── 降级路径：文本归一化 + 语言感知缩进 ────────────────
     const normalized = text
       .split("\n")
-      .map(line => line.trimEnd())          // 去行尾空白
+      .map(line => line.trimEnd())
       .join("\n")
-      .replace(/\n{4,}/g, "\n\n\n")         // 压缩超长空行（3+ → 2）
+      .replace(/\n{4,}/g, "\n\n\n")
 
     if (normalized !== text) {
       view.dispatch({
-        changes: { from: 0, to: state.doc.length, insert: normalized },
+        changes:   { from: 0, to: state.doc.length, insert: normalized },
         selection: { anchor: Math.min(prevCursor, normalized.length) }
       })
     }
 
-    // ── Pass 2: 语言感知缩进重排 ────────────────────────────
     view.dispatch({ selection: { anchor: 0, head: view.state.doc.length } })
     indentSelection(view)
 
-    // 恢复到原光标位置（受重新缩进导致的长度变化影响，做边界裁剪）
     const restored = Math.min(prevCursor, view.state.doc.length)
     view.dispatch({ selection: { anchor: restored }, scrollIntoView: true })
     view.focus()
