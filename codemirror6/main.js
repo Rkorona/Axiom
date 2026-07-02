@@ -619,7 +619,7 @@ window.editorAPI = {
           tabWidth,
           printWidth:  100,
           semi:        true,
-          singleQuote: false,
+          singleQuote: true,
           trailingComma: "es5",
         })
 
