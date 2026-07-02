@@ -51,8 +51,6 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.isImeVisible
-import com.example.test.BoltFill
-
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.io.File
@@ -65,6 +63,7 @@ import io.axiom.editor.ui.model.ProjectType
 import io.axiom.editor.ui.icons.AppIcons
 import io.axiom.editor.ui.icons.ArrowBack
 import io.axiom.editor.ui.icons.BoltNoFill
+import io.axiom.editor.ui.icons.BoltFill
 import io.axiom.editor.ui.icons.BookmarkStacksNoFill
 import io.axiom.editor.ui.icons.BookmarkStacksFill
 import io.axiom.editor.ui.icons.FolderOpen
@@ -122,7 +121,7 @@ fun detectEncoding(bytes: ByteArray): java.nio.charset.Charset {
             // 关键：强制要求遇到错误字符或畸形输入时抛出异常，否则默认行为是替换为 '' 而不报错
             decoder.onMalformedInput(java.nio.charset.CodingErrorAction.REPORT)
             decoder.onUnmappableCharacter(java.nio.charset.CodingErrorAction.REPORT)
-            
+
             decoder.decode(java.nio.ByteBuffer.wrap(bytes))
             return charset // 解码成功，直接返回该字符集
         } catch (e: Exception) {
@@ -176,7 +175,7 @@ class WebAppInterface(
 // ═════════════════════════════════════════════════════════════
 // 编辑器主页面 Composable
 // ═════════════════════════════════════════════════════════════
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class) 
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun EditorScreen(
     filePath: String,
@@ -541,7 +540,7 @@ fun EditorScreen(
             }
         }
     }
-    
+
     LaunchedEffect(isDarkTheme) {
         if (isEditorReady) {
             val bg = if (isDarkTheme) "#141729" else "#ffffff"
@@ -557,7 +556,7 @@ fun EditorScreen(
             executeJs("window.editorAPI.setEditorTheme('${activeEditorTheme.id}')")
         }
     }
-    
+
     // ─────────────────────────────────────────────────────────
     // 5. 初始化加载逻辑：当 H5 准备好且文件读取完毕时注入
     // ─────────────────────────────────────────────────────────
@@ -709,120 +708,120 @@ fun EditorScreen(
         topBar = {
             Column {
                 TopAppBar(
-                title = {
-                    val canShowFileDropdown = !settings.enableFileTabs && !isSafUri
-                    val siblingFiles = remember(filePath) {
-                        if (!isSafUri) {
-                            File(filePath).parentFile?.listFiles()
-                                ?.filter { it.isFile }
-                                ?.sortedBy { it.name.lowercase() }
-                                ?: emptyList()
-                        } else emptyList()
-                    }
-                    Box(
-                        modifier = Modifier.fillMaxWidth(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Row(
-                            modifier = if (canShowFileDropdown && siblingFiles.size > 1)
-                                Modifier.clickable { showFileDropdown = true } else Modifier,
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    title = {
+                        val canShowFileDropdown = !settings.enableFileTabs && !isSafUri
+                        val siblingFiles = remember(filePath) {
+                            if (!isSafUri) {
+                                File(filePath).parentFile?.listFiles()
+                                    ?.filter { it.isFile }
+                                    ?.sortedBy { it.name.lowercase() }
+                                    ?: emptyList()
+                            } else emptyList()
+                        }
+                        Box(
+                            modifier = Modifier.fillMaxWidth(),
+                            contentAlignment = Alignment.Center
                         ) {
-                            Text(
-                                text = fileName,
-                                style = MaterialTheme.typography.titleSmall.copy(
-                                    fontWeight = FontWeight.SemiBold
-                                ),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            if (fileExtension.isNotBlank()) {
-                                Surface(
-                                    color = if (isModified)
-                                        MaterialTheme.colorScheme.errorContainer
-                                    else
-                                        MaterialTheme.colorScheme.primaryContainer,
-                                    shape = RoundedCornerShape(4.dp),
-                                    tonalElevation = 0.dp
-                                ) {
-                                    Text(
-                                        text = fileExtension.uppercase(),
-                                        style = MaterialTheme.typography.labelSmall.copy(
-                                            fontFamily = FontFamily.Monospace,
-                                            fontWeight = FontWeight.Bold,
-                                            letterSpacing = 0.5.sp
-                                        ),
+                            Row(
+                                modifier = if (canShowFileDropdown && siblingFiles.size > 1)
+                                    Modifier.clickable { showFileDropdown = true } else Modifier,
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Text(
+                                    text = fileName,
+                                    style = MaterialTheme.typography.titleSmall.copy(
+                                        fontWeight = FontWeight.SemiBold
+                                    ),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                if (fileExtension.isNotBlank()) {
+                                    Surface(
                                         color = if (isModified)
-                                            MaterialTheme.colorScheme.onErrorContainer
+                                            MaterialTheme.colorScheme.errorContainer
                                         else
-                                            MaterialTheme.colorScheme.onPrimaryContainer,
-                                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                                            MaterialTheme.colorScheme.primaryContainer,
+                                        shape = RoundedCornerShape(4.dp),
+                                        tonalElevation = 0.dp
+                                    ) {
+                                        Text(
+                                            text = fileExtension.uppercase(),
+                                            style = MaterialTheme.typography.labelSmall.copy(
+                                                fontFamily = FontFamily.Monospace,
+                                                fontWeight = FontWeight.Bold,
+                                                letterSpacing = 0.5.sp
+                                            ),
+                                            color = if (isModified)
+                                                MaterialTheme.colorScheme.onErrorContainer
+                                            else
+                                                MaterialTheme.colorScheme.onPrimaryContainer,
+                                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                                        )
+                                    }
+                                }
+                                if (canShowFileDropdown && siblingFiles.size > 1) {
+                                    Icon(
+                                        imageVector = Icons.Filled.ArrowDropDown,
+                                        contentDescription = "切换文件",
+                                        modifier = Modifier.size(18.dp),
+                                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                                     )
                                 }
                             }
-                            if (canShowFileDropdown && siblingFiles.size > 1) {
-                                Icon(
-                                    imageVector = Icons.Filled.ArrowDropDown,
-                                    contentDescription = "切换文件",
-                                    modifier = Modifier.size(18.dp),
-                                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                                )
-                            }
-                        }
-                        // ── 同目录文件下拉菜单（无选项卡模式）──
-                        DropdownMenu(
-                            expanded = showFileDropdown,
-                            onDismissRequest = { showFileDropdown = false }
-                        ) {
-                            siblingFiles.forEach { f ->
-                                val isCurrentFile = f.absolutePath == filePath
-                                DropdownMenuItem(
-                                    text = {
-                                        Text(
-                                            text = f.name,
-                                            style = MaterialTheme.typography.bodyMedium.copy(
-                                                fontFamily = FontFamily.Monospace,
-                                                fontWeight = if (isCurrentFile) FontWeight.Bold else FontWeight.Normal
-                                            ),
-                                            color = if (isCurrentFile)
-                                                MaterialTheme.colorScheme.primary
-                                            else
-                                                MaterialTheme.colorScheme.onSurface
-                                        )
-                                    },
-                                    onClick = {
-                                        showFileDropdown = false
-                                        if (!isCurrentFile) {
-                                            onOpenNewTab?.invoke(f.absolutePath)
+                            // ── 同目录文件下拉菜单（无选项卡模式）──
+                            DropdownMenu(
+                                expanded = showFileDropdown,
+                                onDismissRequest = { showFileDropdown = false }
+                            ) {
+                                siblingFiles.forEach { f ->
+                                    val isCurrentFile = f.absolutePath == filePath
+                                    DropdownMenuItem(
+                                        text = {
+                                            Text(
+                                                text = f.name,
+                                                style = MaterialTheme.typography.bodyMedium.copy(
+                                                    fontFamily = FontFamily.Monospace,
+                                                    fontWeight = if (isCurrentFile) FontWeight.Bold else FontWeight.Normal
+                                                ),
+                                                color = if (isCurrentFile)
+                                                    MaterialTheme.colorScheme.primary
+                                                else
+                                                    MaterialTheme.colorScheme.onSurface
+                                            )
+                                        },
+                                        onClick = {
+                                            showFileDropdown = false
+                                            if (!isCurrentFile) {
+                                                onOpenNewTab?.invoke(f.absolutePath)
+                                            }
                                         }
-                                    }
-                                )
+                                    )
+                                }
                             }
                         }
-                    }
-                },
-                navigationIcon = {
-                    IconButton(onClick = { showExitDialog = true }) {
-                        Icon(
-                            imageVector = AppIcons.ArrowBack,
-                            contentDescription = "返回"
-                        )
-                    }
-                },
-                actions = {
-                    IconButton(onClick = { /* TODO: 菜单 */ }) {
-                        Icon(
-                            imageVector = AppIcons.MoreVert,
-                            contentDescription = "菜单",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                },
-                expandedHeight = 52.dp,
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(3.dp)
-                )
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = { showExitDialog = true }) {
+                            Icon(
+                                imageVector = AppIcons.ArrowBack,
+                                contentDescription = "返回"
+                            )
+                        }
+                    },
+                    actions = {
+                        IconButton(onClick = { /* TODO: 菜单 */ }) {
+                            Icon(
+                                imageVector = AppIcons.MoreVert,
+                                contentDescription = "菜单",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    },
+                    expandedHeight = 52.dp,
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(3.dp)
+                    )
                 )
                 // ── 文件选项卡栏 ──────────────────────────────────
                 if (showTabStrip) {
@@ -978,7 +977,11 @@ fun EditorScreen(
                                 }
                             },
                             hasFileTree = treeProject != null,
-                            onOpenFileTree = { showFileTree = true }
+                            onOpenFileTree = { showFileTree = true },
+                            tabFilePaths = tabFilePaths,
+                            activeTabIndex = activeTabIndex,
+                            onTabSelected = onTabSelected,
+                            modifiedFilePaths = modifiedFilePaths
                         )
                     }
                 }
@@ -1246,7 +1249,7 @@ private fun EditorTabStrip(
                 }
                 val tabBg = if (isActive) activeTabBg else tabBarBg
                 val textColor = if (isActive) MaterialTheme.colorScheme.onSurface
-                               else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
 
                 val isModifiedTab = path in modifiedFilePaths
                 Box(
@@ -1304,7 +1307,7 @@ private fun EditorTabStrip(
                                 contentDescription = "关闭选项卡",
                                 modifier = Modifier.size(10.dp),
                                 tint = if (isActive) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                                       else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+                                else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
                             )
                         }
                     }
@@ -1464,8 +1467,14 @@ private fun EditorActionsBar(
     onToggleKeyboard: () -> Unit,
     modifier: Modifier = Modifier,
     hasFileTree: Boolean = false,
-    onOpenFileTree: () -> Unit = {}
+    onOpenFileTree: () -> Unit = {},
+    tabFilePaths: List<String> = emptyList(),
+    activeTabIndex: Int = 0,
+    onTabSelected: (Int) -> Unit = {},
+    modifiedFilePaths: Set<String> = emptySet()
 ) {
+    // 选项卡下拉列表展开状态（底栏第三个按钮）
+    var showTabsDropdown by remember { mutableStateOf(false) }
     Surface(
         tonalElevation = 4.dp,
         modifier = modifier.fillMaxWidth()
@@ -1508,14 +1517,92 @@ private fun EditorActionsBar(
                             tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-                    IconButton(modifier = Modifier.size(41.dp), onClick = { /* TODO */ }) {
-                        Icon(
-                            imageVector = if (isKeyboardEnabled)
-                                AppIcons.BookmarkStacksFill else AppIcons.BookmarkStacksNoFill,
-                            contentDescription = null,
-                            modifier = Modifier.size(24.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                    Box {
+                        IconButton(
+                            modifier = Modifier.size(41.dp),
+                            onClick = { showTabsDropdown = !showTabsDropdown }
+                        ) {
+                            Icon(
+                                imageVector = if (showTabsDropdown)
+                                    AppIcons.BookmarkStacksFill else AppIcons.BookmarkStacksNoFill,
+                                contentDescription = "选项卡列表",
+                                modifier = Modifier.size(24.dp),
+                                tint = if (showTabsDropdown)
+                                    MaterialTheme.colorScheme.primary
+                                else
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+
+                        // ── 选项卡下拉列表 ──
+                        DropdownMenu(
+                            expanded = showTabsDropdown,
+                            onDismissRequest = { showTabsDropdown = false }
+                        ) {
+                            if (tabFilePaths.isEmpty()) {
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(
+                                            text = "暂无打开的选项卡",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    },
+                                    onClick = { showTabsDropdown = false }
+                                )
+                            } else {
+                                tabFilePaths.forEachIndexed { index, path ->
+                                    val isActive = index == activeTabIndex
+                                    val isSafPath = path.startsWith("content://")
+                                    val tabName = if (isSafPath) {
+                                        Uri.decode(Uri.parse(path).lastPathSegment ?: "")
+                                            .substringAfterLast('/')
+                                            .ifBlank { "untitled" }
+                                    } else {
+                                        path.substringAfterLast('/').ifBlank { "untitled" }
+                                    }
+                                    val isModifiedTab = path in modifiedFilePaths
+
+                                    DropdownMenuItem(
+                                        text = {
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                            ) {
+                                                if (isModifiedTab) {
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .size(6.dp)
+                                                            .clip(androidx.compose.foundation.shape.CircleShape)
+                                                            .background(
+                                                                if (isActive) MaterialTheme.colorScheme.primary
+                                                                else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                                                            )
+                                                    )
+                                                }
+                                                Text(
+                                                    text = tabName,
+                                                    style = MaterialTheme.typography.bodyMedium.copy(
+                                                        fontFamily = FontFamily.Monospace,
+                                                        fontWeight = if (isActive) FontWeight.SemiBold else FontWeight.Normal
+                                                    ),
+                                                    color = if (isActive)
+                                                        MaterialTheme.colorScheme.primary
+                                                    else
+                                                        MaterialTheme.colorScheme.onSurface,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+                                            }
+                                        },
+                                        onClick = {
+                                            onTabSelected(index)
+                                            showTabsDropdown = false
+                                        }
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }
