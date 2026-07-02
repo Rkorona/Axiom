@@ -382,6 +382,10 @@ fun EditorScreen(
     var savedIndicatorTick by remember { mutableStateOf(0) }
     // 跨选项卡的未保存文件路径集合
     var modifiedFilePaths by remember { mutableStateOf<Set<String>>(emptySet()) }
+    // 切走时缓存各 tab 的编辑器内容，切回来时恢复而不是重读磁盘
+    var tabContentCache by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
+    // 记录上一个 filePath，用于切换时捕获旧内容
+    val prevFilePathRef = remember { mutableStateOf("") }
     val treeProject = remember(projectName, projectLocalPath) {
         if (projectLocalPath != null) {
             Project(
@@ -403,6 +407,53 @@ fun EditorScreen(
         // filePath 为空时是空编辑器状态（项目刚进入、无历史选项卡），跳过文件加载
         if (filePath.isEmpty()) return@LaunchedEffect
 
+        // ── 步骤 1：切走前先把旧 tab 的编辑器内容缓存到内存 ──────────────────
+        // 只对「有未保存修改」的 tab 做缓存，避免每次切换都有额外 JS 开销
+        val switchingFrom = prevFilePathRef.value
+        if (switchingFrom.isNotEmpty() && switchingFrom != filePath
+            && switchingFrom in modifiedFilePaths && isEditorReady) {
+            val deferred = kotlinx.coroutines.CompletableDeferred<String?>()
+            webViewRef?.post {
+                webViewRef?.evaluateJavascript("window.editorAPI.getContentBase64()") { result ->
+                    deferred.complete(result?.trim('"')?.takeIf { it != "null" && it.isNotEmpty() })
+                } ?: deferred.complete(null)
+            } ?: deferred.complete(null)
+            val b64 = deferred.await()
+            if (b64 != null) {
+                try {
+                    tabContentCache = tabContentCache + (switchingFrom to b64.fromBase64())
+                } catch (_: Exception) { /* 解码失败忽略，下次从磁盘读 */ }
+            }
+        }
+        prevFilePathRef.value = filePath
+
+        // ── 步骤 2：如果目标文件有未保存内容的缓存，直接恢复，不重读磁盘 ──────
+        val cachedContent = tabContentCache[filePath]
+        if (cachedContent != null && filePath in modifiedFilePaths) {
+            val targetExt = if (filePath.startsWith("content://")) {
+                Uri.decode(Uri.parse(filePath).lastPathSegment ?: "")
+                    .substringAfterLast('/').substringAfterLast('.', "")
+            } else {
+                File(filePath).extension
+            }
+            fileContent = cachedContent
+            isModified = true
+            isFileLoaded = true
+            if (isEditorReady) {
+                val isDark = isDarkTheme
+                val bg = if (isDark) "#141729" else "#ffffff"
+                suppressModFor(800L)
+                executeJs("document.documentElement.style.setProperty('--editor-bg','$bg')")
+                executeJs("window.editorAPI.setContentBase64('${cachedContent.toBase64()}')")
+                executeJs("window.editorAPI.setLanguage('$targetExt')")
+                executeJs("window.editorAPI.setTheme($isDark)")
+                executeJs("window.editorAPI.setEditorTheme('${activeEditorTheme.id}')")
+                applyEditorSettings(isDark)
+            }
+            return@LaunchedEffect   // 缓存命中，无需从磁盘读取
+        }
+
+        // ── 步骤 3：无缓存，正常从磁盘读取 ──────────────────────────────────────
         isFileLoaded = false
         // 只有编辑器 WebView 本身尚未就绪时才显示全屏 loading；
         // 文件切换时 WebView 不会重新加载页面，onPageFinished 不会再触发，
@@ -454,7 +505,9 @@ fun EditorScreen(
                     fileContent = text
                     fileEncoding = charset.name()
                     isModified = false
+                    // 从磁盘读取成功，磁盘内容即最新，移出修改集合并清除缓存
                     modifiedFilePaths = modifiedFilePaths - filePath
+                    tabContentCache = tabContentCache - filePath
                     isFileLoaded = true
 
                     // 若编辑器已就绪（文件切换场景），直接注入新内容，
@@ -554,6 +607,7 @@ fun EditorScreen(
                             launch(Dispatchers.Main) {
                                 isModified = false
                                 modifiedFilePaths = modifiedFilePaths - filePath
+                                tabContentCache = tabContentCache - filePath  // 保存后缓存失效
                                 savedIndicatorTick++
                                 onFileSaved?.invoke()
                             }
