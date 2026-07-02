@@ -1485,10 +1485,13 @@ private fun EditorActionsBar(
             Surface(
                 color = MaterialTheme.colorScheme.surfaceColorAtElevation(10.dp),
                 shape = RoundedCornerShape(10.dp),
-                tonalElevation = 0.dp
+                tonalElevation = 0.dp,
+                modifier = Modifier.fillMaxWidth()
             ) {
                 Row(
-                    verticalAlignment = Alignment.CenterVertically
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
                     IconButton(modifier = Modifier.size(41.dp), onClick = { /* TODO */ }) {
                         Icon(
