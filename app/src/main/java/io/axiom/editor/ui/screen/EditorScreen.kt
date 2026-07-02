@@ -1483,7 +1483,7 @@ private fun EditorActionsBar(
                 Icon(
                     imageVector = AppIcons.PlayArrow,
                     contentDescription = "启动",
-                    modifier = Modifier.size(41.dp),
+                    modifier = Modifier.size(24.dp),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
@@ -1504,7 +1504,7 @@ private fun EditorActionsBar(
                             imageVector = if (isKeyboardEnabled)
                                 AppIcons.BoltFill else AppIcons.BoltNoFill,
                             contentDescription = null,
-                            modifier = Modifier.size(41.dp),
+                            modifier = Modifier.size(24.dp),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
@@ -1513,7 +1513,7 @@ private fun EditorActionsBar(
                             imageVector = if (isKeyboardEnabled)
                                 AppIcons.BookmarkStacksFill else AppIcons.BookmarkStacksNoFill,
                             contentDescription = null,
-                            modifier = Modifier.size(41.dp),
+                            modifier = Modifier.size(24.dp),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
@@ -1528,7 +1528,7 @@ private fun EditorActionsBar(
                     imageVector = if (isKeyboardEnabled)
                         AppIcons.KeyboardHide else AppIcons.KeyboardLock,
                     contentDescription = "软键盘",
-                    modifier = Modifier.size(41.dp),
+                    modifier = Modifier.size(24.dp),
                     tint = if (isKeyboardEnabled)
                         MaterialTheme.colorScheme.primary
                     else
@@ -1540,7 +1540,7 @@ private fun EditorActionsBar(
                     Icon(
                         imageVector = AppIcons.FolderOpen,
                         contentDescription = "文件树",
-                        modifier = Modifier.size(41.dp),
+                        modifier = Modifier.size(24.dp),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
