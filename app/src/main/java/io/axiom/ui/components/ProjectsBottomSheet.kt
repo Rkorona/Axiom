@@ -18,8 +18,10 @@ import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
@@ -63,9 +65,21 @@ import io.axiom.ui.theme.AxiomVoid
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
-// Height of the always-visible peek strip (handle pill + label row)
-private val PEEK_BASE_HEIGHT = 72.dp
-private val SHEET_CORNER = 28.dp
+// ── Layout constants ──────────────────────────────────────────────────────────
+private val PEEK_BASE_HEIGHT  = 72.dp
+private val SHEET_CORNER      = 28.dp
+
+// Used to compute the expanded-sheet height from the project list size, so the
+// sheet only rises as far as needed rather than always flying to the status bar.
+private val SHEET_HANDLE_H    = 20.dp   // handle pill area (padding + pill)
+private val SHEET_PEEK_BAR_H  = 48.dp   // peek row fixed height
+private val SHEET_DIVIDER_H   = 1.dp
+private val LIST_V_PAD        = 8.dp    // LazyColumn contentPadding vertical each side
+private val LIST_HEADER_H     = 40.dp   // SectionHeader approximate height
+private val LIST_SPACING      = 8.dp    // spacedBy between items
+private val CARD_H            = 68.dp   // ProjectCard approximate height
+private val LIST_BOTTOM_SPACER = 16.dp  // trailing Spacer inside LazyColumn
+private val EMPTY_STATE_H     = 200.dp  // ProjectsEmptyState approximate height
 
 /**
  * A draggable bottom sheet that replaces the fixed [ProjectsPanel] slot.
@@ -113,7 +127,32 @@ fun ProjectsBottomSheet(
     ) {
         val fullHeightPx = with(density) { maxHeight.toPx() }
 
-        // Recalculate anchors whenever dimensions change
+        // ── Content-aware expanded anchor ─────────────────────────────────────
+        // Peek section: handle (20dp) + peek bar (48dp + navBar) + divider (1dp)
+        val peekSectionDp = SHEET_HANDLE_H + SHEET_PEEK_BAR_H +
+                navBarHeight.coerceAtLeast(8.dp) + SHEET_DIVIDER_H
+        // List / empty-state content height derived from item count
+        val rawContentDp: Dp = when {
+            projects.isEmpty() -> EMPTY_STATE_H
+            else -> {
+                val n = projects.size
+                LIST_V_PAD + LIST_HEADER_H + LIST_SPACING +
+                        n * CARD_H + (n - 1) * LIST_SPACING +
+                        LIST_BOTTOM_SPACER + LIST_V_PAD
+            }
+        }
+        // Maximum sheet height before it would overlap the status-bar gap
+        val maxSheetDp = with(density) { (fullHeightPx - minOffsetPx).toDp() }
+        val clampedContentDp = rawContentDp.coerceAtMost(maxSheetDp - peekSectionDp)
+        val maxSheetVisualDp = peekSectionDp + clampedContentDp
+
+        // Expanded anchor: sheet bottom stays at screen bottom, top sits just
+        // above the content — no wasted empty space.
+        val expandedOffset = with(density) {
+            (fullHeightPx - maxSheetVisualDp.toPx()).coerceAtLeast(minOffsetPx)
+        }
+
+        // Recalculate collapsed anchor whenever dimensions change
         LaunchedEffect(fullHeightPx, peekPx) {
             collapsedOffset = fullHeightPx - peekPx
             if (!isSearchActive) {
@@ -126,7 +165,7 @@ fun ProjectsBottomSheet(
             if (collapsedOffset == 0f) return@LaunchedEffect  // dimensions not ready yet
             if (isSearchActive) {
                 isExpanded = false
-                // Fast snap off-screen (no bounce — it should feel like it's clearing the way)
+                // Fast snap off-screen — clearing the way for the results panel
                 offsetAnim.animateTo(
                     targetValue    = collapsedOffset + peekPx,
                     animationSpec  = spring(
@@ -157,26 +196,27 @@ fun ProjectsBottomSheet(
                         scope.launch {
                             offsetAnim.snapTo(
                                 (offsetAnim.value + delta)
-                                    .coerceIn(minOffsetPx, collapsedOffset + peekPx)
+                                    .coerceIn(expandedOffset, collapsedOffset + peekPx)
                             )
                         }
                     },
                     onDragStopped = { velocity ->
                         scope.launch {
-                            val current  = offsetAnim.value
-                            // Snap threshold: 40 % of the way up OR fast upward fling
-                            val snapUp   = velocity < -600f ||
-                                    current < collapsedOffset * 0.55f
-                            val target   = if (snapUp) {
+                            val current = offsetAnim.value
+                            val travel  = collapsedOffset - expandedOffset
+                            // Snap up: fast fling OR crossed 55 % of travel distance
+                            val snapUp  = velocity < -600f ||
+                                    (travel > 0f && current < collapsedOffset - travel * 0.55f)
+                            val target  = if (snapUp) {
                                 isExpanded = true
-                                minOffsetPx
+                                expandedOffset
                             } else {
                                 isExpanded = false
                                 collapsedOffset
                             }
                             offsetAnim.animateTo(
-                                targetValue    = target,
-                                animationSpec  = spring(
+                                targetValue     = target,
+                                animationSpec   = spring(
                                     dampingRatio = Spring.DampingRatioMediumBouncy,
                                     stiffness    = Spring.StiffnessMediumLow
                                 ),
@@ -199,10 +239,14 @@ fun ProjectsBottomSheet(
                     )
             )
 
-            // ── Sheet surface ────────────────────────────────────────────────
+            // ── Sheet surface — wraps content height ─────────────────────────
+            // wrapContentHeight() + heightIn() means the background fills only
+            // what the content needs, not the entire screen.
             Column(
                 modifier = Modifier
-                    .fillMaxSize()
+                    .fillMaxWidth()
+                    .wrapContentHeight(align = Alignment.Top, unbounded = false)
+                    .heightIn(max = maxSheetVisualDp)
                     .clip(RoundedCornerShape(topStart = SHEET_CORNER, topEnd = SHEET_CORNER))
                     .background(AxiomVoid)
             ) {
@@ -211,30 +255,33 @@ fun ProjectsBottomSheet(
 
                 // Peek bar — always rendered, visible at any expansion level
                 SheetPeekBar(
-                    projects          = projects,
-                    navBarBottomPad   = navBarHeight
+                    projects        = projects,
+                    navBarBottomPad = navBarHeight
                 )
 
                 // Thin divider line
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(1.dp)
+                        .height(SHEET_DIVIDER_H)
                         .background(AxiomDusk.copy(alpha = 0.6f))
                 )
 
-                // Scrollable content — meaningful only when expanded
+                // Content area — sized to fit the project list exactly
                 Box(
                     modifier = Modifier
-                        .weight(1f)
                         .fillMaxWidth()
+                        .height(clampedContentDp)
                 ) {
                     if (projects.isEmpty()) {
                         ProjectsEmptyState(onNewProject = onNewProject)
                     } else {
                         ProjectsList(
                             projects       = projects,
-                            onProjectClick = onProjectClick
+                            onProjectClick = onProjectClick,
+                            listModifier   = Modifier
+                                .fillMaxWidth()
+                                .height(clampedContentDp)
                         )
                     }
 

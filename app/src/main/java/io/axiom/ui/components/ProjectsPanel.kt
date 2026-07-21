@@ -106,7 +106,8 @@ fun ProjectsPanel(
 @Composable
 internal fun ProjectsList(
     projects: List<Project>,
-    onProjectClick: (Project) -> Unit
+    onProjectClick: (Project) -> Unit,
+    listModifier: Modifier = Modifier.fillMaxSize()
 ) {
     // Stagger-reveal items as they load
     val revealedItems = remember(projects) { mutableStateListOf<Int>() }
@@ -124,7 +125,7 @@ internal fun ProjectsList(
     LazyColumn(
         contentPadding      = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
-        modifier            = Modifier.fillMaxSize()
+        modifier            = listModifier
     ) {
         // Section header
         item(key = "header-recent") {
