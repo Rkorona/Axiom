@@ -101,8 +101,12 @@ fun SectionHeader(
                 CountBadge(count = count, accentColor = accentColor)
             }
 
-            // Divider line
-            Spacer(Modifier.weight(if (count != null) 0f else 1f))
+            // Divider line — only need the stretching spacer when there is no
+            // count badge; when count != null the earlier Spacer(weight(1f))
+            // already consumed all free space, and weight(0f) would crash.
+            if (count == null) {
+                Spacer(Modifier.weight(1f))
+            }
             Box(
                 modifier = Modifier
                     .weight(1f)
