@@ -10,7 +10,7 @@ kotlin = "2.4.10"
 composeBom = "2026.06.01"
 material3 = "1.5.0-alpha23"
 room = "2.7.1"
-ksp = "2.4.10-1.0.31"
+ksp = "2.3.9"
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }

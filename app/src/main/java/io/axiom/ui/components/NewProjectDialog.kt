@@ -74,7 +74,7 @@ fun NewProjectDialog(
     onDismiss: () -> Unit,
     onCreate: (name: String, language: CodeLanguage) -> Unit
 ) {
-    val sheetState = rememberModalBottomSheetState(skipPartialExpansion = true)
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     var projectName by remember { mutableStateOf("") }
     var selectedLanguage by remember { mutableStateOf(CodeLanguage.UNKNOWN) }
