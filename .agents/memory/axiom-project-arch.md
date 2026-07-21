@@ -1,6 +1,6 @@
 ---
 name: Axiom project architecture
-description: Key decisions made when adding the Room data layer and project management UI to Axiom.
+description: Key decisions made when adding the Room data layer, project management UI, and the projects bottom sheet to Axiom.
 ---
 
 # Axiom — Data Layer + Project UI Architecture
@@ -25,11 +25,30 @@ description: Key decisions made when adding the Room data layer and project mana
 - `recentProjects` collected from `ProjectRepository.recentProjects(limit = 6)` Flow
 
 **Home screen state machine**
-- ① Idle: wings = project chips (`RecentProjectsWing`), bottom = `ProjectsPanel`
-- ② Search active: wings collapse, bottom = `ResultsPanel`
+- ① Idle: wings = project chips (`RecentProjectsWing`), bottom sheet collapsed (PROJECTS peek bar)
+- ② Search active: wings collapse, sheet hides off-screen, `ResultsPanel` fills the space
 - ③ In-project (future): wings = current project's files, bottom = file tree
 
-**How to apply:** Any change to home screen layout must preserve the three-state machine. The dual `AnimatedVisibility` panels (`ProjectsPanel` / `ResultsPanel`) in the same `Box` use mutually exclusive `visible` conditions to avoid overlap.
+**How to apply:** Any change to home screen layout must preserve the three-state machine. The sheet auto-hides when `focused = true`; ResultsPanel uses `Box(weight = 1f)` in the Column.
+
+**Home screen layout weights (unfocused / focused)**
+- `topWeight`: 0.65f / 0.04f — centres the command stage rather than pushing it to the lower half
+- `midWeight`: 0.35f / 0.02f
+- Bottom slot: removed — replaced by `ProjectsBottomSheet` overlay (Layer 4 in root Box)
+
+**Why weights changed:** The original 1.2f/0.6f pushed content into the lower half with empty upper space. 0.65f/0.35f centres the stage vertically.
+
+**ProjectsBottomSheet (`ui/components/ProjectsBottomSheet.kt`)**
+- Custom draggable overlay using `Animatable<Float>` + `draggable` modifier (no M3 BottomSheetScaffold)
+- Two anchors: `collapsedOffset` (peek only) and `minOffsetPx` (just below status bar)
+- Spring physics everywhere — `DampingRatioMediumBouncy / StiffnessMediumLow` for snap, `DampingRatioNoBouncy / StiffnessMedium` for search-hide
+- Velocity threshold for fling-to-expand: < −600f px/s OR position < 55% of travel distance
+- When `isSearchActive`: sheet hides below screen (collapsedOffset + peekPx), resets `isExpanded = false`
+- `BoxWithConstraints` provides `fullHeightPx`; anchors recalculated via `LaunchedEffect(fullHeightPx, peekPx)`
+
+**ProjectsPanel.kt**
+- `ProjectsList` and `ProjectsEmptyState` changed from `private` to `internal` so `ProjectsBottomSheet` can reuse them
+- `ProjectsPanel` composable itself is now unused by HomeScreen (the sheet replaced it) but kept for potential future use
 
 **Mock data**
 - `HomeViewModel.mockFiles` and `mockCommands` still in place — real file scanning is a follow-up

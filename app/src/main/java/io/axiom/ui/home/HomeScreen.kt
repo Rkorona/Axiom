@@ -56,7 +56,7 @@ import io.axiom.data.model.Project
 import io.axiom.ui.components.AnimatedBackground
 import io.axiom.ui.components.CommandBar
 import io.axiom.ui.components.NewProjectDialog
-import io.axiom.ui.components.ProjectsPanel
+import io.axiom.ui.components.ProjectsBottomSheet
 import io.axiom.ui.components.RecentFilesWing
 import io.axiom.ui.components.ResultsPanel
 import io.axiom.ui.components.WingSide
@@ -122,8 +122,10 @@ fun HomeScreen(
 
     // Animate spacer weights: spring the bar toward the top when focused so
     // the results panel fills the space between the bar and the keyboard.
+    // topWeight reduced from 1.2f → 0.65f to centre the command stage in the
+    // upper half of the screen now that the bottom slot is a draggable sheet.
     val topWeight by animateFloatAsState(
-        targetValue   = if (focused) 0.04f else 1.2f,
+        targetValue   = if (focused) 0.04f else 0.65f,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioMediumBouncy,
             stiffness    = Spring.StiffnessMediumLow
@@ -131,7 +133,7 @@ fun HomeScreen(
         label = "top-spacer-weight"
     )
     val midWeight by animateFloatAsState(
-        targetValue   = if (focused) 0.02f else 0.6f,
+        targetValue   = if (focused) 0.02f else 0.35f,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioMediumBouncy,
             stiffness    = Spring.StiffnessMediumLow
@@ -198,29 +200,14 @@ fun HomeScreen(
             // ── Mode hint row (> commands · # symbols) ────────────────────────
             ModeHints(isVisible = !focused && uiState.query.isEmpty())
 
-            // ── Bottom slot ───────────────────────────────────────────────────
-            // Weight stays constant so layout never jumps.
-            // ProjectsPanel fills this slot when idle.
-            // ResultsPanel takes over when the bar is focused + query is active.
+            // ── Results slot ──────────────────────────────────────────────────
+            // Fills the remaining column space between the bar and the keyboard.
+            // Empty and invisible while idle — the bottom sheet fills that role.
             Box(
                 modifier = Modifier
-                    .weight(1.4f)
+                    .weight(1f)
                     .fillMaxWidth()
             ) {
-                // Idle project list — visible when bar is unfocused and no query
-                ProjectsPanel(
-                    projects       = uiState.recentProjects,
-                    visible        = !focused && uiState.query.isEmpty(),
-                    onProjectClick = viewModel::onProjectClick,
-                    onNewProject   = {
-                        viewModel.onCommandClick(
-                            AppCommand(id = "new_project", title = "New Project", description = "")
-                        )
-                    },
-                    modifier       = Modifier.fillMaxSize()
-                )
-
-                // Search results — visible when bar is focused
                 ResultsPanel(
                     groupedResults = uiState.groupedResults,
                     commandMode    = uiState.commandMode,
@@ -235,6 +222,20 @@ fun HomeScreen(
                 )
             }
         }
+
+        // ── Layer 4: Projects bottom sheet ────────────────────────────────────
+        // Sits outside the inset-padded Column so it can extend into the nav bar
+        // area and manage its own padding around the handle / peek bar.
+        ProjectsBottomSheet(
+            projects       = uiState.recentProjects,
+            isSearchActive = focused,
+            onProjectClick = viewModel::onProjectClick,
+            onNewProject   = {
+                viewModel.onCommandClick(
+                    AppCommand(id = "new_project", title = "New Project", description = "")
+                )
+            }
+        )
     }
 
     // ── New Project Dialog ────────────────────────────────────────────────────

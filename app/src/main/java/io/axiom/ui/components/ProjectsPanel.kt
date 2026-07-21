@@ -104,7 +104,7 @@ fun ProjectsPanel(
 // ── Projects list ─────────────────────────────────────────────────────────────
 
 @Composable
-private fun ProjectsList(
+internal fun ProjectsList(
     projects: List<Project>,
     onProjectClick: (Project) -> Unit
 ) {
@@ -170,7 +170,7 @@ private fun ProjectsList(
 // ── Empty state ───────────────────────────────────────────────────────────────
 
 @Composable
-private fun ProjectsEmptyState(onNewProject: () -> Unit) {
+internal fun ProjectsEmptyState(onNewProject: () -> Unit) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
