@@ -10,7 +10,10 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.activity.compose.BackHandler
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -114,15 +117,42 @@ fun HomeScreen(
         label = "mid-spacer-weight"
     )
 
+    // Scrim: fades in behind content when focused to signal "focused mode" and
+    // visually communicate that the dark empty area is a tap-to-dismiss target.
+    val scrimAlpha by animateFloatAsState(
+        targetValue   = if (focused) 0.38f else 0f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioNoBouncy,
+            stiffness    = Spring.StiffnessMediumLow
+        ),
+        label = "scrim-alpha"
+    )
+
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(AxiomInk)
+            // Tap on any empty area (not consumed by a child) dismisses search.
+            // Children (result rows, command bar buttons) consume their own taps
+            // first, so this only fires in genuinely empty space.
+            .pointerInput(focused) {
+                if (focused) detectTapGestures { focusManager.clearFocus() }
+            }
     ) {
         // ── Layer 1: Animated deep-space background ───────────────────────────
         AnimatedBackground(commandMode = uiState.commandMode)
 
-        // ── Layer 2: Single column — search bar + inline results ──────────────
+        // ── Layer 2: Scrim — visual only, no pointer interception ─────────────
+        // Sits between the background and the content column so it dims the
+        // ambient glow when the user is in search mode without blocking taps to
+        // result items or the command bar.
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = scrimAlpha))
+        )
+
+        // ── Layer 3: Single column — search bar + inline results ──────────────
         // ResultsPanel lives here (not as a floating overlay) so it can never
         // overlap the bar and always fills exactly the space above the keyboard.
         Column(
