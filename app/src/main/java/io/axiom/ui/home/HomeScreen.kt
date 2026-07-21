@@ -10,6 +10,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -19,6 +20,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -33,6 +35,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
@@ -84,6 +87,13 @@ fun HomeScreen(
     viewModel: HomeViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val focusManager = LocalFocusManager.current
+
+    // Intercept back press while search is active: collapse the bar instead of
+    // exiting the app.
+    BackHandler(enabled = uiState.isCommandBarFocused) {
+        focusManager.clearFocus()
+    }
 
     BoxWithConstraints(
         modifier = Modifier
@@ -102,6 +112,7 @@ fun HomeScreen(
                 .fillMaxSize()
                 .statusBarsPadding()
                 .navigationBarsPadding()
+                .imePadding()   // shift content up when keyboard appears
         ) {
             Spacer(Modifier.weight(1.2f))
 
@@ -270,8 +281,9 @@ private fun CommandStage(
     val safeCenterWeight = (1f - safeWingWeight * 2).coerceAtLeast(0.0001f)
 
     Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier          = Modifier
+        verticalAlignment     = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),  // gap between wings and bar
+        modifier              = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp)
     ) {
