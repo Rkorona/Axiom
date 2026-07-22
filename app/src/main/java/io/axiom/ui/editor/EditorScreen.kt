@@ -169,15 +169,17 @@ fun EditorScreen(
 
             // Results panel — sits directly above the CommandBar so results slide up
             // from the bar rather than appearing at the top of the screen.
+            val resultsVisible = focused && (uiState.query.isNotEmpty() || !uiState.groupedResults.isEmpty)
             ResultsPanel(
-                groupedResults = uiState.groupedResults,
-                commandMode    = uiState.commandMode,
-                isSearching    = uiState.isSearching,
-                showEmptyState = uiState.showEmptyState,
-                visible        = focused && (uiState.query.isNotEmpty() || !uiState.groupedResults.isEmpty),
-                onFileClick    = viewModel::onFileClick,
-                onCommandClick = viewModel::onCommandClick,
-                modifier       = Modifier
+                groupedResults      = uiState.groupedResults,
+                commandMode         = uiState.commandMode,
+                isSearching         = uiState.isSearching,
+                showEmptyState      = uiState.showEmptyState,
+                visible             = resultsVisible,
+                isConnectedBarBelow = resultsVisible,
+                onFileClick         = viewModel::onFileClick,
+                onCommandClick      = viewModel::onCommandClick,
+                modifier            = Modifier
                     .fillMaxWidth()
                     .heightIn(max = 360.dp)
             )
@@ -201,17 +203,18 @@ fun EditorScreen(
                     .padding(horizontal = 16.dp, vertical = 8.dp)
             }
             CommandBar(
-                query            = uiState.query,
-                commandMode      = uiState.commandMode,
-                isExpanded       = focused,
-                placeholderIndex = uiState.placeholderIndex,
-                isSearching      = uiState.isSearching,
-                hints            = editorCommandBarHints,
-                onQueryChange    = viewModel::onQueryChange,
-                onFocusChange    = viewModel::onCommandBarFocusChange,
-                onClear          = viewModel::onClearQuery,
-                onFileTreeClick  = { showFileTree = true },
-                modifier         = cmdBarModifier
+                query                    = uiState.query,
+                commandMode              = uiState.commandMode,
+                isExpanded               = focused,
+                placeholderIndex         = uiState.placeholderIndex,
+                isSearching              = uiState.isSearching,
+                hints                    = editorCommandBarHints,
+                onQueryChange            = viewModel::onQueryChange,
+                onFocusChange            = viewModel::onCommandBarFocusChange,
+                onClear                  = viewModel::onClearQuery,
+                onFileTreeClick          = { showFileTree = true },
+                isConnectedToPanelAbove  = resultsVisible,
+                modifier                 = cmdBarModifier
             )
 
             Spacer(Modifier.navigationBarsPadding())

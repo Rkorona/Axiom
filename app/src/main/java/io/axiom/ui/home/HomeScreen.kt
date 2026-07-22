@@ -218,19 +218,17 @@ fun HomeScreen(
                     .weight(1f)
                     .fillMaxWidth()
             ) {
-                val resultsVisible = focused &&
-                                     (uiState.query.isNotEmpty() ||
-                                      !uiState.groupedResults.isEmpty)
                 ResultsPanel(
-                    groupedResults   = uiState.groupedResults,
-                    commandMode      = uiState.commandMode,
-                    isSearching      = uiState.isSearching,
-                    showEmptyState   = uiState.showEmptyState,
-                    visible          = resultsVisible,
-                    isConnectedToBar = resultsVisible,
-                    onFileClick      = { /* TODO: open file in editor */ },
-                    onCommandClick   = viewModel::onCommandClick,
-                    modifier         = Modifier.fillMaxSize()
+                    groupedResults = uiState.groupedResults,
+                    commandMode    = uiState.commandMode,
+                    isSearching    = uiState.isSearching,
+                    showEmptyState = uiState.showEmptyState,
+                    visible        = focused &&
+                                     (uiState.query.isNotEmpty() ||
+                                      !uiState.groupedResults.isEmpty),
+                    onFileClick    = { /* TODO: open file in editor */ },
+                    onCommandClick = viewModel::onCommandClick,
+                    modifier       = Modifier.fillMaxSize()
                 )
             }
         }
@@ -423,9 +421,6 @@ private fun CommandStage(
             onQueryChange    = onQueryChange,
             onFocusChange    = onFocusChange,
             onClear          = onClear,
-            hasResults       = isExpanded &&
-                               (uiState.query.isNotEmpty() ||
-                                !uiState.groupedResults.isEmpty),
             modifier         = cmdBarModifier
         )
 

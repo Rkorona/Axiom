@@ -97,11 +97,12 @@ import io.axiom.ui.theme.AxiomVoid
  * @param onFocusChange      Called when focus state changes.
  * @param hints              Cycling placeholder strings. Defaults to [commandBarHints].
  * @param onClear            Called when the ✕ button is pressed.
- * @param onFileTreeClick    When non-null, shows a folder icon button on the left that
- *                           opens the file tree. Pass null (default) to hide the button
- *                           (e.g. on the home screen where there is no project open).
- * @param hasResults         When true and expanded, the bar's bottom corners flatten so it
- *                           visually fuses with the ResultsPanel below it ("The Chute").
+ * @param onFileTreeClick         When non-null, shows a folder icon button on the left that
+ *                                opens the file tree. Pass null (default) to hide the button
+ *                                (e.g. on the home screen where there is no project open).
+ * @param isConnectedToPanelAbove When true and expanded, the bar's top corners flatten so it
+ *                                visually fuses with the ResultsPanel sitting above it in the
+ *                                editor ("The Chute" effect — panel above, bar below).
  */
 @Composable
 fun CommandBar(
@@ -115,7 +116,7 @@ fun CommandBar(
     onFocusChange: (Boolean) -> Unit,
     onClear: () -> Unit,
     onFileTreeClick: (() -> Unit)? = null,
-    hasResults: Boolean = false,
+    isConnectedToPanelAbove: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val keyboard = LocalSoftwareKeyboardController.current
@@ -137,17 +138,17 @@ fun CommandBar(
         ),
         label = "cmd-bar-corner"
     )
-    // Bottom corners flatten to 6 dp when the results panel is docked below,
+    // Top corners flatten to 6 dp when the results panel is docked above (editor layout),
     // so bar + panel share a seamless flat junction ("The Chute" effect).
-    val bottomCornerRadius by animateDpAsState(
-        targetValue   = if (isExpanded && hasResults) 6.dp
+    val topCornerRadius by animateDpAsState(
+        targetValue   = if (isExpanded && isConnectedToPanelAbove) 6.dp
                         else if (isExpanded) 20.dp
                         else 30.dp,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioMediumBouncy,
             stiffness    = Spring.StiffnessMedium
         ),
-        label = "cmd-bar-bottom-corner"
+        label = "cmd-bar-top-corner"
     )
 
     // ── Elevation ─────────────────────────────────────────────────────────────
@@ -192,10 +193,10 @@ fun CommandBar(
     )
 
     val shape = RoundedCornerShape(
-        topStart    = cornerRadius,
-        topEnd      = cornerRadius,
-        bottomStart = bottomCornerRadius,
-        bottomEnd   = bottomCornerRadius
+        topStart    = topCornerRadius,
+        topEnd      = topCornerRadius,
+        bottomStart = cornerRadius,
+        bottomEnd   = cornerRadius
     )
 
     BasicTextField(

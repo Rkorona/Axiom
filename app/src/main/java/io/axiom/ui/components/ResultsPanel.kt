@@ -73,9 +73,11 @@ import kotlinx.coroutines.delay
  * @param isSearching    Suppresses empty state while debounce is running.
  * @param showEmptyState Shows the "no results" state when true.
  * @param visible           Whether the panel should be on screen.
- * @param isConnectedToBar  When true, top corners flatten to match the bar's bottom
- *                          corners and horizontal padding aligns the panel with the bar
- *                          width, creating a seamless "chute" between bar and results.
+ * @param isConnectedToBar   HomeScreen variant: panel sits below the bar. Top corners
+ *                           flatten and horizontal padding aligns with the bar width.
+ * @param isConnectedBarBelow  EditorScreen variant: panel sits above the bar. Horizontal
+ *                             padding aligns with the bar width and a thin accent line
+ *                             appears at the panel's bottom edge ("The Chute").
  */
 @Composable
 fun ResultsPanel(
@@ -87,6 +89,7 @@ fun ResultsPanel(
     onFileClick: (FileItem) -> Unit,
     onCommandClick: (AppCommand) -> Unit,
     isConnectedToBar: Boolean = false,
+    isConnectedBarBelow: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     // Accent colour for the thin divider line that replaces the top fade when docked.
@@ -106,9 +109,10 @@ fun ResultsPanel(
         label = "results-top-corner"
     )
 
-    // Horizontal padding aligns the panel with the bar (bar Row has padding 16 dp).
+    // Horizontal padding aligns the panel width with the bar (bar has padding 16 dp).
+    // Applies for both HomeScreen (bar above) and EditorScreen (bar below) connections.
     val horizontalPadding by animateDpAsState(
-        targetValue   = if (isConnectedToBar) 16.dp else 0.dp,
+        targetValue   = if (isConnectedToBar || isConnectedBarBelow) 16.dp else 0.dp,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioMediumBouncy,
             stiffness    = Spring.StiffnessMedium
@@ -145,9 +149,9 @@ fun ResultsPanel(
                 )
                 .background(AxiomVoid)
         ) {
+            // ── Top edge treatment ────────────────────────────────────────────
             if (isConnectedToBar) {
-                // Thin accent divider instead of the frosted fade — visually
-                // "seals" the junction between bar and panel.
+                // HomeScreen: panel below bar — thin accent line seals the top junction.
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -156,7 +160,7 @@ fun ResultsPanel(
                         .align(Alignment.TopCenter)
                 )
             } else {
-                // Fade gradient at the very top of the panel for a "frosted" feel
+                // Default frosted fade at the top edge.
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -167,6 +171,18 @@ fun ResultsPanel(
                             )
                         )
                         .align(Alignment.TopCenter)
+                )
+            }
+
+            // ── Bottom edge treatment ─────────────────────────────────────────
+            if (isConnectedBarBelow) {
+                // EditorScreen: panel above bar — thin accent line seals the bottom junction.
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(1.dp)
+                        .background(accentColor.copy(alpha = 0.25f))
+                        .align(Alignment.BottomCenter)
                 )
             }
 
