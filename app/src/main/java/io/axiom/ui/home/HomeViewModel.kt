@@ -78,31 +78,14 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     )
 
     private val mockCommands = listOf(
-        // ── Project commands (shown first — most relevant on home screen) ─────
-        AppCommand("new_project",    "New Project",         "Create a new project in Axiom",                null,   CommandCategory.FILE),
-        AppCommand("open_folder",    "Open Folder",         "Import an existing folder as a project",       null,   CommandCategory.FILE),
-        // ── File commands ─────────────────────────────────────────────────────
-        AppCommand("new_file",       "New File",            "Create a new file in the current directory",   "⌘N",   CommandCategory.FILE),
-        AppCommand("new_folder",     "New Folder",          "Create a new folder",                          "⌘⇧N",  CommandCategory.FILE),
-        AppCommand("save_all",       "Save All",            "Save all unsaved changes",                     "⌘⇧S",  CommandCategory.FILE),
-        AppCommand("close_file",     "Close File",          "Close the active editor tab",                  "⌘W",   CommandCategory.FILE),
-        // ── Edit commands ─────────────────────────────────────────────────────
-        AppCommand("find_replace",   "Find & Replace",      "Search and replace across all project files",  "⌘⇧F",  CommandCategory.EDIT),
-        AppCommand("format_doc",     "Format Document",     "Run the code formatter on the current file",   "⌘⇧I",  CommandCategory.EDIT),
-        AppCommand("rename_symbol",  "Rename Symbol",       "Refactor: rename symbol under cursor",         "F2",    CommandCategory.EDIT),
-        // ── Terminal ──────────────────────────────────────────────────────────
-        AppCommand("open_terminal",  "Open Terminal",       "Open integrated terminal panel",               "⌘`",   CommandCategory.TERMINAL),
+        // ── Project ───────────────────────────────────────────────────────────
+        AppCommand("new_project",    "New Project",     "Create a new project in Axiom",               null,   CommandCategory.FILE),
+        AppCommand("open_folder",    "Open Folder",     "Import an existing folder as a project",      null,   CommandCategory.FILE),
         // ── View ──────────────────────────────────────────────────────────────
-        AppCommand("split_editor",   "Split Editor",        "Split editor horizontally or vertically",      "⌘\\",  CommandCategory.VIEW),
-        AppCommand("toggle_minimap", "Toggle Minimap",      "Show or hide the code minimap",                null,   CommandCategory.VIEW),
-        AppCommand("toggle_theme",   "Toggle Theme",        "Switch between dark and light colour scheme",  null,   CommandCategory.VIEW),
-        // ── Git ───────────────────────────────────────────────────────────────
-        AppCommand("git_status",     "Git Status",          "Show working tree status",                     null,   CommandCategory.GIT),
-        AppCommand("git_commit",     "Git Commit",          "Stage all changes and open commit dialog",     null,   CommandCategory.GIT),
-        AppCommand("git_push",       "Git Push",            "Push commits to remote",                       null,   CommandCategory.GIT),
+        AppCommand("toggle_theme",   "Toggle Theme",    "Switch between dark and light colour scheme", null,   CommandCategory.VIEW),
         // ── General ───────────────────────────────────────────────────────────
-        AppCommand("settings",       "Settings",            "Open application settings",                    "⌘,",   CommandCategory.GENERAL),
-        AppCommand("command_palette","Command Palette",     "Open this command palette",                    "⌘⇧P",  CommandCategory.GENERAL),
+        AppCommand("settings",       "Settings",        "Open application settings",                   "⌘,",   CommandCategory.GENERAL),
+        AppCommand("command_palette","Command Palette", "Open this command palette",                   "⌘⇧P",  CommandCategory.GENERAL),
     )
 
     // ── Init ───────────────────────────────────────────────────────────────────

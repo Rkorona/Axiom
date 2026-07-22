@@ -303,14 +303,29 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
         private const val SEARCH_DEBOUNCE_MS = 100L
 
         private val EDITOR_COMMANDS = listOf(
-            AppCommand("save",         "Save File",       "Save the currently open file",         null, CommandCategory.FILE),
-            AppCommand("new_file",     "New File",        "Create a new file in this project",    null, CommandCategory.FILE),
-            AppCommand("close_file",   "Close File",      "Close the active file",                null, CommandCategory.FILE),
-            AppCommand("find_replace", "Find & Replace",  "Search and replace in current file",   null, CommandCategory.EDIT),
-            AppCommand("format_doc",   "Format Document", "Run code formatter on current file",   null, CommandCategory.EDIT),
-            AppCommand("git_status",   "Git Status",      "Show working tree status",             null, CommandCategory.GIT),
-            AppCommand("git_commit",   "Git Commit",      "Stage changes and commit",             null, CommandCategory.GIT),
-            AppCommand("settings",     "Settings",        "Open application settings",            null, CommandCategory.GENERAL)
+            // ── File ──────────────────────────────────────────────────────────
+            AppCommand("save",           "Save File",        "Save the currently open file",                null, CommandCategory.FILE),
+            AppCommand("save_all",       "Save All",         "Save all unsaved changes",                    null, CommandCategory.FILE),
+            AppCommand("new_file",       "New File",         "Create a new file in this project",           null, CommandCategory.FILE),
+            AppCommand("new_folder",     "New Folder",       "Create a new folder in this project",         null, CommandCategory.FILE),
+            AppCommand("close_file",     "Close File",       "Close the active file",                       null, CommandCategory.FILE),
+            // ── Edit ──────────────────────────────────────────────────────────
+            AppCommand("find_replace",   "Find & Replace",   "Search and replace in current file",          null, CommandCategory.EDIT),
+            AppCommand("format_doc",     "Format Document",  "Run code formatter on current file",          null, CommandCategory.EDIT),
+            AppCommand("rename_symbol",  "Rename Symbol",    "Rename symbol under cursor",                  null, CommandCategory.EDIT),
+            // ── Terminal ──────────────────────────────────────────────────────
+            AppCommand("open_terminal",  "Open Terminal",    "Open integrated terminal panel",              null, CommandCategory.TERMINAL),
+            // ── View ──────────────────────────────────────────────────────────
+            AppCommand("split_editor",   "Split Editor",     "Split editor horizontally or vertically",     null, CommandCategory.VIEW),
+            AppCommand("toggle_minimap", "Toggle Minimap",   "Show or hide the code minimap",               null, CommandCategory.VIEW),
+            AppCommand("toggle_theme",   "Toggle Theme",     "Switch between dark and light colour scheme", null, CommandCategory.VIEW),
+            // ── Git ───────────────────────────────────────────────────────────
+            AppCommand("git_status",     "Git Status",       "Show working tree status",                    null, CommandCategory.GIT),
+            AppCommand("git_commit",     "Git Commit",       "Stage changes and commit",                    null, CommandCategory.GIT),
+            AppCommand("git_push",       "Git Push",         "Push commits to remote",                      null, CommandCategory.GIT),
+            // ── General ───────────────────────────────────────────────────────
+            AppCommand("settings",       "Settings",         "Open application settings",                   null, CommandCategory.GENERAL),
+            AppCommand("command_palette","Command Palette",  "Open this command palette",                   null, CommandCategory.GENERAL),
         )
     }
 }
