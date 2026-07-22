@@ -91,7 +91,7 @@ fun SoraCodeEditor(
                 // Language object (CodeEditor has no addNewlineHandler method).
                 // We subclass EmptyLanguage and override getNewlineHandlers().
                 setEditorLanguage(object : EmptyLanguage() {
-                    private val handlers = listOf(object : NewlineHandler {
+                    private val handlers = arrayOf(object : NewlineHandler {
                         override fun matchesRequirement(
                             text: Content,
                             position: CharPosition,
