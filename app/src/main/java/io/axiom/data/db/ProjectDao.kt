@@ -43,4 +43,7 @@ interface ProjectDao {
 
     @Query("UPDATE projects SET lastEditedFile = :file WHERE id = :id")
     suspend fun updateLastEditedFile(id: Long, file: String)
+
+    @Query("SELECT * FROM projects WHERE id = :id LIMIT 1")
+    suspend fun getById(id: Long): ProjectEntity?
 }

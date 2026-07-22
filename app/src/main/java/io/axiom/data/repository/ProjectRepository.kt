@@ -110,4 +110,8 @@ class ProjectRepository(private val context: Context) {
     /** Record the most recently edited file path for the project's card subtitle. */
     suspend fun updateLastEditedFile(project: Project, filePath: String) =
         dao.updateLastEditedFile(project.id, filePath)
+
+    /** Fetch a single project by its Room id. Returns null if not found. */
+    suspend fun getProjectById(id: Long): Project? =
+        withContext(Dispatchers.IO) { dao.getById(id)?.toProject() }
 }

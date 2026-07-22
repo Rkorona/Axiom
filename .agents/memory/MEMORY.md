@@ -1,1 +1,2 @@
 - [Axiom project architecture](axiom-project-arch.md) — Room + ProjectRepository data layer added; home screen has dual-panel bottom slot (ProjectsPanel idle / ResultsPanel searching)
+- [Axiom editor screen architecture](axiom-editor-arch.md) — Phase A complete: NavGraph, EditorScreen, EditorViewModel, FileTreeSheet; B2 command bar at bottom of editor

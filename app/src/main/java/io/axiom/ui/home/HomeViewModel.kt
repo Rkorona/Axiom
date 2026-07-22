@@ -33,6 +33,9 @@ import kotlinx.coroutines.launch
 sealed class HomeSideEffect {
     /** Ask the system to open a document-tree picker (SAF). */
     data object OpenFolderPicker : HomeSideEffect()
+
+    /** Navigate to the editor screen for the given project. */
+    data class NavigateToProject(val project: Project) : HomeSideEffect()
 }
 
 // ── ViewModel ─────────────────────────────────────────────────────────────────
@@ -228,11 +231,11 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    /** Stamp the project as recently opened and navigate into it (navigation TBD). */
+    /** Stamp the project as recently opened and navigate into it. */
     fun onProjectClick(project: Project) {
         viewModelScope.launch {
             repository.touchLastOpened(project)
-            // TODO: navigate to ProjectScreen
+            _sideEffects.emit(HomeSideEffect.NavigateToProject(project))
         }
     }
 

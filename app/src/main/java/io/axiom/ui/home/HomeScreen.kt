@@ -87,7 +87,8 @@ import kotlinx.coroutines.delay
  */
 @Composable
 fun HomeScreen(
-    viewModel: HomeViewModel = viewModel()
+    viewModel: HomeViewModel = viewModel(),
+    onNavigateToProject: (Project) -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val focusManager = LocalFocusManager.current
@@ -109,7 +110,8 @@ fun HomeScreen(
     LaunchedEffect(Unit) {
         viewModel.sideEffects.collect { effect ->
             when (effect) {
-                HomeSideEffect.OpenFolderPicker -> folderPickerLauncher.launch(null)
+                HomeSideEffect.OpenFolderPicker          -> folderPickerLauncher.launch(null)
+                is HomeSideEffect.NavigateToProject      -> onNavigateToProject(effect.project)
             }
         }
     }

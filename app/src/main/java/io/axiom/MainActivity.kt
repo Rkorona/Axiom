@@ -4,7 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import io.axiom.ui.home.HomeScreen
+import io.axiom.ui.navigation.AxiomNavGraph
 import io.axiom.ui.theme.AxiomTheme
 
 /**
@@ -20,7 +20,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             AxiomTheme {
-                HomeScreen()
+                AxiomNavGraph()
             }
         }
     }

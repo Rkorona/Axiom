@@ -1,6 +1,8 @@
 package io.axiom.data.util
 
 import io.axiom.data.model.CodeLanguage
+import io.axiom.data.model.FileItem
+import io.axiom.data.model.toCodeLanguage
 import java.io.File
 
 /**
@@ -67,6 +69,47 @@ object FileSystemUtils {
             .ifBlank { "project_${System.currentTimeMillis()}" }
         val projectDir = File(baseDir, sanitized)
         return if (projectDir.mkdirs() || projectDir.exists()) projectDir else null
+    }
+
+    /**
+     * Recursively scan a project directory and return a flat list of [FileItem]s.
+     *
+     * Skips hidden files, `node_modules`, `build`, `.gradle`, `.git`, `__pycache__`,
+     * and `target` directories to avoid polluting the tree with generated artefacts.
+     *
+     * @param rootPath Absolute path to the project root.
+     * @param maxFiles Safety cap to avoid walking enormous monorepos.
+     */
+    fun scanFiles(rootPath: String, maxFiles: Int = 300): List<FileItem> {
+        val root = File(rootPath)
+        if (!root.exists() || !root.isDirectory) return emptyList()
+
+        val skipDirs = setOf(
+            "node_modules", "build", ".gradle", ".git",
+            "__pycache__", "target", ".idea", ".dart_tool", ".pub-cache"
+        )
+
+        return root.walkTopDown()
+            .onEnter { dir ->
+                !dir.name.startsWith(".") && dir.name !in skipDirs
+            }
+            .filter { it.isFile && !it.name.startsWith(".") }
+            .take(maxFiles)
+            .mapIndexed { index, file ->
+                val relativePath = file.relativeTo(root).parentFile?.path ?: ""
+                val ext = file.extension.lowercase()
+                FileItem(
+                    id           = index.toString(),
+                    name         = file.name,
+                    path         = if (relativePath.isEmpty()) "" else "$relativePath/",
+                    extension    = ext,
+                    lastModified = file.lastModified(),
+                    size         = file.length(),
+                    language     = ext.toCodeLanguage()
+                )
+            }
+            .sortedWith(compareBy({ it.path }, { it.name }))
+            .toList()
     }
 
     /**

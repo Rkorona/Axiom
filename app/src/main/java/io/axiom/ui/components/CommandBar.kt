@@ -93,6 +93,7 @@ import io.axiom.ui.theme.AxiomVoid
  * @param isSearching        Shows a loading indicator while results stream in.
  * @param onQueryChange      Called on every keystroke.
  * @param onFocusChange      Called when focus state changes.
+ * @param hints              Cycling placeholder strings. Defaults to [commandBarHints].
  * @param onClear            Called when the ✕ button is pressed.
  */
 @Composable
@@ -102,6 +103,7 @@ fun CommandBar(
     isExpanded: Boolean,
     placeholderIndex: Int,
     isSearching: Boolean,
+    hints: List<String> = commandBarHints,
     onQueryChange: (String) -> Unit,
     onFocusChange: (Boolean) -> Unit,
     onClear: () -> Unit,
@@ -254,7 +256,7 @@ fun CommandBar(
                             label = "placeholder-cycle"
                         ) { index ->
                             Text(
-                                text  = commandBarHints.getOrElse(index) { commandBarHints[0] },
+                                text  = hints.getOrElse(index) { hints.getOrNull(0) ?: "" },
                                 style = MaterialTheme.typography.bodyLarge.copy(
                                     color      = AxiomTextDisabled,
                                     fontFamily = FontFamily.Monospace,
