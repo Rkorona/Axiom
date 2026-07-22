@@ -100,6 +100,8 @@ import io.axiom.ui.theme.AxiomVoid
  * @param onFileTreeClick    When non-null, shows a folder icon button on the left that
  *                           opens the file tree. Pass null (default) to hide the button
  *                           (e.g. on the home screen where there is no project open).
+ * @param hasResults         When true and expanded, the bar's bottom corners flatten so it
+ *                           visually fuses with the ResultsPanel below it ("The Chute").
  */
 @Composable
 fun CommandBar(
@@ -113,6 +115,7 @@ fun CommandBar(
     onFocusChange: (Boolean) -> Unit,
     onClear: () -> Unit,
     onFileTreeClick: (() -> Unit)? = null,
+    hasResults: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val keyboard = LocalSoftwareKeyboardController.current
@@ -133,6 +136,18 @@ fun CommandBar(
             stiffness    = Spring.StiffnessMedium
         ),
         label = "cmd-bar-corner"
+    )
+    // Bottom corners flatten to 6 dp when the results panel is docked below,
+    // so bar + panel share a seamless flat junction ("The Chute" effect).
+    val bottomCornerRadius by animateDpAsState(
+        targetValue   = if (isExpanded && hasResults) 6.dp
+                        else if (isExpanded) 20.dp
+                        else 30.dp,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness    = Spring.StiffnessMedium
+        ),
+        label = "cmd-bar-bottom-corner"
     )
 
     // ── Elevation ─────────────────────────────────────────────────────────────
@@ -176,7 +191,12 @@ fun CommandBar(
         label = "cmd-bar-entry-scale"
     )
 
-    val shape = RoundedCornerShape(cornerRadius)
+    val shape = RoundedCornerShape(
+        topStart    = cornerRadius,
+        topEnd      = cornerRadius,
+        bottomStart = bottomCornerRadius,
+        bottomEnd   = bottomCornerRadius
+    )
 
     BasicTextField(
         value           = query,

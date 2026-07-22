@@ -2,6 +2,7 @@ package io.axiom.ui.components
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -71,7 +72,10 @@ import kotlinx.coroutines.delay
  * @param commandMode    Current mode — controls section accent colours.
  * @param isSearching    Suppresses empty state while debounce is running.
  * @param showEmptyState Shows the "no results" state when true.
- * @param visible        Whether the panel should be on screen.
+ * @param visible           Whether the panel should be on screen.
+ * @param isConnectedToBar  When true, top corners flatten to match the bar's bottom
+ *                          corners and horizontal padding aligns the panel with the bar
+ *                          width, creating a seamless "chute" between bar and results.
  */
 @Composable
 fun ResultsPanel(
@@ -82,8 +86,36 @@ fun ResultsPanel(
     visible: Boolean,
     onFileClick: (FileItem) -> Unit,
     onCommandClick: (AppCommand) -> Unit,
+    isConnectedToBar: Boolean = false,
     modifier: Modifier = Modifier
 ) {
+    // Accent colour for the thin divider line that replaces the top fade when docked.
+    val accentColor = when (commandMode) {
+        CommandMode.FILE    -> AxiomFileModeColor
+        CommandMode.COMMAND -> AxiomCommandModeColor
+        CommandMode.SYMBOL  -> AxiomSymbolModeColor
+    }
+
+    // Top corners flatten to 6 dp when docked, matching the bar's bottom corners.
+    val topCornerRadius by animateDpAsState(
+        targetValue   = if (isConnectedToBar) 6.dp else 28.dp,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness    = Spring.StiffnessMedium
+        ),
+        label = "results-top-corner"
+    )
+
+    // Horizontal padding aligns the panel with the bar (bar Row has padding 16 dp).
+    val horizontalPadding by animateDpAsState(
+        targetValue   = if (isConnectedToBar) 16.dp else 0.dp,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness    = Spring.StiffnessMedium
+        ),
+        label = "results-h-padding"
+    )
+
     AnimatedVisibility(
         visible = visible,
         enter   = slideInVertically(
@@ -102,21 +134,41 @@ fun ResultsPanel(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
+                .padding(horizontal = horizontalPadding)
+                .clip(
+                    RoundedCornerShape(
+                        topStart    = topCornerRadius,
+                        topEnd      = topCornerRadius,
+                        bottomStart = 0.dp,
+                        bottomEnd   = 0.dp
+                    )
+                )
                 .background(AxiomVoid)
         ) {
-            // Fade gradient at the very top of the panel for a "frosted" feel
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(28.dp)
-                    .background(
-                        Brush.verticalGradient(
-                            listOf(AxiomVoid, AxiomVoid.copy(alpha = 0f))
+            if (isConnectedToBar) {
+                // Thin accent divider instead of the frosted fade — visually
+                // "seals" the junction between bar and panel.
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(1.dp)
+                        .background(accentColor.copy(alpha = 0.25f))
+                        .align(Alignment.TopCenter)
+                )
+            } else {
+                // Fade gradient at the very top of the panel for a "frosted" feel
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(28.dp)
+                        .background(
+                            Brush.verticalGradient(
+                                listOf(AxiomVoid, AxiomVoid.copy(alpha = 0f))
+                            )
                         )
-                    )
-                    .align(Alignment.TopCenter)
-            )
+                        .align(Alignment.TopCenter)
+                )
+            }
 
             if (showEmptyState && !isSearching) {
                 EmptyResultsState()
