@@ -181,7 +181,7 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
 
         return when (mode) {
             CommandMode.FILE -> _uiState.value.files
-                .filter { it.name.contains(q, ignoreCase = true) || it.path.contains(q, ignoreCase = true) }
+                .filter { !it.isDirectory && (it.name.contains(q, ignoreCase = true) || it.path.contains(q, ignoreCase = true)) }
                 .take(12)
                 .map { SearchResult.FileResult(it) }
 
@@ -232,12 +232,12 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
                     val size  = if (c.isNull(3)) 0L else c.getLong(3)
                     val mod   = if (c.isNull(4)) 0L else c.getLong(4)
 
-                    // Skip directories and hidden files
-                    if (mime == DocumentsContract.Document.MIME_TYPE_DIR) continue
+                    // Skip hidden files; include directories
                     if (name.startsWith(".")) continue
 
+                    val isDir  = mime == DocumentsContract.Document.MIME_TYPE_DIR
                     val docUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, docId)
-                    val ext    = name.substringAfterLast('.', "").lowercase()
+                    val ext    = if (isDir) "" else name.substringAfterLast('.', "").lowercase()
                     items.add(
                         FileItem(
                             id           = index.toString(),
@@ -245,14 +245,16 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
                             path         = docUri.toString(), // URI stored as path for SAF reads
                             extension    = ext,
                             lastModified = mod,
-                            size         = size,
-                            language     = ext.toCodeLanguage()
+                            size         = if (isDir) 0L else size,
+                            language     = if (isDir) CodeLanguage.UNKNOWN else ext.toCodeLanguage(),
+                            isDirectory  = isDir
                         )
                     )
                     index++
                 }
             }
-            items.sortedBy { it.name }
+            // Folders first, then files, each group alphabetical
+            items.sortedWith(compareBy({ !it.isDirectory }, { it.name }))
         } catch (e: Exception) {
             emptyList()
         }

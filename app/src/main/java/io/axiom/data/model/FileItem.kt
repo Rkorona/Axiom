@@ -11,7 +11,8 @@ data class FileItem(
     val lastModified: Long = System.currentTimeMillis(),
     val size: Long = 0L,
     val isPinned: Boolean = false,
-    val language: CodeLanguage = CodeLanguage.UNKNOWN
+    val language: CodeLanguage = CodeLanguage.UNKNOWN,
+    val isDirectory: Boolean = false
 )
 
 /**

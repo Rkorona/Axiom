@@ -177,7 +177,11 @@ fun EditorScreen(
                 showEmptyState      = uiState.showEmptyState,
                 visible             = resultsVisible,
                 isConnectedBarBelow = resultsVisible,
-                onFileClick         = viewModel::onFileClick,
+                onFileClick         = { file ->
+                    viewModel.onFileClick(file)
+                    viewModel.onClearQuery()
+                    focusManager.clearFocus()
+                },
                 onCommandClick      = viewModel::onCommandClick,
                 modifier            = Modifier
                     .fillMaxWidth()

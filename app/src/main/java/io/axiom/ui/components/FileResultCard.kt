@@ -131,7 +131,8 @@ fun FileResultCard(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                if (file.path.isNotBlank()) {
+                // Don't display raw SAF content:// URIs — they're internal identifiers, not paths
+                if (file.path.isNotBlank() && !file.path.startsWith("content://")) {
                     Spacer(Modifier.height(2.dp))
                     Text(
                         text     = file.path,

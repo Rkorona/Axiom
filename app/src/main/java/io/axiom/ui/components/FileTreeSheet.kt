@@ -35,6 +35,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.material.icons.rounded.Folder
 import io.axiom.data.model.FileItem
 import io.axiom.ui.theme.AxiomDusk
 import io.axiom.ui.theme.AxiomMist
@@ -108,7 +109,7 @@ fun FileTreeModalSheet(
                 )
             )
             Spacer(Modifier.weight(1f))
-            // Count badge
+            // Count badge — files only, exclude directories
             Box(
                 contentAlignment = Alignment.Center,
                 modifier         = Modifier
@@ -117,7 +118,7 @@ fun FileTreeModalSheet(
                     .padding(horizontal = 8.dp, vertical = 3.dp)
             ) {
                 Text(
-                    text  = files.size.toString(),
+                    text  = files.count { !it.isDirectory }.toString(),
                     style = MaterialTheme.typography.labelSmall.copy(
                         color      = AxiomTextDisabled,
                         fontFamily = FontFamily.Monospace,
@@ -164,14 +165,18 @@ fun FileTreeModalSheet(
                             }
                         }
                         itemsIndexed(dirFiles, key = { _, f -> f.id }) { _, file ->
-                            FileTreeRow(
-                                file     = file,
-                                isActive = file.id == openFile?.id,
-                                onClick  = {
-                                    onFileClick(file)
-                                    onDismiss()
-                                }
-                            )
+                            if (file.isDirectory) {
+                                FolderTreeRow(name = file.name)
+                            } else {
+                                FileTreeRow(
+                                    file     = file,
+                                    isActive = file.id == openFile?.id,
+                                    onClick  = {
+                                        onFileClick(file)
+                                        onDismiss()
+                                    }
+                                )
+                            }
                         }
                     }
                 }
@@ -191,9 +196,16 @@ fun FileTreeModalSheet(
 
 // ── Grouped file map ──────────────────────────────────────────────────────────
 
-/** Groups files by their [FileItem.path] directory. Preserves insertion order. */
+/**
+ * Groups files by their [FileItem.path] directory. Preserves insertion order.
+ * SAF files carry a full content:// URI in [FileItem.path] — normalize those to
+ * an empty string so they all land in a single root group without a URI header.
+ */
 private fun groupByDirectory(files: List<FileItem>): Map<String, List<FileItem>> =
-    files.groupByTo(LinkedHashMap()) { it.path.trimEnd('/') }
+    files.groupByTo(LinkedHashMap()) { file ->
+        val p = file.path.trimEnd('/')
+        if (p.startsWith("content://")) "" else p
+    }
 
 // ── Sub-composables ───────────────────────────────────────────────────────────
 
@@ -296,6 +308,35 @@ private fun FileTreeRow(
                     .background(AxiomViolet)
             )
         }
+    }
+}
+
+@Composable
+private fun FolderTreeRow(name: String) {
+    Row(
+        verticalAlignment     = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        modifier              = Modifier
+            .fillMaxWidth()
+            .height(FILE_ITEM_H)
+            .padding(horizontal = 20.dp)
+    ) {
+        Icon(
+            imageVector        = Icons.Rounded.Folder,
+            contentDescription = null,
+            tint               = AxiomViolet.copy(alpha = 0.65f),
+            modifier           = Modifier.size(15.dp)
+        )
+        Text(
+            text     = name,
+            style    = MaterialTheme.typography.bodyMedium.copy(
+                color      = AxiomTextSecondary,
+                fontFamily = FontFamily.Monospace,
+                fontSize   = 13.sp
+            ),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }
 
