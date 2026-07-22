@@ -9,8 +9,13 @@ description: How sora-editor (CodeEditor) is wired into the Axiom editor screen,
 `io.github.Rosemoe.sora-editor:editor:0.23.4` — core only (no language-textmate yet).
 
 ## Files
-- `app/src/main/java/io/axiom/ui/editor/SoraCodeEditor.kt` — Compose wrapper via `AndroidView`
-- `app/src/main/java/io/axiom/ui/editor/AxiomEditorColorScheme.kt` — custom `EditorColorScheme` subclass matching Axiom palette
+- `app/src/main/java/io/axiom/ui/editor/SoraCodeEditor.kt` — Compose wrapper via `AndroidView`; includes `NewlineHandler` for auto-indent
+- `app/src/main/java/io/axiom/ui/editor/AxiomEditorColorScheme.kt` — extends `SchemeDarcula` (not `EditorColorScheme`) for dark scrollbars/popups by default
+
+## Critical: extend SchemeDarcula, NOT EditorColorScheme
+`EditorColorScheme.applyDefault()` is a LIGHT theme. Extending it and only overriding background/text leaves scrollbars, edge effects and auto-complete popups white — very visible against a dark editor.
+**Why:** `SchemeDarcula.applyDefault()` sets all unoverridden colours to a dark baseline, so scrollbars and popups are dark without needing explicit overrides for every internal colour constant.
+**How to apply:** Always extend a dark built-in scheme (`SchemeDarcula`) and override only the Axiom-specific accents on top.
 
 ## Key design decisions
 

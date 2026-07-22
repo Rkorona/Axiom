@@ -1,6 +1,7 @@
 package io.axiom.ui.editor
 
 import android.graphics.Typeface
+import android.view.View
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -11,6 +12,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
 import io.axiom.data.model.CodeLanguage
 import io.github.rosemoe.sora.event.ContentChangeEvent
+import io.github.rosemoe.sora.lang.smartEnter.HandleResult
+import io.github.rosemoe.sora.lang.smartEnter.NewlineHandler
+import io.github.rosemoe.sora.text.ContentReference
+import io.github.rosemoe.sora.text.Cursor
 import io.github.rosemoe.sora.widget.CodeEditor
 
 /**
@@ -30,8 +35,13 @@ import io.github.rosemoe.sora.widget.CodeEditor
  *  - Currently uses [io.github.rosemoe.sora.langs.EmptyLanguage] (no highlighting).
  *  - The [language] parameter is accepted so callers don't need to change their
  *    call-site when TextMate grammar support is wired up later.
- *  - [AxiomEditorColorScheme] is applied so all syntax token colours are ready
- *    the moment a real language is attached.
+ *  - [AxiomEditorColorScheme] (extends SchemeDarcula) is applied so all colours —
+ *    including scrollbars and popups — are dark by default.
+ *
+ * Auto-indent:
+ *  - A [NewlineHandler] copies the current line's leading whitespace on every Enter.
+ *  - An extra indent level is added automatically after lines ending with
+ *    `{`, `(`, `[`, or `:`.
  */
 @Composable
 fun SoraCodeEditor(
@@ -53,22 +63,55 @@ fun SoraCodeEditor(
             CodeEditor(context).apply {
 
                 // ── Theme ──────────────────────────────────────────────────────
+                // SchemeDarcula base ensures scrollbars, popups and all
+                // unoverridden colours are dark — no more white bars.
                 colorScheme = AxiomEditorColorScheme()
 
                 // ── Typography ─────────────────────────────────────────────────
                 typefaceText = Typeface.MONOSPACE
-                setTextSize(13f)  // sp — matches the old BasicTextField size
+                setTextSize(13f)
+                tabWidth = 4
 
                 // ── Layout behaviour ───────────────────────────────────────────
-                isWordwrap = false              // horizontal scroll for long lines
+                isWordwrap = false
                 isLineNumberEnabled = true
-
-                // Hide whitespace dots/arrows — cleaner for reading code
                 nonPrintablePaintingFlags = 0
 
+                // ── Scrollbars ─────────────────────────────────────────────────
+                // Disable Android View's own scroll indicators; sora-editor draws
+                // its own which are already dark via SchemeDarcula.
+                isVerticalScrollBarEnabled = false
+                isHorizontalScrollBarEnabled = false
+                overScrollMode = View.OVER_SCROLL_NEVER
+
+                // ── Auto-indent ────────────────────────────────────────────────
+                // Copies the previous line's leading whitespace on Enter, and
+                // adds one extra tab level after block-opening characters.
+                addNewlineHandler(object : NewlineHandler {
+                    override fun matchesRequirement(
+                        text: ContentReference,
+                        cursor: Cursor
+                    ): Boolean = true
+
+                    override fun handleNewline(
+                        text: ContentReference,
+                        cursor: Cursor,
+                        tabSize: Int
+                    ): HandleResult {
+                        val line    = text.getLine(cursor.leftLine).toString()
+                        val indent  = line.takeWhile { it == ' ' || it == '\t' }
+                        val trimmed = line.trimEnd()
+                        val extra   = if (trimmed.endsWith("{") ||
+                                          trimmed.endsWith("(") ||
+                                          trimmed.endsWith("[") ||
+                                          (trimmed.endsWith(":") && !trimmed.contains("//"))) {
+                            " ".repeat(tabSize)
+                        } else ""
+                        return HandleResult("\n$indent$extra", 0)
+                    }
+                })
+
                 // ── Content change → ViewModel ─────────────────────────────────
-                // Fires on every character insert/delete so the ViewModel always
-                // holds a current snapshot and can mark the file dirty.
                 subscribeEvent(ContentChangeEvent::class.java) { _, _ ->
                     onChangeState.value(text.toString())
                 }
@@ -79,14 +122,12 @@ fun SoraCodeEditor(
             if (fileKey != lastLoadedKey) {
                 lastLoadedKey = fileKey
                 editor.setText(content)
-                // Reset cursor to the top of the new file.
                 if (editor.lineCount > 0) {
                     editor.setSelection(0, 0)
                 }
             }
         },
         onRelease = { editor ->
-            // Free native resources when the composable leaves the composition.
             editor.release()
         },
         modifier = modifier
