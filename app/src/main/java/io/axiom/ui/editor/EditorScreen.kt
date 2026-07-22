@@ -26,11 +26,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowBackIosNew
 import androidx.compose.material.icons.rounded.Save
@@ -50,7 +46,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.TextStyle
@@ -159,9 +154,12 @@ fun EditorScreen(
             Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
                 when {
                     uiState.isLoadingContent -> LoadingOverlay()
-                    uiState.openFile != null -> EditorSurface(
+                    uiState.openFile != null -> SoraCodeEditor(
                         content         = uiState.fileContent,
-                        onContentChange = viewModel::onContentChange
+                        fileKey         = "${uiState.openFile!!.path}${uiState.openFile!!.name}",
+                        language        = uiState.openFile!!.language,
+                        onContentChange = viewModel::onContentChange,
+                        modifier        = Modifier.fillMaxSize()
                     )
                     else                     -> EditorEmptyState(isLoadingFiles = uiState.isLoadingFiles)
                 }
@@ -349,40 +347,6 @@ private fun EditorTopBar(
             .height(1.dp)
             .background(AxiomDusk.copy(alpha = 0.5f))
     )
-}
-
-// ── Editor surface ────────────────────────────────────────────────────────────
-
-@Composable
-private fun EditorSurface(
-    content: String,
-    onContentChange: (String) -> Unit
-) {
-    val scrollState = rememberScrollState()
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(scrollState)
-    ) {
-        BasicTextField(
-            value         = content,
-            onValueChange = onContentChange,
-            modifier      = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 16.dp),
-            textStyle     = TextStyle(
-                color        = AxiomTextPrimary,
-                fontFamily   = FontFamily.Monospace,
-                fontSize     = 13.sp,
-                lineHeight   = 22.sp,
-                letterSpacing = 0.sp
-            ),
-            cursorBrush   = SolidColor(AxiomViolet),
-            maxLines      = Int.MAX_VALUE,
-            decorationBox = { innerTextField -> innerTextField() }
-        )
-    }
 }
 
 // ── Loading / empty states ────────────────────────────────────────────────────

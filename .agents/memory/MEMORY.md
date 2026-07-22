@@ -1,2 +1,3 @@
 - [Axiom project architecture](axiom-project-arch.md) — Room + ProjectRepository data layer added; home screen has dual-panel bottom slot (ProjectsPanel idle / ResultsPanel searching)
 - [Axiom editor screen architecture](axiom-editor-arch.md) — Phase A complete: NavGraph, EditorScreen, EditorViewModel, FileTreeSheet; file tree redesigned as ModalBottomSheet triggered by folder icon in CommandBar
+- [sora-editor integration](sora-editor-integration.md) — BasicTextField replaced with CodeEditor (v0.23.4) via AndroidView; filePath key prevents re-seeding on recomposition; TextMate syntax highlighting deferred
