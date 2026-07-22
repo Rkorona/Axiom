@@ -17,7 +17,10 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.FolderOpen
+import androidx.compose.material.icons.rounded.KeyboardArrowDown
+import androidx.compose.material.icons.rounded.KeyboardArrowRight
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -25,6 +28,10 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -35,7 +42,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.material.icons.rounded.Folder
 import io.axiom.data.model.FileItem
 import io.axiom.ui.theme.AxiomDusk
 import io.axiom.ui.theme.AxiomMist
@@ -49,19 +55,20 @@ import io.axiom.ui.theme.AxiomVoid
 // ── Layout constants ──────────────────────────────────────────────────────────
 
 private val FILE_ITEM_H    = 52.dp
-private val DIR_HEADER_H   = 36.dp
 private val TREE_V_PADDING = 12.dp
 private val MAX_VISIBLE_H  = 480.dp
+private val INDENT_PER_DEPTH = 16.dp
 
 /**
  * A standard [ModalBottomSheet] that shows the project file tree.
  *
- * Replaces the previous custom draggable peek-sheet to eliminate the
- * WindowInsets timing race and the layout conflict with the CommandBar.
+ * For SAF (external) projects, items carry [FileItem.parentPath] and [FileItem.depth]
+ * enabling an expandable tree: tapping a folder row expands/collapses its children.
+ * For internal projects the list is flat (all items have depth 0).
  *
- * @param files       Flat list of [FileItem]s from the project scan.
+ * @param files       Full item list from the project scan (depth-first order for SAF).
  * @param openFile    Currently active file (highlighted in the list).
- * @param onDismiss   Called when the sheet is dismissed (back press, drag, scrim tap).
+ * @param onDismiss   Called when the sheet is dismissed.
  * @param onFileClick Called when the user taps a file row.
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -74,15 +81,27 @@ fun FileTreeModalSheet(
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    ModalBottomSheet(
-        onDismissRequest    = onDismiss,
-        sheetState          = sheetState,
-        containerColor      = AxiomVoid,
-        scrimColor          = Color.Black.copy(alpha = 0.45f),
-        dragHandle          = { FileTreeHandle() }
-    ) {
-        val grouped = groupByDirectory(files)
+    // Tracks which folder paths are currently expanded.
+    var expandedFolders by remember { mutableStateOf(emptySet<String>()) }
 
+    // Determine whether any item has parentPath set — i.e. this is a SAF tree scan.
+    val isTreeMode = files.any { it.parentPath.isNotEmpty() || it.isDirectory }
+
+    // In tree mode, show only root items plus items whose parent chain is fully expanded.
+    // In flat mode (internal projects) show all items as before.
+    val visibleItems = if (isTreeMode) {
+        treeVisibleItems(files, expandedFolders)
+    } else {
+        files
+    }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState       = sheetState,
+        containerColor   = AxiomVoid,
+        scrimColor       = Color.Black.copy(alpha = 0.45f),
+        dragHandle       = { FileTreeHandle() }
+    ) {
         // ── Sheet header ──────────────────────────────────────────────────────
         Row(
             verticalAlignment     = Alignment.CenterVertically,
@@ -137,13 +156,8 @@ fun FileTreeModalSheet(
         )
 
         // ── File list ─────────────────────────────────────────────────────────
-        val rawContentDp = run {
-            val dirHeaders = grouped.keys.size * DIR_HEADER_H.value
-            val fileRows   = files.size * FILE_ITEM_H.value
-            val padding    = TREE_V_PADDING.value * 2
-            dirHeaders + fileRows + padding
-        }
-        val clampedContentDp = rawContentDp.coerceAtMost(MAX_VISIBLE_H.value).dp
+        val clampedContentDp = (visibleItems.size * FILE_ITEM_H.value + TREE_V_PADDING.value * 2)
+            .coerceAtMost(MAX_VISIBLE_H.value).dp
 
         Box(
             modifier = Modifier
@@ -158,25 +172,32 @@ fun FileTreeModalSheet(
                         .fillMaxWidth()
                         .height(clampedContentDp)
                 ) {
-                    grouped.forEach { (dir, dirFiles) ->
-                        if (grouped.size > 1 || dir.isNotEmpty()) {
-                            item(key = "dir_$dir") {
-                                DirectoryHeader(path = dir)
-                            }
-                        }
-                        itemsIndexed(dirFiles, key = { _, f -> f.id }) { _, file ->
-                            if (file.isDirectory) {
-                                FolderTreeRow(name = file.name)
-                            } else {
-                                FileTreeRow(
-                                    file     = file,
-                                    isActive = file.id == openFile?.id,
-                                    onClick  = {
-                                        onFileClick(file)
-                                        onDismiss()
+                    itemsIndexed(visibleItems, key = { _, f -> f.id }) { _, item ->
+                        if (item.isDirectory) {
+                            val isExpanded = item.path in expandedFolders
+                            FolderTreeRow(
+                                name       = item.name,
+                                depth      = item.depth,
+                                isExpanded = isExpanded,
+                                onClick    = {
+                                    expandedFolders = if (isExpanded) {
+                                        // Collapse this folder and all its descendants
+                                        expandedFolders - collapseSubtree(item, expandedFolders)
+                                    } else {
+                                        expandedFolders + item.path
                                     }
-                                )
-                            }
+                                }
+                            )
+                        } else {
+                            FileTreeRow(
+                                file     = item,
+                                isActive = item.id == openFile?.id,
+                                depth    = item.depth,
+                                onClick  = {
+                                    onFileClick(item)
+                                    onDismiss()
+                                }
+                            )
                         }
                     }
                 }
@@ -194,18 +215,40 @@ fun FileTreeModalSheet(
     }
 }
 
-// ── Grouped file map ──────────────────────────────────────────────────────────
+// ── Tree visibility helpers ────────────────────────────────────────────────────
 
 /**
- * Groups files by their [FileItem.path] directory. Preserves insertion order.
- * SAF files carry a full content:// URI in [FileItem.path] — normalize those to
- * an empty string so they all land in a single root group without a URI header.
+ * Returns the subset of [files] that should be visible given [expandedFolders].
+ * An item is visible when every ancestor folder in its parent chain is expanded.
+ * Root items (parentPath == "") are always visible.
  */
-private fun groupByDirectory(files: List<FileItem>): Map<String, List<FileItem>> =
-    files.groupByTo(LinkedHashMap()) { file ->
-        val p = file.path.trimEnd('/')
-        if (p.startsWith("content://")) "" else p
+private fun treeVisibleItems(
+    files: List<FileItem>,
+    expandedFolders: Set<String>
+): List<FileItem> {
+    // Build a lookup map from path → item for fast parent resolution.
+    val byPath = files.associateBy { it.path }
+
+    return files.filter { item ->
+        var parentPath = item.parentPath
+        while (parentPath.isNotEmpty()) {
+            if (parentPath !in expandedFolders) return@filter false
+            parentPath = byPath[parentPath]?.parentPath ?: ""
+        }
+        true
     }
+}
+
+/**
+ * Returns the set of folder paths to remove when collapsing [folder]:
+ * the folder itself plus every expanded descendant folder.
+ */
+private fun collapseSubtree(folder: FileItem, expandedFolders: Set<String>): Set<String> {
+    val toCollapse = mutableSetOf(folder.path)
+    // Any expanded folder whose path starts with this folder's path (descendants).
+    expandedFolders.filterTo(toCollapse) { it.startsWith(folder.path) }
+    return toCollapse
+}
 
 // ── Sub-composables ───────────────────────────────────────────────────────────
 
@@ -227,25 +270,46 @@ private fun FileTreeHandle() {
 }
 
 @Composable
-private fun DirectoryHeader(path: String) {
-    val displayPath = path.ifEmpty { "root" }
+private fun FolderTreeRow(
+    name: String,
+    depth: Int,
+    isExpanded: Boolean,
+    onClick: () -> Unit
+) {
+    val startPad = (20 + depth * INDENT_PER_DEPTH.value).dp
     Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier          = Modifier
+        verticalAlignment     = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier              = Modifier
             .fillMaxWidth()
-            .height(DIR_HEADER_H)
-            .padding(horizontal = 20.dp)
+            .height(FILE_ITEM_H)
+            .clickable(onClick = onClick)
+            .padding(start = startPad, end = 20.dp)
     ) {
+        Icon(
+            imageVector        = if (isExpanded) Icons.Rounded.FolderOpen else Icons.Rounded.Folder,
+            contentDescription = null,
+            tint               = AxiomViolet.copy(alpha = if (isExpanded) 0.9f else 0.65f),
+            modifier           = Modifier.size(15.dp)
+        )
         Text(
-            text     = displayPath,
-            style    = MaterialTheme.typography.labelSmall.copy(
-                color         = AxiomTextDisabled,
-                fontFamily    = FontFamily.Monospace,
-                fontSize      = 10.sp,
-                letterSpacing = 0.5.sp
+            text     = name,
+            style    = MaterialTheme.typography.bodyMedium.copy(
+                color      = if (isExpanded) AxiomViolet.copy(alpha = 0.9f) else AxiomTextSecondary,
+                fontFamily = FontFamily.Monospace,
+                fontWeight = if (isExpanded) FontWeight.Medium else FontWeight.Normal,
+                fontSize   = 13.sp
             ),
             maxLines = 1,
-            overflow = TextOverflow.Ellipsis
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f)
+        )
+        Icon(
+            imageVector        = if (isExpanded) Icons.Rounded.KeyboardArrowDown
+                                 else Icons.Rounded.KeyboardArrowRight,
+            contentDescription = if (isExpanded) "Collapse" else "Expand",
+            tint               = AxiomTextDisabled.copy(alpha = 0.7f),
+            modifier           = Modifier.size(16.dp)
         )
     }
 }
@@ -254,9 +318,11 @@ private fun DirectoryHeader(path: String) {
 private fun FileTreeRow(
     file: FileItem,
     isActive: Boolean,
+    depth: Int,
     onClick: () -> Unit
 ) {
-    val bg = if (isActive) AxiomViolet.copy(alpha = 0.10f) else Color.Transparent
+    val bg      = if (isActive) AxiomViolet.copy(alpha = 0.10f) else Color.Transparent
+    val startPad = (20 + depth * INDENT_PER_DEPTH.value).dp
     Row(
         verticalAlignment     = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -265,7 +331,7 @@ private fun FileTreeRow(
             .height(FILE_ITEM_H)
             .background(bg)
             .clickable(onClick = onClick)
-            .padding(horizontal = 20.dp)
+            .padding(start = startPad, end = 20.dp)
     ) {
         // Language colour dot
         Box(
@@ -308,35 +374,6 @@ private fun FileTreeRow(
                     .background(AxiomViolet)
             )
         }
-    }
-}
-
-@Composable
-private fun FolderTreeRow(name: String) {
-    Row(
-        verticalAlignment     = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-        modifier              = Modifier
-            .fillMaxWidth()
-            .height(FILE_ITEM_H)
-            .padding(horizontal = 20.dp)
-    ) {
-        Icon(
-            imageVector        = Icons.Rounded.Folder,
-            contentDescription = null,
-            tint               = AxiomViolet.copy(alpha = 0.65f),
-            modifier           = Modifier.size(15.dp)
-        )
-        Text(
-            text     = name,
-            style    = MaterialTheme.typography.bodyMedium.copy(
-                color      = AxiomTextSecondary,
-                fontFamily = FontFamily.Monospace,
-                fontSize   = 13.sp
-            ),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
     }
 }
 

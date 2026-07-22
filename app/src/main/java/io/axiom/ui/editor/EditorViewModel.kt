@@ -204,60 +204,93 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
      * Stores the document URI in [FileItem.path] so [onFileClick] can open it
      * directly with ContentResolver.
      */
+    /**
+     * Recursively scan a SAF document tree up to [maxDepth] levels deep.
+     * [FileItem.path] stores the document URI for reading.
+     * [FileItem.parentPath] stores the parent folder URI ("" for root-level items).
+     * [FileItem.depth] stores the nesting level (0 = direct child of project root).
+     */
     private fun scanSafFiles(rootUriString: String): List<FileItem> {
-        val context  = getApplication<Application>()
-        val treeUri  = Uri.parse(rootUriString)
+        val app     = getApplication<Application>()
+        val treeUri = Uri.parse(rootUriString)
         return try {
-            val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(
-                treeUri, DocumentsContract.getTreeDocumentId(treeUri)
-            )
-            val projection = arrayOf(
-                DocumentsContract.Document.COLUMN_DOCUMENT_ID,
-                DocumentsContract.Document.COLUMN_DISPLAY_NAME,
-                DocumentsContract.Document.COLUMN_MIME_TYPE,
-                DocumentsContract.Document.COLUMN_SIZE,
-                DocumentsContract.Document.COLUMN_LAST_MODIFIED
-            )
-            val cursor = context.contentResolver.query(
-                childrenUri, projection, null, null, null
-            ) ?: return emptyList()
-
-            val items = mutableListOf<FileItem>()
-            cursor.use { c ->
-                var index = 0
-                while (c.moveToNext()) {
-                    val docId = c.getString(0) ?: continue
-                    val name  = c.getString(1) ?: continue
-                    val mime  = c.getString(2) ?: ""
-                    val size  = if (c.isNull(3)) 0L else c.getLong(3)
-                    val mod   = if (c.isNull(4)) 0L else c.getLong(4)
-
-                    // Skip hidden files; include directories
-                    if (name.startsWith(".")) continue
-
-                    val isDir  = mime == DocumentsContract.Document.MIME_TYPE_DIR
-                    val docUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, docId)
-                    val ext    = if (isDir) "" else name.substringAfterLast('.', "").lowercase()
-                    items.add(
-                        FileItem(
-                            id           = index.toString(),
-                            name         = name,
-                            path         = docUri.toString(), // URI stored as path for SAF reads
-                            extension    = ext,
-                            lastModified = mod,
-                            size         = if (isDir) 0L else size,
-                            language     = if (isDir) CodeLanguage.UNKNOWN else ext.toCodeLanguage(),
-                            isDirectory  = isDir
-                        )
-                    )
-                    index++
-                }
-            }
-            // Folders first, then files, each group alphabetical
-            items.sortedWith(compareBy({ !it.isDirectory }, { it.name }))
+            val rootDocId = DocumentsContract.getTreeDocumentId(treeUri)
+            scanSafDirectory(app, treeUri, rootDocId, parentPath = "", depth = 0)
         } catch (e: Exception) {
             emptyList()
         }
+    }
+
+    private fun scanSafDirectory(
+        app: Application,
+        treeUri: Uri,
+        dirDocId: String,
+        parentPath: String,
+        depth: Int,
+        maxDepth: Int = 5
+    ): List<FileItem> {
+        if (depth > maxDepth) return emptyList()
+
+        val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, dirDocId)
+        val projection = arrayOf(
+            DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+            DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+            DocumentsContract.Document.COLUMN_MIME_TYPE,
+            DocumentsContract.Document.COLUMN_SIZE,
+            DocumentsContract.Document.COLUMN_LAST_MODIFIED
+        )
+        val cursor = app.contentResolver.query(childrenUri, projection, null, null, null)
+            ?: return emptyList()
+
+        data class Entry(val docId: String, val item: FileItem)
+        val entries = mutableListOf<Entry>()
+
+        cursor.use { c ->
+            while (c.moveToNext()) {
+                val docId = c.getString(0) ?: continue
+                val name  = c.getString(1) ?: continue
+                val mime  = c.getString(2) ?: ""
+                val size  = if (c.isNull(3)) 0L else c.getLong(3)
+                val mod   = if (c.isNull(4)) 0L else c.getLong(4)
+
+                if (name.startsWith(".")) continue
+
+                val isDir  = mime == DocumentsContract.Document.MIME_TYPE_DIR
+                val docUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, docId)
+                val ext    = if (isDir) "" else name.substringAfterLast('.', "").lowercase()
+
+                entries.add(Entry(
+                    docId = docId,
+                    item  = FileItem(
+                        id           = docId,
+                        name         = name,
+                        path         = docUri.toString(),
+                        extension    = ext,
+                        lastModified = mod,
+                        size         = if (isDir) 0L else size,
+                        language     = if (isDir) CodeLanguage.UNKNOWN else ext.toCodeLanguage(),
+                        isDirectory  = isDir,
+                        parentPath   = parentPath,
+                        depth        = depth
+                    )
+                ))
+            }
+        }
+
+        // Directories first, then files, alphabetically
+        entries.sortWith(compareBy({ !it.item.isDirectory }, { it.item.name }))
+
+        // Depth-first: each folder immediately followed by its subtree
+        val result = mutableListOf<FileItem>()
+        for (entry in entries) {
+            result.add(entry.item)
+            if (entry.item.isDirectory) {
+                result.addAll(
+                    scanSafDirectory(app, treeUri, entry.docId, entry.item.path, depth + 1, maxDepth)
+                )
+            }
+        }
+        return result
     }
 
     override fun onCleared() {

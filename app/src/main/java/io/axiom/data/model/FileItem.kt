@@ -12,7 +12,11 @@ data class FileItem(
     val size: Long = 0L,
     val isPinned: Boolean = false,
     val language: CodeLanguage = CodeLanguage.UNKNOWN,
-    val isDirectory: Boolean = false
+    val isDirectory: Boolean = false,
+    /** SAF only: URI of the parent folder, or "" for root-level items. */
+    val parentPath: String = "",
+    /** SAF only: nesting depth; 0 = direct child of project root. */
+    val depth: Int = 0
 )
 
 /**
