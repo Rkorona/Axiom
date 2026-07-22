@@ -1,0 +1,114 @@
+用户：
+现在暂时主页面是差不多搞好了，下一步你推荐往哪个方向进行？你有什么大胆的想法？讨论一下。
+
+
+看完整个代码结构，能看清楚 Axiom 现在的状态：主页做得很完整，但产品循环没有闭合——点一个项目卡片，什么都不会发生。
+
+以下是我觉得值得讨论的几个方向：
+
+方向 A：关闭产品循环（最关键）
+内存里已经写了状态机第三态 ③ In-project：进入项目后 wings 变成文件列表，bottom sheet 变成文件树。这是最自然的下一步——现有的动效语言、布局权重逻辑直接复用，只是内容换了。同时把 mockFiles / mockCommands 替换成真实的文件系统扫描。不做这个，其他一切都是装饰。
+
+方向 B（大胆）：编辑器本身做成什么样？
+这是最有意思的设计问题。有几种完全不同的方向：
+
+B1 — 普通代码编辑器 BasicTextField + VisualTransformation 做语法高亮，行号，滚动。实用，但没有灵魂，跟 VS Code Mobile 没什么区别。
+
+B2 — Command bar 即编辑器 极端路线：进入文件后，命令栏仍然是主角。所有操作（跳转符号、搜索替换、执行代码块）都通过它完成，编辑区域只是"结果视图"。类似 Helix/Kakoune 的哲学移植到触控上——手机从来没有过真正 modal 的编辑器，这会是 Axiom 的差异点。
+
+B3 — 排版优先的写作编辑器 不是 IDE，是给写作用的。每个项目可以选字体/间距/行宽，进入项目就是沉浸式全屏排版面。主页那种克制美学延伸进去。目标用户是写作者、笔记者，不是程序员。
+
+方向 C（大胆）：主页动效 → 项目过渡动画
+现在打开项目是 Navigator.navigate()，直接切屏。但整个主页花了这么多精力做 spring 动效，进入项目的瞬间是浪费掉的。大胆做法：项目卡片点击后做 shared element transition——卡片展开成编辑器界面，命令栏从主页"继承"过来，不是跳页而是变形。Compose 1.7+ 的 SharedTransitionLayout 已经支持这个。视觉上会非常有冲击力。
+
+我的建议
+先做 A（in-project 状态机 + 真实文件扫描），这是基础。同时要先决定 B 选哪条路，因为 B 直接影响 A 的文件树设计——写作 app 和代码编辑器的文件导航是完全不同的东西。C 可以最后锦上添花。
+
+你觉得 Axiom 的核心用户是谁？写作者还是开发者？这个答案决定了 B 的选择。
+
+
+用户：
+方案B中的B2路线，所有操作都通过搜索栏完成？写代码和粘贴代码也是？
+
+
+好问题，我描述得太极端了，让我澄清一下。
+
+写代码和粘贴当然还是直接在编辑区域操作。 没有任何编辑器会把打字这件事路由到命令栏，包括 Vim、Helix 也不会——你在 buffer 里直接输入字符。
+
+B2 的"所有操作通过命令栏"指的是编辑以外的一切动作：
+
+操作	传统移动编辑器的做法	B2 的做法
+跳转到某个函数	侧边栏文件树 → 手动找	命令栏输入函数名 → 直接跳
+搜索替换	顶部工具栏按钮展开面板	> replace foo bar
+切换文件	标签栏或抽屉	命令栏输入文件名
+格式化代码	长按菜单	> format
+Git 操作	独立页面	> commit "fix auth"
+运行/编译	底部按钮	> run
+实际差异在于：桌面编辑器靠键盘快捷键触发这些操作，手机上快捷键没用。B2 的判断是——命令栏比汉堡菜单、工具栏、长按弹窗更适合触控，因为它可发现、可搜索、不占屏幕空间。
+
+编辑区域本身其实很平常，BasicTextField 就够了。B2 的赌注是：移动端编辑器的体验瓶颈不在打字，在导航和操作，而现有的移动编辑器全都在用桌面的交互模式（工具栏、菜单）应对这个问题。
+
+你觉得这个方向有没有意义？还是说你想的 Axiom 更偏向写作/笔记，而不是代码？
+
+
+用户：
+当然是代码和文件编辑器，目前来看方案A + 方案B(B2) + 方案C视觉效果这套组合拳还有点意思。你认为呢？
+
+
+组合拳逻辑上是自洽的，而且三个方向之间有真正的协同，不是凑数的：
+
+为什么它们互相加强：
+
+C（过渡动画）能成立，恰恰是因为 B2。命令栏在主页存在，进入项目后还在同一个位置——SharedElement 动画不是在两个不相关的界面之间跳，而是在同一个"工具"的两种状态之间变形。用户感知上是"我打开了一个项目，工具还在"，而不是"我去了另一个页面"。这个感觉非常难得。
+
+A 的底部 sheet 变成文件树，和 B2 的命令栏并存，两套导航范式各司其职：文件树管结构（我在哪），命令栏管操作（我要做什么）。不冲突，互补。
+
+我唯一的担心是 B2 的范围边界。 命令词汇表需要早期就设计清楚——哪些操作进命令栏、哪些留在编辑区上下文菜单（比如长按选词后的 cut/copy/paste 还是应该在气泡里）。这条线画不清楚，后期会乱。
+
+执行顺序我建议：
+
+A（编辑器界面 + 文件树 + 真实文件扫描）
+    ↓ 同步定义命令词汇表
+B2（命令解析 + 操作路由）
+    ↓ 两个屏幕都稳定后
+C（SharedElement 过渡）
+
+C 必须最后做，因为它依赖两端屏幕都稳定。但命令栏的 UI 位置和尺寸从 A 开始就要按最终形态定好，不然 C 的动画对不上。
+
+要开始的话从哪里切入？
+
+
+
+用户：
+按你的推荐顺序来
+
+
+Phase A 完成。以下是所有变更的完整清单：
+
+新增依赖
+
+navigation-compose 2.9.0 — NavHost 导航图
+新增文件（5个）
+
+文件	作用
+ui/navigation/AxiomNavGraph.kt	两条路由：home / editor/{projectId}
+ui/editor/EditorUiState.kt	编辑器状态机 + editorCommandBarHints
+ui/editor/EditorViewModel.kt	项目加载、真实文件扫描、文件读写、命令栏搜索
+ui/editor/EditorScreen.kt	编辑器界面：TopBar + EditorSurface + CommandBar(B2)
+ui/components/FileTreeSheet.kt	可拖拽文件树底部 sheet，沿用 ProjectsBottomSheet 的 spring 物理
+修改文件（8个）
+
+ProjectDao — 新增 getById(Long) 查询
+ProjectRepository — 新增 getProjectById(Long)
+FileSystemUtils — 新增 scanFiles(rootPath, maxFiles=300) 真实目录遍历，自动过滤 .git / node_modules / build 等
+HomeViewModel — onProjectClick 从 TODO 改为发射 NavigateToProject side effect
+HomeScreen — 接收 onNavigateToProject 回调，观察新 side effect
+CommandBar — 新增 hints 参数（默认不变，编辑器可传自己的提示文本）
+MainActivity — 从 HomeScreen() 切换为 AxiomNavGraph()
+关键设计决定值得注意：
+
+SAF 项目：文件扫描只列根目录（DocumentsContract 顶层查询），FileItem.path 存储 document URI，读取时直接 ContentResolver.openInputStream。SAF 写入是下一个空缺。
+
+ResultsPanel 位置：编辑器里它作为叠加层放在 weight(1f) 的编辑区 Box 内，而不是列元素——避免 command bar 获焦时把编辑区向上压。
+
+FileTreeSheet 收起高度：bottomPaddingDp = 80dp，让 peek 条正好浮在 CommandBar 上方。

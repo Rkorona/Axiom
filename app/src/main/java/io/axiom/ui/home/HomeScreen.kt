@@ -4,6 +4,9 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
@@ -85,10 +88,13 @@ import kotlinx.coroutines.delay
  *    Bottom = file tree / editor tabs
  * ```
  */
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun HomeScreen(
     viewModel: HomeViewModel = viewModel(),
-    onNavigateToProject: (Project) -> Unit = {}
+    onNavigateToProject: (Project) -> Unit = {},
+    sharedTransitionScope: SharedTransitionScope? = null,
+    animatedVisibilityScope: AnimatedVisibilityScope? = null
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val focusManager = LocalFocusManager.current
@@ -192,11 +198,13 @@ fun HomeScreen(
 
             // ── Command stage: wings + bar ────────────────────────────────────
             CommandStage(
-                uiState       = uiState,
-                onQueryChange = viewModel::onQueryChange,
-                onFocusChange = viewModel::onCommandBarFocusChange,
-                onClear       = viewModel::onClearQuery,
-                onFileClick   = { /* TODO: open file in editor */ }
+                uiState                 = uiState,
+                onQueryChange           = viewModel::onQueryChange,
+                onFocusChange           = viewModel::onCommandBarFocusChange,
+                onClear                 = viewModel::onClearQuery,
+                onFileClick             = { /* TODO: open file in editor */ },
+                sharedTransitionScope   = sharedTransitionScope,
+                animatedVisibilityScope = animatedVisibilityScope
             )
 
             // ── Mode hint row (> commands · # symbols) ────────────────────────
@@ -337,13 +345,16 @@ private fun HeroGreeting(
 
 private val WING_FRACTION = 0.20f
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 private fun CommandStage(
     uiState: HomeUiState,
     onQueryChange: (String) -> Unit,
     onFocusChange: (Boolean) -> Unit,
     onClear: () -> Unit,
-    onFileClick: (FileItem) -> Unit
+    onFileClick: (FileItem) -> Unit,
+    sharedTransitionScope: SharedTransitionScope? = null,
+    animatedVisibilityScope: AnimatedVisibilityScope? = null
 ) {
     val isExpanded = uiState.isCommandBarFocused
 
@@ -387,6 +398,20 @@ private fun CommandStage(
         }
 
         // ── Command bar ───────────────────────────────────────────────────────
+        // Plan C: sharedElement marks this as the transition anchor so the
+        // bar morphs into its editor-screen counterpart instead of cutting.
+        val cmdBarModifier = if (sharedTransitionScope != null && animatedVisibilityScope != null) {
+            with(sharedTransitionScope) {
+                Modifier
+                    .weight(safeCenterWeight)
+                    .sharedElement(
+                        state                   = rememberSharedContentState(key = "command-bar"),
+                        animatedVisibilityScope = animatedVisibilityScope
+                    )
+            }
+        } else {
+            Modifier.weight(safeCenterWeight)
+        }
         CommandBar(
             query            = uiState.query,
             commandMode      = uiState.commandMode,
@@ -396,7 +421,7 @@ private fun CommandStage(
             onQueryChange    = onQueryChange,
             onFocusChange    = onFocusChange,
             onClear          = onClear,
-            modifier         = Modifier.weight(safeCenterWeight)
+            modifier         = cmdBarModifier
         )
 
         // ── Right wing — recent file chips ────────────────────────────────────

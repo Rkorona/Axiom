@@ -2,6 +2,9 @@ package io.axiom.ui.editor
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
@@ -92,11 +95,14 @@ private val EDITOR_CMD_BAR_HEIGHT = 64.dp
  * @param projectId Room id of the project to open.
  * @param onBack    Called when the user presses the back arrow.
  */
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun EditorScreen(
     projectId: Long,
     onBack: () -> Unit,
-    viewModel: EditorViewModel = viewModel()
+    viewModel: EditorViewModel = viewModel(),
+    sharedTransitionScope: SharedTransitionScope? = null,
+    animatedVisibilityScope: AnimatedVisibilityScope? = null
 ) {
     val uiState    by viewModel.uiState.collectAsState()
     val focusManager = LocalFocusManager.current
@@ -173,6 +179,23 @@ fun EditorScreen(
             }
 
             // Command bar — B2 primary operation surface, always present at bottom
+            // Plan C: sharedElement shares this bar with the home-screen CommandBar
+            // so it morphs across the transition rather than fading in from nothing.
+            val cmdBarModifier = if (sharedTransitionScope != null && animatedVisibilityScope != null) {
+                with(sharedTransitionScope) {
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                        .sharedElement(
+                            state                   = rememberSharedContentState(key = "command-bar"),
+                            animatedVisibilityScope = animatedVisibilityScope
+                        )
+                }
+            } else {
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+            }
             CommandBar(
                 query            = uiState.query,
                 commandMode      = uiState.commandMode,
@@ -183,9 +206,7 @@ fun EditorScreen(
                 onQueryChange    = viewModel::onQueryChange,
                 onFocusChange    = viewModel::onCommandBarFocusChange,
                 onClear          = viewModel::onClearQuery,
-                modifier         = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                modifier         = cmdBarModifier
             )
 
             Spacer(Modifier.navigationBarsPadding())
