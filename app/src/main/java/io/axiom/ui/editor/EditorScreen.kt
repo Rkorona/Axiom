@@ -187,7 +187,7 @@ fun EditorScreen(
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 8.dp)
                         .sharedElement(
-                            state                   = rememberSharedContentState(key = "command-bar"),
+                            sharedContentState      = rememberSharedContentState(key = "command-bar"),
                             animatedVisibilityScope = animatedVisibilityScope
                         )
                 }

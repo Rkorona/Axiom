@@ -405,7 +405,7 @@ private fun CommandStage(
                 Modifier
                     .weight(safeCenterWeight)
                     .sharedElement(
-                        state                   = rememberSharedContentState(key = "command-bar"),
+                        sharedContentState      = rememberSharedContentState(key = "command-bar"),
                         animatedVisibilityScope = animatedVisibilityScope
                     )
             }

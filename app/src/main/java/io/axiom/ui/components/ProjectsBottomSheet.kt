@@ -137,7 +137,7 @@ fun ProjectsBottomSheet(
             else -> {
                 val n = projects.size
                 LIST_V_PAD + LIST_HEADER_H + LIST_SPACING +
-                        n * CARD_H + (n - 1) * LIST_SPACING +
+                        CARD_H * n + LIST_SPACING * (n - 1) +
                         LIST_BOTTOM_SPACER + LIST_V_PAD
             }
         }
