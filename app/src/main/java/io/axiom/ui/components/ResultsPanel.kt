@@ -100,21 +100,23 @@ fun ResultsPanel(
     }
 
     // Top corners flatten to 6 dp when docked, matching the bar's bottom corners.
+    // NoBouncy: a corner radius must never overshoot below 0.
     val topCornerRadius by animateDpAsState(
         targetValue   = if (isConnectedToBar) 6.dp else 28.dp,
         animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
+            dampingRatio = Spring.DampingRatioNoBouncy,
             stiffness    = Spring.StiffnessMedium
         ),
         label = "results-top-corner"
     )
 
     // Horizontal padding aligns the panel width with the bar (bar has padding 16 dp).
-    // Applies for both HomeScreen (bar above) and EditorScreen (bar below) connections.
+    // NoBouncy: padding must never go negative — a bouncy spring overshoots past 0 and
+    // crashes with "Padding must be non-negative".
     val horizontalPadding by animateDpAsState(
         targetValue   = if (isConnectedToBar || isConnectedBarBelow) 16.dp else 0.dp,
         animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
+            dampingRatio = Spring.DampingRatioNoBouncy,
             stiffness    = Spring.StiffnessMedium
         ),
         label = "results-h-padding"

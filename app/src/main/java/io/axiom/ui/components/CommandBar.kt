@@ -140,12 +140,13 @@ fun CommandBar(
     )
     // Top corners flatten to 6 dp when the results panel is docked above (editor layout),
     // so bar + panel share a seamless flat junction ("The Chute" effect).
+    // NoBouncy: corner radius must never overshoot below 0.
     val topCornerRadius by animateDpAsState(
         targetValue   = if (isExpanded && isConnectedToPanelAbove) 6.dp
                         else if (isExpanded) 20.dp
                         else 30.dp,
         animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
+            dampingRatio = Spring.DampingRatioNoBouncy,
             stiffness    = Spring.StiffnessMedium
         ),
         label = "cmd-bar-top-corner"
