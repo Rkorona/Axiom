@@ -12,10 +12,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
 import io.axiom.data.model.CodeLanguage
 import io.github.rosemoe.sora.event.ContentChangeEvent
-import io.github.rosemoe.sora.lang.smartEnter.HandleResult
+import io.github.rosemoe.sora.lang.EmptyLanguage
+import io.github.rosemoe.sora.lang.smartEnter.NewlineHandleResult
 import io.github.rosemoe.sora.lang.smartEnter.NewlineHandler
-import io.github.rosemoe.sora.text.ContentReference
-import io.github.rosemoe.sora.text.Cursor
+import io.github.rosemoe.sora.lang.styling.Styles
+import io.github.rosemoe.sora.text.CharPosition
+import io.github.rosemoe.sora.text.Content
 import io.github.rosemoe.sora.widget.CodeEditor
 
 /**
@@ -85,30 +87,36 @@ fun SoraCodeEditor(
                 overScrollMode = View.OVER_SCROLL_NEVER
 
                 // ── Auto-indent ────────────────────────────────────────────────
-                // Copies the previous line's leading whitespace on Enter, and
-                // adds one extra tab level after block-opening characters.
-                addNewlineHandler(object : NewlineHandler {
-                    override fun matchesRequirement(
-                        text: ContentReference,
-                        cursor: Cursor
-                    ): Boolean = true
+                // In v0.24.x, NewlineHandlers must be registered through the
+                // Language object (CodeEditor has no addNewlineHandler method).
+                // We subclass EmptyLanguage and override getNewlineHandlers().
+                setEditorLanguage(object : EmptyLanguage() {
+                    private val handlers = listOf(object : NewlineHandler {
+                        override fun matchesRequirement(
+                            text: Content,
+                            position: CharPosition,
+                            styles: Styles?
+                        ): Boolean = true
 
-                    override fun handleNewline(
-                        text: ContentReference,
-                        cursor: Cursor,
-                        tabSize: Int
-                    ): HandleResult {
-                        val line    = text.getLine(cursor.leftLine).toString()
-                        val indent  = line.takeWhile { it == ' ' || it == '\t' }
-                        val trimmed = line.trimEnd()
-                        val extra   = if (trimmed.endsWith("{") ||
-                                          trimmed.endsWith("(") ||
-                                          trimmed.endsWith("[") ||
-                                          (trimmed.endsWith(":") && !trimmed.contains("//"))) {
-                            " ".repeat(tabSize)
-                        } else ""
-                        return HandleResult("\n$indent$extra", 0)
-                    }
+                        override fun handleNewline(
+                            text: Content,
+                            position: CharPosition,
+                            styles: Styles?,
+                            tabSize: Int
+                        ): NewlineHandleResult {
+                            val line    = text.getLine(position.line).toString()
+                            val indent  = line.takeWhile { it == ' ' || it == '\t' }
+                            val trimmed = line.trimEnd()
+                            val extra   = if (trimmed.endsWith("{") ||
+                                              trimmed.endsWith("(") ||
+                                              trimmed.endsWith("[") ||
+                                              (trimmed.endsWith(":") && !trimmed.contains("//"))) {
+                                " ".repeat(tabSize)
+                            } else ""
+                            return NewlineHandleResult("\n$indent$extra", 0)
+                        }
+                    })
+                    override fun getNewlineHandlers() = handlers
                 })
 
                 // ── Content change → ViewModel ─────────────────────────────────
