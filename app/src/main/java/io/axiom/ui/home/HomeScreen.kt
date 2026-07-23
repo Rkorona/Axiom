@@ -93,6 +93,7 @@ import kotlinx.coroutines.delay
 fun HomeScreen(
     viewModel: HomeViewModel = viewModel(),
     onNavigateToProject: (Project) -> Unit = {},
+    onNavigateToSettings: () -> Unit = {},
     sharedTransitionScope: SharedTransitionScope? = null,
     animatedVisibilityScope: AnimatedVisibilityScope? = null
 ) {
@@ -116,8 +117,9 @@ fun HomeScreen(
     LaunchedEffect(Unit) {
         viewModel.sideEffects.collect { effect ->
             when (effect) {
-                HomeSideEffect.OpenFolderPicker          -> folderPickerLauncher.launch(null)
-                is HomeSideEffect.NavigateToProject      -> onNavigateToProject(effect.project)
+                HomeSideEffect.OpenFolderPicker     -> folderPickerLauncher.launch(null)
+                is HomeSideEffect.NavigateToProject -> onNavigateToProject(effect.project)
+                HomeSideEffect.NavigateToSettings   -> onNavigateToSettings()
             }
         }
     }

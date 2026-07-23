@@ -36,6 +36,9 @@ sealed class HomeSideEffect {
 
     /** Navigate to the editor screen for the given project. */
     data class NavigateToProject(val project: Project) : HomeSideEffect()
+
+    /** Navigate to the settings screen. */
+    data object NavigateToSettings : HomeSideEffect()
 }
 
 // ── ViewModel ─────────────────────────────────────────────────────────────────
@@ -173,6 +176,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         when (command.id) {
             "new_project" -> _uiState.update { it.copy(showNewProjectDialog = true) }
             "open_folder" -> _sideEffects.tryEmit(HomeSideEffect.OpenFolderPicker)
+            "settings"    -> _sideEffects.tryEmit(HomeSideEffect.NavigateToSettings)
             else -> { /* TODO: wire remaining commands to editor actions */ }
         }
     }
