@@ -47,15 +47,13 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
                 AppSettingsRepository.fontSize,
                 AppSettingsRepository.tabSize,
                 AppSettingsRepository.wordWrap,
-                AppSettingsRepository.lineNumbers,
-                AppSettingsRepository.autoIndent
-            ) { fontSize, tabSize, wordWrap, lineNumbers, autoIndent ->
+                AppSettingsRepository.lineNumbers
+            ) { fontSize, tabSize, wordWrap, lineNumbers ->
                 EditorSettings(
                     fontSize    = fontSize,
                     tabSize     = tabSize,
                     wordWrap    = wordWrap,
-                    lineNumbers = lineNumbers,
-                    autoIndent  = autoIndent
+                    lineNumbers = lineNumbers
                 )
             }
             .collect { s -> _uiState.update { it.copy(editorSettings = s) } }

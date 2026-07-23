@@ -47,8 +47,7 @@ fun defaultSettings(): List<SettingsEntry> = listOf(
         SettingValue.Toggle(false),          SettingsCategory.EDITOR),
     SettingsEntry("lineNumbers", "lineNumbers","// gutter line numbers",
         SettingValue.Toggle(true),           SettingsCategory.EDITOR),
-    SettingsEntry("autoIndent",  "autoIndent", "// auto-indent on newline",
-        SettingValue.Toggle(true),           SettingsCategory.EDITOR),
+
 
     // ── GIT ────────────────────────────────────────────────────────────────────
     SettingsEntry("autoFetch",     "autoFetch",    "// fetch on project open",

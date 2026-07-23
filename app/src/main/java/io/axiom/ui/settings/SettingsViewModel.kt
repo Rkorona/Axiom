@@ -35,8 +35,6 @@ class SettingsViewModel : ViewModel() {
                         AppSettingsRepository.wordWrap.value))
                     "lineNumbers"        -> entry.copy(value = SettingValue.Toggle(
                         AppSettingsRepository.lineNumbers.value))
-                    "autoIndent"         -> entry.copy(value = SettingValue.Toggle(
-                        AppSettingsRepository.autoIndent.value))
                     "autoFetch"          -> entry.copy(value = SettingValue.Toggle(
                         AppSettingsRepository.autoFetch.value))
                     "defaultBranch"      -> entry.copy(value = SettingValue.Select(
@@ -121,8 +119,6 @@ class SettingsViewModel : ViewModel() {
                 ?.let { AppSettingsRepository.setWordWrap(it.enabled) }
             "lineNumbers"        -> (value as? SettingValue.Toggle)
                 ?.let { AppSettingsRepository.setLineNumbers(it.enabled) }
-            "autoIndent"         -> (value as? SettingValue.Toggle)
-                ?.let { AppSettingsRepository.setAutoIndent(it.enabled) }
             "autoFetch"          -> (value as? SettingValue.Toggle)
                 ?.let { AppSettingsRepository.setAutoFetch(it.enabled) }
             "defaultBranch"      -> (value as? SettingValue.Select)
