@@ -6,15 +6,13 @@
 
 ## 主页搜索栏（HomeViewModel · `mockCommands`）
 
-共 **5 条**。仅展示全局/项目管理级别的命令，不依赖任何打开的文件或编辑器上下文。
+共 **3 条**。仅展示全局/项目管理级别的命令，不依赖任何打开的文件或编辑器上下文。
 
 | # | ID | 显示名称 | 描述 | 分类 | 快捷键 | 状态 |
 |---|---|---|---|---|---|---|
 | 1 | `new_project` | New Project | Create a new project in Axiom | File | — | ✅ 已实现 |
 | 2 | `open_folder` | Open Folder | Import an existing folder as a project | File | — | ✅ 已实现 |
-| 3 | `toggle_theme` | Toggle Theme | Switch between dark and light colour scheme | View | — | ⚠️ Stub |
-| 4 | `settings` | Settings | Open application settings | General | ⌘, | ⚠️ Stub |
-| 5 | `command_palette` | Command Palette | Open this command palette | General | ⌘⇧P | ⚠️ Stub |
+| 3 | `settings` | Settings | Open application settings | General | ⌘, | ⚠️ Stub |
 
 ---
 

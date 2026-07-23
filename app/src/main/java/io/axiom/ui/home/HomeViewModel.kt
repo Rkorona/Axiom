@@ -79,13 +79,10 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     private val mockCommands = listOf(
         // ── Project ───────────────────────────────────────────────────────────
-        AppCommand("new_project",    "New Project",     "Create a new project in Axiom",               null,   CommandCategory.FILE),
-        AppCommand("open_folder",    "Open Folder",     "Import an existing folder as a project",      null,   CommandCategory.FILE),
-        // ── View ──────────────────────────────────────────────────────────────
-        AppCommand("toggle_theme",   "Toggle Theme",    "Switch between dark and light colour scheme", null,   CommandCategory.VIEW),
+        AppCommand("new_project", "New Project",  "Create a new project in Axiom",          null,  CommandCategory.FILE),
+        AppCommand("open_folder", "Open Folder",  "Import an existing folder as a project", null,  CommandCategory.FILE),
         // ── General ───────────────────────────────────────────────────────────
-        AppCommand("settings",       "Settings",        "Open application settings",                   "⌘,",   CommandCategory.GENERAL),
-        AppCommand("command_palette","Command Palette", "Open this command palette",                   "⌘⇧P",  CommandCategory.GENERAL),
+        AppCommand("settings",    "Settings",     "Open application settings",              "⌘,",  CommandCategory.GENERAL),
     )
 
     // ── Init ───────────────────────────────────────────────────────────────────
