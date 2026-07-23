@@ -1,0 +1,109 @@
+{
+  "name": "CSS",
+  "scopeName": "source.css",
+  "fileTypes": ["css", "scss", "sass", "less"],
+  "patterns": [
+    { "include": "#comment" },
+    { "include": "#at-rule" },
+    { "include": "#rule-set" }
+  ],
+  "repository": {
+    "comment": {
+      "name": "comment.block.css",
+      "begin": "/\\*",
+      "end": "\\*/",
+      "beginCaptures": { "0": { "name": "punctuation.definition.comment.css" } },
+      "endCaptures": { "0": { "name": "punctuation.definition.comment.css" } }
+    },
+    "at-rule": {
+      "patterns": [
+        {
+          "name": "keyword.control.at-rule.css",
+          "match": "@[a-zA-Z-]+"
+        }
+      ]
+    },
+    "rule-set": {
+      "patterns": [
+        { "include": "#selector" },
+        { "include": "#block" }
+      ]
+    },
+    "selector": {
+      "patterns": [
+        {
+          "name": "entity.name.tag.css",
+          "match": "(?<![{};]\\s*)\\b[a-zA-Z][a-zA-Z0-9-]*\\b(?!\\s*:)"
+        },
+        {
+          "name": "entity.other.attribute-name.class.css",
+          "match": "\\.[a-zA-Z_-][a-zA-Z0-9_-]*"
+        },
+        {
+          "name": "entity.other.attribute-name.id.css",
+          "match": "#[a-zA-Z_-][a-zA-Z0-9_-]*"
+        },
+        {
+          "name": "entity.other.attribute-name.pseudo-class.css",
+          "match": ":[a-zA-Z-]+"
+        },
+        {
+          "name": "entity.other.attribute-name.pseudo-element.css",
+          "match": "::[a-zA-Z-]+"
+        }
+      ]
+    },
+    "block": {
+      "name": "meta.property-list.css",
+      "begin": "\\{",
+      "end": "\\}",
+      "patterns": [
+        { "include": "#comment" },
+        { "include": "#property" }
+      ]
+    },
+    "property": {
+      "patterns": [
+        {
+          "name": "support.type.property-name.css",
+          "match": "(?<=\\{|;|\\*/|\\n)\\s*([a-zA-Z-]+)\\s*(?=:)"
+        },
+        { "include": "#value" }
+      ]
+    },
+    "value": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.css",
+          "begin": "\"",
+          "end": "\""
+        },
+        {
+          "name": "string.quoted.single.css",
+          "begin": "'",
+          "end": "'"
+        },
+        {
+          "name": "constant.numeric.css",
+          "match": "-?[0-9]+(\\.[0-9]+)?"
+        },
+        {
+          "name": "keyword.other.unit.css",
+          "match": "\\b(?:px|em|rem|vh|vw|vmin|vmax|%|pt|pc|cm|mm|in|ex|ch|fr|deg|rad|turn|s|ms)\\b"
+        },
+        {
+          "name": "constant.other.color.hex.css",
+          "match": "#[0-9a-fA-F]{3,8}\\b"
+        },
+        {
+          "name": "support.constant.property-value.css",
+          "match": "\\b(auto|inherit|initial|unset|none|normal|bold|italic|underline|block|inline|flex|grid|absolute|relative|fixed|sticky|center|left|right|top|bottom|transparent|solid|dashed|dotted|hidden|visible|scroll|overflow|nowrap|wrap|column|row)\\b"
+        },
+        {
+          "name": "support.function.calc.css",
+          "match": "\\b([a-zA-Z-]+)(?=\\()"
+        }
+      ]
+    }
+  }
+}

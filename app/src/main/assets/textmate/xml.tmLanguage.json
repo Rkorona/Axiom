@@ -1,0 +1,81 @@
+{
+  "name": "XML",
+  "scopeName": "text.xml",
+  "fileTypes": ["xml", "plist", "xsd", "xsl", "xslt", "svg"],
+  "patterns": [
+    { "include": "#comment" },
+    { "include": "#cdata" },
+    { "include": "#doctype" },
+    { "include": "#tag" },
+    { "include": "#entity" }
+  ],
+  "repository": {
+    "comment": {
+      "name": "comment.block.xml",
+      "begin": "<!--",
+      "end": "-->",
+      "beginCaptures": { "0": { "name": "punctuation.definition.comment.xml" } },
+      "endCaptures": { "0": { "name": "punctuation.definition.comment.xml" } }
+    },
+    "cdata": {
+      "name": "string.unquoted.cdata.xml",
+      "begin": "<!\\[CDATA\\[",
+      "end": "\\]\\]>"
+    },
+    "doctype": {
+      "name": "meta.tag.sgml.doctype.xml",
+      "begin": "<!DOCTYPE",
+      "end": ">",
+      "captures": { "0": { "name": "keyword.control.xml" } }
+    },
+    "tag": {
+      "patterns": [
+        {
+          "name": "meta.tag.preprocessor.xml",
+          "begin": "<\\?",
+          "end": "\\?>",
+          "captures": { "0": { "name": "punctuation.definition.tag.xml" } },
+          "patterns": [{ "include": "#attribute" }]
+        },
+        {
+          "name": "meta.tag.xml",
+          "begin": "</?",
+          "end": "/?>",
+          "beginCaptures": { "0": { "name": "punctuation.definition.tag.begin.xml" } },
+          "endCaptures": { "0": { "name": "punctuation.definition.tag.end.xml" } },
+          "patterns": [
+            {
+              "name": "entity.name.tag.xml",
+              "match": "[a-zA-Z_:][a-zA-Z0-9_:.-]*"
+            },
+            { "include": "#attribute" }
+          ]
+        }
+      ]
+    },
+    "attribute": {
+      "patterns": [
+        {
+          "name": "entity.other.attribute-name.xml",
+          "match": "[a-zA-Z_:][a-zA-Z0-9_:.-]*"
+        },
+        {
+          "name": "string.quoted.double.xml",
+          "begin": "\"",
+          "end": "\"",
+          "patterns": [{ "include": "#entity" }]
+        },
+        {
+          "name": "string.quoted.single.xml",
+          "begin": "'",
+          "end": "'",
+          "patterns": [{ "include": "#entity" }]
+        }
+      ]
+    },
+    "entity": {
+      "name": "constant.character.entity.xml",
+      "match": "&(?:[a-zA-Z]+|#[0-9]+|#x[0-9a-fA-F]+);"
+    }
+  }
+}

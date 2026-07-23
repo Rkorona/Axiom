@@ -17,7 +17,22 @@ import io.github.rosemoe.sora.event.ContentChangeEvent
 import io.github.rosemoe.sora.widget.CodeEditor
 
 /**
- * 集成 TextMate 动态语法高亮与 TextMateColorScheme 的 Sora Editor 封装。
+ * Compose wrapper around sora-editor's [CodeEditor] with TextMate syntax highlighting.
+ *
+ * Architecture:
+ *  - [TextMateManager.init] is idempotent; it loads grammars and the Axiom dark theme
+ *    from `assets/textmate/` on first call, then no-ops on subsequent calls.
+ *  - [TextMateManager.applyTheme] binds [TextMateColorScheme] so token colours from
+ *    the theme JSON are used.  Falls back to [AxiomEditorColorScheme] if init failed.
+ *  - [TextMateManager.createLanguage] returns a per-editor [TextMateLanguage] instance
+ *    (single-editor use, per sora docs) keyed on the language's TextMate scope name.
+ *  - Auto-indent is provided natively by [TextMateLanguage] via the bundled
+ *    `*.language-configuration.json` files; no manual NewlineHandler needed.
+ *
+ * File switching:
+ *  - [fileKey] must be unique per file: callers use `"${file.path}${file.name}"`.
+ *  - Editor content and language are only reloaded when [fileKey] changes, never on
+ *    every recomposition or keystroke.
  */
 @Composable
 fun SoraCodeEditor(
@@ -29,56 +44,64 @@ fun SoraCodeEditor(
 ) {
     val context = LocalContext.current
     val onChangeState = rememberUpdatedState(onContentChange)
-
     var lastLoadedKey by remember { mutableStateOf<String?>(null) }
 
-    // 同步确保持润 TextMate 环境准备就绪
-    remember(context) {
-        TextMateManager.ensureInitialized(context)
-    }
+    // Ensure the TextMate pipeline is ready before the first frame.
+    // remember(context) runs once per composition lifetime.
+    remember(context) { TextMateManager.init(context) }
 
     AndroidView(
         factory = { ctx ->
-            TextMateManager.ensureInitialized(ctx)
+            // init() is idempotent — safe to call redundantly here in case
+            // the factory runs on a different Context than the one above.
+            TextMateManager.init(ctx)
 
             CodeEditor(ctx).apply {
-                // 必须在 View 实例化时强绑定 TextMateColorScheme，高亮颜色才不会变成透明！
-                TextMateManager.applyColorScheme(this)
 
+                // ── Theme ──────────────────────────────────────────────────
+                // Must be set before the first layout pass or colours are lost.
+                TextMateManager.applyTheme(this)
+
+                // ── Typography ─────────────────────────────────────────────
                 typefaceText = Typeface.MONOSPACE
                 setTextSize(13f)
                 tabWidth = 4
 
+                // ── Layout behaviour ───────────────────────────────────────
                 isWordwrap = false
                 isLineNumberEnabled = true
                 nonPrintablePaintingFlags = 0
 
+                // ── Scrollbars ─────────────────────────────────────────────
+                // Disable the native Android scroll indicators; sora draws
+                // its own from the theme.
                 isVerticalScrollBarEnabled = false
                 isHorizontalScrollBarEnabled = false
                 overScrollMode = View.OVER_SCROLL_NEVER
 
-                // 设置语言语法解析器
-                setEditorLanguage(TextMateManager.createLanguageFor(language))
+                // ── Language & auto-indent ─────────────────────────────────
+                // TextMateLanguage provides syntax highlighting and reads
+                // indentationRules from the bundled language-configuration.json
+                // for automatic indent on Enter — no manual NewlineHandler needed.
+                setEditorLanguage(TextMateManager.createLanguage(language))
 
+                // ── Content change → ViewModel ─────────────────────────────
                 subscribeEvent(ContentChangeEvent::class.java) { _, _ ->
                     onChangeState.value(text.toString())
                 }
             }
         },
         update = { editor ->
+            // Only reload content and language when the open file changes.
             if (fileKey != lastLoadedKey) {
                 lastLoadedKey = fileKey
                 editor.setText(content)
-                if (editor.lineCount > 0) {
-                    editor.setSelection(0, 0)
-                }
-                TextMateManager.applyColorScheme(editor)
-                editor.setEditorLanguage(TextMateManager.createLanguageFor(language))
+                if (editor.lineCount > 0) editor.setSelection(0, 0)
+                TextMateManager.applyTheme(editor)
+                editor.setEditorLanguage(TextMateManager.createLanguage(language))
             }
         },
-        onRelease = { editor ->
-            editor.release()
-        },
+        onRelease = { editor -> editor.release() },
         modifier = modifier
     )
 }

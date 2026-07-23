@@ -1,0 +1,67 @@
+{
+  "name": "YAML",
+  "scopeName": "source.yaml",
+  "fileTypes": ["yml", "yaml"],
+  "patterns": [
+    { "include": "#comment" },
+    { "include": "#directive" },
+    { "include": "#document-start" },
+    { "include": "#block-mapping-pair" },
+    { "include": "#string" },
+    { "include": "#constant" },
+    { "include": "#number" }
+  ],
+  "repository": {
+    "comment": {
+      "name": "comment.line.number-sign.yaml",
+      "match": "#.*$"
+    },
+    "directive": {
+      "name": "keyword.control.yaml",
+      "match": "^---$|^\\.\\.\\.$"
+    },
+    "document-start": {
+      "name": "punctuation.definition.document.yaml",
+      "match": "^---"
+    },
+    "block-mapping-pair": {
+      "patterns": [
+        {
+          "name": "entity.name.tag.yaml",
+          "match": "^[ \\t]*([a-zA-Z_][a-zA-Z0-9_.-]*)\\s*:"
+        },
+        {
+          "name": "entity.name.tag.yaml",
+          "match": "(?<=\\{|,)\\s*([a-zA-Z_][a-zA-Z0-9_.-]*)\\s*:"
+        }
+      ]
+    },
+    "string": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.yaml",
+          "begin": "\"",
+          "end": "\"",
+          "patterns": [{ "name": "constant.character.escape.yaml", "match": "\\\\." }]
+        },
+        {
+          "name": "string.quoted.single.yaml",
+          "begin": "'",
+          "end": "'"
+        },
+        {
+          "name": "string.unquoted.block.yaml",
+          "match": "(?<=:\\s)[|>][-+]?\\d*"
+        }
+      ]
+    },
+    "constant": {
+      "name": "constant.language.yaml",
+      "match": "\\b(true|True|TRUE|false|False|FALSE|null|Null|NULL|~|yes|Yes|YES|no|No|NO)\\b"
+    },
+    "number": {
+      "name": "constant.numeric.yaml",
+      "match": "\\b([+-]?(?:0x[0-9a-fA-F]+|0o[0-7]+|[0-9]+(?:\\.[0-9]+)?(?:[eE][+-]?[0-9]+)?|.inf|.Inf|.INF)|.nan|.NaN|.NAN)\\b"
+    }
+  }
+}

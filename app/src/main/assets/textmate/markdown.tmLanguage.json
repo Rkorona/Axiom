@@ -1,0 +1,128 @@
+{
+  "name": "Markdown",
+  "scopeName": "text.html.markdown",
+  "fileTypes": ["md", "markdown", "mdx"],
+  "patterns": [
+    { "include": "#heading" },
+    { "include": "#code-block" },
+    { "include": "#inline-code" },
+    { "include": "#bold-italic" },
+    { "include": "#bold" },
+    { "include": "#italic" },
+    { "include": "#blockquote" },
+    { "include": "#link" },
+    { "include": "#image" },
+    { "include": "#list" },
+    { "include": "#horizontal-rule" },
+    { "include": "#html-comment" }
+  ],
+  "repository": {
+    "heading": {
+      "patterns": [
+        {
+          "name": "markup.heading.1.markdown",
+          "match": "^(#)\\s+.+$",
+          "captures": { "1": { "name": "punctuation.definition.heading.markdown" } }
+        },
+        {
+          "name": "markup.heading.2.markdown",
+          "match": "^(##)\\s+.+$",
+          "captures": { "1": { "name": "punctuation.definition.heading.markdown" } }
+        },
+        {
+          "name": "markup.heading.3.markdown",
+          "match": "^(###)\\s+.+$",
+          "captures": { "1": { "name": "punctuation.definition.heading.markdown" } }
+        },
+        {
+          "name": "markup.heading.4.markdown",
+          "match": "^(####)\\s+.+$",
+          "captures": { "1": { "name": "punctuation.definition.heading.markdown" } }
+        },
+        {
+          "name": "markup.heading.5.markdown",
+          "match": "^(#{5,6})\\s+.+$",
+          "captures": { "1": { "name": "punctuation.definition.heading.markdown" } }
+        }
+      ]
+    },
+    "code-block": {
+      "patterns": [
+        {
+          "name": "markup.fenced_code.block.markdown",
+          "begin": "^(```+|~~~+)([a-zA-Z0-9]*)?",
+          "end": "^\\1",
+          "beginCaptures": {
+            "1": { "name": "punctuation.definition.raw.markdown" },
+            "2": { "name": "fenced_code.block.language.markdown" }
+          },
+          "endCaptures": { "0": { "name": "punctuation.definition.raw.markdown" } }
+        },
+        {
+          "name": "markup.raw.block.markdown",
+          "match": "^(    |\\t).+$"
+        }
+      ]
+    },
+    "inline-code": {
+      "name": "markup.inline.raw.string.markdown",
+      "match": "(`+)[^`]+\\1",
+      "captures": { "1": { "name": "punctuation.definition.raw.markdown" } }
+    },
+    "bold-italic": {
+      "name": "markup.bold.italic.markdown",
+      "match": "(\\*\\*\\*|___)[^\\s].*?[^\\s]\\1",
+      "captures": { "1": { "name": "punctuation.definition.bold.italic.markdown" } }
+    },
+    "bold": {
+      "name": "markup.bold.markdown",
+      "match": "(\\*\\*|__)[^\\s].*?[^\\s]\\1",
+      "captures": { "1": { "name": "punctuation.definition.bold.markdown" } }
+    },
+    "italic": {
+      "name": "markup.italic.markdown",
+      "match": "(\\*|_)[^\\s].*?[^\\s]\\1",
+      "captures": { "1": { "name": "punctuation.definition.italic.markdown" } }
+    },
+    "blockquote": {
+      "name": "markup.quote.markdown",
+      "match": "^>\\s.*$"
+    },
+    "link": {
+      "name": "meta.link.inline.markdown",
+      "match": "(!?)\\[([^\\]]*)\\]\\(([^)]+)\\)",
+      "captures": {
+        "2": { "name": "string.other.link.title.markdown" },
+        "3": { "name": "markup.underline.link.markdown" }
+      }
+    },
+    "image": {
+      "name": "meta.image.inline.markdown",
+      "match": "!\\[([^\\]]*)\\]\\(([^)]+)\\)",
+      "captures": {
+        "2": { "name": "markup.underline.link.image.markdown" }
+      }
+    },
+    "list": {
+      "patterns": [
+        {
+          "name": "markup.list.unnumbered.markdown",
+          "match": "^\\s*[-*+]\\s"
+        },
+        {
+          "name": "markup.list.numbered.markdown",
+          "match": "^\\s*[0-9]+\\.\\s"
+        }
+      ]
+    },
+    "horizontal-rule": {
+      "name": "meta.separator.markdown",
+      "match": "^[-*_]{3,}\\s*$"
+    },
+    "html-comment": {
+      "name": "comment.block.html.markdown",
+      "begin": "<!--",
+      "end": "-->"
+    }
+  }
+}

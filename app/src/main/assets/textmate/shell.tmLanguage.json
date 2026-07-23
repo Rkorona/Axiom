@@ -1,0 +1,79 @@
+{
+  "name": "Shell Script",
+  "scopeName": "source.shell",
+  "fileTypes": ["sh", "bash", "zsh", "ksh"],
+  "patterns": [
+    { "include": "#comment" },
+    { "include": "#shebang" },
+    { "include": "#string-double" },
+    { "include": "#string-single" },
+    { "include": "#heredoc" },
+    { "include": "#variable" },
+    { "include": "#keywords" },
+    { "include": "#built-in" },
+    { "include": "#number" }
+  ],
+  "repository": {
+    "comment": {
+      "name": "comment.line.number-sign.shell",
+      "match": "(?<!\\$)#.*$"
+    },
+    "shebang": {
+      "name": "comment.line.shebang.shell",
+      "match": "^#!.*$"
+    },
+    "string-double": {
+      "name": "string.quoted.double.shell",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        { "name": "constant.character.escape.shell", "match": "\\\\." },
+        { "include": "#variable" }
+      ]
+    },
+    "string-single": {
+      "name": "string.quoted.single.shell",
+      "begin": "'",
+      "end": "'"
+    },
+    "heredoc": {
+      "name": "string.unquoted.heredoc.shell",
+      "begin": "<<-?\\s*(['\"]?)(\\w+)\\1",
+      "end": "^\\s*\\2$",
+      "beginCaptures": {
+        "2": { "name": "keyword.control.heredoc-token.shell" }
+      },
+      "endCaptures": {
+        "0": { "name": "keyword.control.heredoc-token.shell" }
+      }
+    },
+    "variable": {
+      "patterns": [
+        {
+          "name": "variable.other.special.shell",
+          "match": "\\$(?:[0-9*@#?$!_-]|[a-zA-Z_][a-zA-Z0-9_]*|\\{[^}]+\\})"
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "name": "keyword.control.shell",
+          "match": "\\b(if|then|else|elif|fi|case|esac|for|while|until|do|done|in|select|time|function|return|exit|break|continue)\\b"
+        }
+      ]
+    },
+    "built-in": {
+      "patterns": [
+        {
+          "name": "support.function.builtin.shell",
+          "match": "\\b(echo|printf|read|source|export|unset|set|shift|trap|exec|eval|cd|pwd|ls|mkdir|rm|cp|mv|cat|grep|sed|awk|find|test|\\[|\\[\\[|declare|local|typeset|readonly|alias|unalias|hash|type|command|enable|getopts|pushd|popd|dirs)\\b"
+        }
+      ]
+    },
+    "number": {
+      "name": "constant.numeric.shell",
+      "match": "\\b[0-9]+\\b"
+    }
+  }
+}

@@ -1,0 +1,118 @@
+{
+  "name": "TypeScript",
+  "scopeName": "source.ts",
+  "fileTypes": ["ts", "tsx"],
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#template-strings" },
+    { "include": "#strings" },
+    { "include": "#decorators" },
+    { "include": "#keywords" },
+    { "include": "#constants" },
+    { "include": "#numbers" },
+    { "include": "#types" },
+    { "include": "#functions" }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        { "name": "comment.line.double-slash.ts", "match": "//.*$" },
+        {
+          "name": "comment.block.ts",
+          "begin": "/\\*",
+          "end": "\\*/",
+          "beginCaptures": { "0": { "name": "punctuation.definition.comment.ts" } },
+          "endCaptures": { "0": { "name": "punctuation.definition.comment.ts" } }
+        }
+      ]
+    },
+    "template-strings": {
+      "name": "string.template.ts",
+      "begin": "`",
+      "end": "`",
+      "patterns": [
+        { "name": "constant.character.escape.ts", "match": "\\\\." },
+        {
+          "name": "meta.template.expression.ts",
+          "begin": "\\$\\{",
+          "end": "\\}",
+          "beginCaptures": { "0": { "name": "punctuation.definition.template-expression.begin.ts" } },
+          "endCaptures": { "0": { "name": "punctuation.definition.template-expression.end.ts" } },
+          "patterns": [{ "include": "$self" }]
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.ts",
+          "begin": "\"",
+          "end": "\"",
+          "patterns": [{ "name": "constant.character.escape.ts", "match": "\\\\." }]
+        },
+        {
+          "name": "string.quoted.single.ts",
+          "begin": "'",
+          "end": "'",
+          "patterns": [{ "name": "constant.character.escape.ts", "match": "\\\\." }]
+        }
+      ]
+    },
+    "decorators": {
+      "patterns": [
+        {
+          "name": "storage.type.annotation.ts",
+          "match": "@[a-zA-Z_][a-zA-Z0-9_.]*"
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "name": "keyword.control.ts",
+          "match": "\\b(if|else|for|while|do|return|break|continue|switch|case|default|try|catch|finally|throw|in|of|instanceof|new|delete|typeof|void|yield|await|async|import|export|from|as|with|debugger|satisfies|asserts|infer|keyof|unique|readonly|is|never)\\b"
+        },
+        {
+          "name": "storage.type.ts",
+          "match": "\\b(var|let|const|function|class|interface|type|enum|namespace|module|extends|implements|super|abstract|declare)\\b"
+        },
+        {
+          "name": "storage.modifier.ts",
+          "match": "\\b(static|get|set|override|public|private|protected|readonly)\\b"
+        }
+      ]
+    },
+    "constants": {
+      "patterns": [
+        {
+          "name": "constant.language.ts",
+          "match": "\\b(true|false|null|undefined|NaN|Infinity|this|arguments)\\b"
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "name": "constant.numeric.ts",
+          "match": "\\b(0x[0-9a-fA-F_]+n?|0o[0-7_]+n?|0b[01_]+n?|[0-9][0-9_]*(\\.[0-9][0-9_]*)?([eE][+-]?[0-9]+)?n?)\\b"
+        }
+      ]
+    },
+    "types": {
+      "patterns": [
+        {
+          "name": "entity.name.type.ts",
+          "match": "\\b[A-Z][a-zA-Z0-9_]*\\b"
+        }
+      ]
+    },
+    "functions": {
+      "patterns": [
+        {
+          "name": "entity.name.function.ts",
+          "match": "\\b([a-z_$][a-zA-Z0-9_$]*)(?=\\s*[({<])"
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,127 @@
+{
+  "name": "JavaScript",
+  "scopeName": "source.js",
+  "fileTypes": ["js", "mjs", "cjs"],
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#template-strings" },
+    { "include": "#strings" },
+    { "include": "#decorators" },
+    { "include": "#keywords" },
+    { "include": "#constants" },
+    { "include": "#numbers" },
+    { "include": "#regex" },
+    { "include": "#types" },
+    { "include": "#functions" }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        { "name": "comment.line.double-slash.js", "match": "//.*$" },
+        {
+          "name": "comment.block.js",
+          "begin": "/\\*",
+          "end": "\\*/",
+          "beginCaptures": { "0": { "name": "punctuation.definition.comment.js" } },
+          "endCaptures": { "0": { "name": "punctuation.definition.comment.js" } }
+        }
+      ]
+    },
+    "template-strings": {
+      "name": "string.template.js",
+      "begin": "`",
+      "end": "`",
+      "patterns": [
+        { "name": "constant.character.escape.js", "match": "\\\\." },
+        {
+          "name": "meta.template.expression.js",
+          "begin": "\\$\\{",
+          "end": "\\}",
+          "beginCaptures": { "0": { "name": "punctuation.definition.template-expression.begin.js" } },
+          "endCaptures": { "0": { "name": "punctuation.definition.template-expression.end.js" } },
+          "patterns": [{ "include": "$self" }]
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.js",
+          "begin": "\"",
+          "end": "\"",
+          "patterns": [{ "name": "constant.character.escape.js", "match": "\\\\." }]
+        },
+        {
+          "name": "string.quoted.single.js",
+          "begin": "'",
+          "end": "'",
+          "patterns": [{ "name": "constant.character.escape.js", "match": "\\\\." }]
+        }
+      ]
+    },
+    "decorators": {
+      "patterns": [
+        {
+          "name": "entity.name.decorator.js",
+          "match": "@[a-zA-Z_][a-zA-Z0-9_]*"
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "name": "keyword.control.js",
+          "match": "\\b(if|else|for|while|do|return|break|continue|switch|case|default|try|catch|finally|throw|in|of|instanceof|new|delete|typeof|void|yield|await|async|import|export|from|as|with|debugger)\\b"
+        },
+        {
+          "name": "storage.type.js",
+          "match": "\\b(var|let|const|function|class|extends|super)\\b"
+        },
+        {
+          "name": "storage.modifier.js",
+          "match": "\\b(static|get|set|abstract|override|public|private|protected|readonly|declare)\\b"
+        }
+      ]
+    },
+    "constants": {
+      "patterns": [
+        {
+          "name": "constant.language.js",
+          "match": "\\b(true|false|null|undefined|NaN|Infinity|this|arguments)\\b"
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "name": "constant.numeric.js",
+          "match": "\\b(0x[0-9a-fA-F_]+n?|0o[0-7_]+n?|0b[01_]+n?|[0-9][0-9_]*(\\.[0-9][0-9_]*)?([eE][+-]?[0-9]+)?n?)\\b"
+        }
+      ]
+    },
+    "regex": {
+      "patterns": [
+        {
+          "name": "string.regexp.js",
+          "match": "(?<=[=(,!&|?:[]|return|=>)\\s*/(?![/*])[^/\\n]*/[gimsuy]*"
+        }
+      ]
+    },
+    "types": {
+      "patterns": [
+        {
+          "name": "entity.name.type.js",
+          "match": "\\b[A-Z][a-zA-Z0-9_]*\\b"
+        }
+      ]
+    },
+    "functions": {
+      "patterns": [
+        {
+          "name": "entity.name.function.js",
+          "match": "\\b([a-z_$][a-zA-Z0-9_$]*)(?=\\s*[({<])"
+        }
+      ]
+    }
+  }
+}

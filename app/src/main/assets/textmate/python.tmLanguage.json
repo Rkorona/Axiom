@@ -1,0 +1,115 @@
+{
+  "name": "Python",
+  "scopeName": "source.python",
+  "fileTypes": ["py", "pyw"],
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#strings" },
+    { "include": "#decorators" },
+    { "include": "#keywords" },
+    { "include": "#constants" },
+    { "include": "#numbers" },
+    { "include": "#types" },
+    { "include": "#functions" }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        { "name": "comment.line.number-sign.python", "match": "#.*$" }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.triple.double.python",
+          "begin": "\"\"\"",
+          "end": "\"\"\"",
+          "patterns": [{ "include": "#string-interpolation-python" }]
+        },
+        {
+          "name": "string.quoted.triple.single.python",
+          "begin": "'''",
+          "end": "'''"
+        },
+        {
+          "name": "string.quoted.double.python",
+          "begin": "\"",
+          "end": "\"",
+          "patterns": [
+            { "name": "constant.character.escape.python", "match": "\\\\." },
+            { "include": "#string-interpolation-python" }
+          ]
+        },
+        {
+          "name": "string.quoted.single.python",
+          "begin": "'",
+          "end": "'",
+          "patterns": [
+            { "name": "constant.character.escape.python", "match": "\\\\." }
+          ]
+        }
+      ]
+    },
+    "string-interpolation-python": {
+      "patterns": [
+        {
+          "name": "meta.template.expression.python",
+          "match": "\\{[^}]*\\}",
+          "captures": { "0": { "name": "variable.other.python" } }
+        }
+      ]
+    },
+    "decorators": {
+      "patterns": [
+        {
+          "name": "entity.name.decorator.python",
+          "match": "@[a-zA-Z_][a-zA-Z0-9_.]*"
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "name": "keyword.control.python",
+          "match": "\\b(if|elif|else|for|while|break|continue|return|pass|yield|try|except|finally|raise|with|as|and|or|not|in|is|del|assert|global|nonlocal|async|await|lambda)\\b"
+        },
+        {
+          "name": "storage.type.python",
+          "match": "\\b(def|class|import|from)\\b"
+        }
+      ]
+    },
+    "constants": {
+      "patterns": [
+        {
+          "name": "constant.language.python",
+          "match": "\\b(True|False|None|self|cls)\\b"
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "name": "constant.numeric.python",
+          "match": "\\b(0x[0-9a-fA-F_]+|0o[0-7_]+|0b[01_]+|[0-9][0-9_]*(\\.[0-9][0-9_]*)?([eE][+-]?[0-9]+)?[jJ]?)\\b"
+        }
+      ]
+    },
+    "types": {
+      "patterns": [
+        {
+          "name": "entity.name.type.python",
+          "match": "\\b[A-Z][a-zA-Z0-9_]*\\b"
+        }
+      ]
+    },
+    "functions": {
+      "patterns": [
+        {
+          "name": "entity.name.function.python",
+          "match": "\\b([a-z_][a-zA-Z0-9_]*)(?=\\s*\\()"
+        }
+      ]
+    }
+  }
+}
