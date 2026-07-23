@@ -70,7 +70,6 @@ import io.axiom.ui.theme.AxiomMist
 import io.axiom.ui.theme.AxiomSymbolModeColor
 import io.axiom.ui.theme.AxiomTextDisabled
 import io.axiom.ui.theme.AxiomTextPrimary
-import io.axiom.ui.theme.AxiomViolet
 import io.axiom.ui.theme.AxiomVoid
 
 /**
@@ -94,6 +93,7 @@ fun CommandBar(
     onClear: () -> Unit,
     onFileTreeClick: (() -> Unit)? = null,
     isConnectedToPanelAbove: Boolean = false,
+    fileAccentColor: Color = AxiomFileModeColor,
     modifier: Modifier = Modifier
 ) {
     val keyboard = LocalSoftwareKeyboardController.current
@@ -101,7 +101,11 @@ fun CommandBar(
 
     // ── 模式主色调过渡 ───────────────────────────────────────────────────────
     val modeAccentColor by animateColorAsState(
-        targetValue   = commandMode.toAccentColor(),
+        targetValue   = when (commandMode) {
+            CommandMode.FILE    -> fileAccentColor
+            CommandMode.COMMAND -> AxiomCommandModeColor
+            CommandMode.SYMBOL  -> AxiomSymbolModeColor
+        },
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioLowBouncy,
             stiffness    = Spring.StiffnessMediumLow
@@ -230,7 +234,7 @@ fun CommandBar(
                         Icon(
                             imageVector        = Icons.Rounded.FolderOpen,
                             contentDescription = "Browse files",
-                            tint               = AxiomViolet.copy(alpha = 0.85f),
+                            tint               = modeAccentColor.copy(alpha = 0.85f),
                             modifier           = Modifier.size(17.dp)
                         )
                     }
@@ -361,8 +365,3 @@ private fun CommandModeIndicator(
     }
 }
 
-private fun CommandMode.toAccentColor(): Color = when (this) {
-    CommandMode.FILE    -> AxiomFileModeColor
-    CommandMode.COMMAND -> AxiomCommandModeColor
-    CommandMode.SYMBOL  -> AxiomSymbolModeColor
-}

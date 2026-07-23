@@ -14,6 +14,42 @@ class SettingsViewModel : ViewModel() {
     private val _uiState = MutableStateFlow(SettingsUiState())
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
 
+    init {
+        // Seed UI from current repository values so re-entering settings
+        // never resets changes the user already made this session.
+        _uiState.update { state ->
+            state.copy(entries = state.entries.map { entry ->
+                when (entry.id) {
+                    "theme"              -> entry.copy(value = SettingValue.Select(
+                        listOf("dark", "system", "light"),
+                        AppSettingsRepository.theme.value))
+                    "accentColor"        -> entry.copy(value = SettingValue.AccentPicker(
+                        AppSettingsRepository.accentKey.value))
+                    "fontSize"           -> entry.copy(value = (entry.value as SettingValue.Stepper).copy(
+                        value = AppSettingsRepository.fontSize.value))
+                    "animatedBackground" -> entry.copy(value = SettingValue.Toggle(
+                        AppSettingsRepository.animatedBackground.value))
+                    "tabSize"            -> entry.copy(value = (entry.value as SettingValue.Stepper).copy(
+                        value = AppSettingsRepository.tabSize.value))
+                    "wordWrap"           -> entry.copy(value = SettingValue.Toggle(
+                        AppSettingsRepository.wordWrap.value))
+                    "lineNumbers"        -> entry.copy(value = SettingValue.Toggle(
+                        AppSettingsRepository.lineNumbers.value))
+                    "autoIndent"         -> entry.copy(value = SettingValue.Toggle(
+                        AppSettingsRepository.autoIndent.value))
+                    "bracketPairs"       -> entry.copy(value = SettingValue.Toggle(
+                        AppSettingsRepository.bracketPairs.value))
+                    "autoFetch"          -> entry.copy(value = SettingValue.Toggle(
+                        AppSettingsRepository.autoFetch.value))
+                    "defaultBranch"      -> entry.copy(value = SettingValue.Select(
+                        listOf("main", "master", "develop"),
+                        AppSettingsRepository.defaultBranch.value))
+                    else                 -> entry
+                }
+            })
+        }
+    }
+
     fun onCategorySelect(category: SettingsCategory) {
         _uiState.update { it.copy(activeCategory = category) }
     }

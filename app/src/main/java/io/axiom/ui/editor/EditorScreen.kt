@@ -228,6 +228,7 @@ fun EditorScreen(
                 onClear                  = viewModel::onClearQuery,
                 onFileTreeClick          = { showFileTree = true },
                 isConnectedToPanelAbove  = resultsVisible,
+                fileAccentColor          = fileAccentColor,
                 modifier                 = cmdBarModifier
             )
 

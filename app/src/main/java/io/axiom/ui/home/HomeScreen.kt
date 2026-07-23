@@ -204,8 +204,9 @@ fun HomeScreen(
 
             // ── Hero greeting ─────────────────────────────────────────────────
             HeroGreeting(
-                text      = uiState.greetingText,
-                isVisible = !focused && uiState.query.isEmpty()
+                text            = uiState.greetingText,
+                isVisible       = !focused && uiState.query.isEmpty(),
+                fileAccentColor = fileAccentColor
             )
 
             Spacer(Modifier.weight(midWeight.coerceAtLeast(0.0001f)))
@@ -213,6 +214,7 @@ fun HomeScreen(
             // ── Command stage: wings + bar ────────────────────────────────────
             CommandStage(
                 uiState                 = uiState,
+                fileAccentColor         = fileAccentColor,
                 onQueryChange           = viewModel::onQueryChange,
                 onFocusChange           = viewModel::onCommandBarFocusChange,
                 onClear                 = viewModel::onClearQuery,
@@ -276,7 +278,8 @@ fun HomeScreen(
 @Composable
 private fun HeroGreeting(
     text: String,
-    isVisible: Boolean
+    isVisible: Boolean,
+    fileAccentColor: Color = AxiomFileModeColor
 ) {
     var hasEnteredOnce by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
@@ -310,8 +313,8 @@ private fun HeroGreeting(
                 .background(
                     Brush.horizontalGradient(
                         listOf(
-                            AxiomFileModeColor.copy(alpha = 0.20f),
-                            AxiomFileModeColor.copy(alpha = 0.10f)
+                            fileAccentColor.copy(alpha = 0.20f),
+                            fileAccentColor.copy(alpha = 0.10f)
                         )
                     )
                 )
@@ -320,7 +323,7 @@ private fun HeroGreeting(
             Text(
                 text  = "AXIOM EDITOR",
                 style = MaterialTheme.typography.labelSmall.copy(
-                    color         = AxiomFileModeColor.copy(alpha = 0.9f),
+                    color         = fileAccentColor.copy(alpha = 0.9f),
                     fontWeight    = FontWeight.Bold,
                     letterSpacing = 2.sp,
                     fontSize      = 10.sp
@@ -363,6 +366,7 @@ private val WING_FRACTION = 0.20f
 @Composable
 private fun CommandStage(
     uiState: HomeUiState,
+    fileAccentColor: Color,
     onQueryChange: (String) -> Unit,
     onFocusChange: (Boolean) -> Unit,
     onClear: () -> Unit,
@@ -435,6 +439,7 @@ private fun CommandStage(
             onQueryChange    = onQueryChange,
             onFocusChange    = onFocusChange,
             onClear          = onClear,
+            fileAccentColor  = fileAccentColor,
             modifier         = cmdBarModifier
         )
 
