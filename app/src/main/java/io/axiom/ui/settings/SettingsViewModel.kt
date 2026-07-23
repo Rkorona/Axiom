@@ -37,8 +37,6 @@ class SettingsViewModel : ViewModel() {
                         AppSettingsRepository.lineNumbers.value))
                     "autoIndent"         -> entry.copy(value = SettingValue.Toggle(
                         AppSettingsRepository.autoIndent.value))
-                    "bracketPairs"       -> entry.copy(value = SettingValue.Toggle(
-                        AppSettingsRepository.bracketPairs.value))
                     "autoFetch"          -> entry.copy(value = SettingValue.Toggle(
                         AppSettingsRepository.autoFetch.value))
                     "defaultBranch"      -> entry.copy(value = SettingValue.Select(
@@ -125,8 +123,6 @@ class SettingsViewModel : ViewModel() {
                 ?.let { AppSettingsRepository.setLineNumbers(it.enabled) }
             "autoIndent"         -> (value as? SettingValue.Toggle)
                 ?.let { AppSettingsRepository.setAutoIndent(it.enabled) }
-            "bracketPairs"       -> (value as? SettingValue.Toggle)
-                ?.let { AppSettingsRepository.setBracketPairs(it.enabled) }
             "autoFetch"          -> (value as? SettingValue.Toggle)
                 ?.let { AppSettingsRepository.setAutoFetch(it.enabled) }
             "defaultBranch"      -> (value as? SettingValue.Select)

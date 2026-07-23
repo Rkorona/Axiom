@@ -25,17 +25,15 @@ object AppSettingsRepository {
     val animatedBackground: StateFlow<Boolean> = _animatedBackground.asStateFlow()
 
     // ── Editor ─────────────────────────────────────────────────────────────────
-    private val _tabSize      = MutableStateFlow(4)
-    private val _wordWrap     = MutableStateFlow(false)
-    private val _lineNumbers  = MutableStateFlow(true)
-    private val _autoIndent   = MutableStateFlow(true)
-    private val _bracketPairs = MutableStateFlow(true)
+    private val _tabSize     = MutableStateFlow(4)
+    private val _wordWrap    = MutableStateFlow(false)
+    private val _lineNumbers = MutableStateFlow(true)
+    private val _autoIndent  = MutableStateFlow(true)
 
-    val tabSize:      StateFlow<Int>     = _tabSize.asStateFlow()
-    val wordWrap:     StateFlow<Boolean> = _wordWrap.asStateFlow()
-    val lineNumbers:  StateFlow<Boolean> = _lineNumbers.asStateFlow()
-    val autoIndent:   StateFlow<Boolean> = _autoIndent.asStateFlow()
-    val bracketPairs: StateFlow<Boolean> = _bracketPairs.asStateFlow()
+    val tabSize:     StateFlow<Int>     = _tabSize.asStateFlow()
+    val wordWrap:    StateFlow<Boolean> = _wordWrap.asStateFlow()
+    val lineNumbers: StateFlow<Boolean> = _lineNumbers.asStateFlow()
+    val autoIndent:  StateFlow<Boolean> = _autoIndent.asStateFlow()
 
     // ── Git ────────────────────────────────────────────────────────────────────
     private val _autoFetch     = MutableStateFlow(false)
@@ -53,7 +51,6 @@ object AppSettingsRepository {
     fun setWordWrap(on: Boolean)           { _wordWrap.value           = on }
     fun setLineNumbers(on: Boolean)        { _lineNumbers.value        = on }
     fun setAutoIndent(on: Boolean)         { _autoIndent.value         = on }
-    fun setBracketPairs(on: Boolean)       { _bracketPairs.value       = on }
     fun setAutoFetch(on: Boolean)          { _autoFetch.value          = on }
     fun setDefaultBranch(branch: String)   { _defaultBranch.value      = branch }
 }

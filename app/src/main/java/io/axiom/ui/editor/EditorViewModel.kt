@@ -58,7 +58,6 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
                     autoIndent  = autoIndent
                 )
             }
-            .combine(AppSettingsRepository.bracketPairs) { s, bp -> s.copy(bracketPairs = bp) }
             .collect { s -> _uiState.update { it.copy(editorSettings = s) } }
         }
 

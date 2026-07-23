@@ -20,19 +20,21 @@ import io.github.rosemoe.sora.widget.CodeEditor
 /**
  * Compose wrapper around sora-editor's [CodeEditor] with TextMate syntax highlighting.
  *
- * Settings are applied reactively:
- * - [EditorSettings.fontSize], [tabSize], [wordWrap], [lineNumbers] are applied on
- *   every `update` pass — cheap property assignments that take effect immediately.
- * - [EditorSettings.autoIndent] controls `autoCompleteEnabled` on the TextMate language
- *   (governs the completion popup and grammar-driven auto-indent on Enter).
- * - [EditorSettings.bracketPairs] controls `editor.props.symbolPairAutoCompletion`
- *   (governs whether typing `{` inserts a matching `}`).
- * - The language is recreated whenever [autoIndent], [tabSize], or the active file changes
- *   so the language picks up the current [tabWidth] as its indent unit.
+ * Settings are applied **only when their value changes** — this prevents sora-editor
+ * from calling `invalidate()` on every keystroke (which caused the editor to flash).
+ *
+ * - [EditorSettings.tabSize]    → `editor.tabWidth`  (visual tab width + auto-indent unit)
+ * - [EditorSettings.autoIndent] → `editor.props.autoIndent`  (auto-indent on Enter)
+ * - [EditorSettings.wordWrap]   → `editor.isWordwrap`
+ * - [EditorSettings.lineNumbers]→ `editor.isLineNumberEnabled`
+ * - [EditorSettings.fontSize]   → `editor.setTextSize`
+ *
+ * Language is only recreated when the active file or its detected language changes —
+ * NOT on every settings change — so there is no recomposition side-effect from typing.
  *
  * File switching:
- * - Content and language are only reloaded when [fileKey] changes, never on
- *   every recomposition or keystroke — this prevents cursor-jump on typing.
+ * Content and language are only reloaded when [fileKey] changes, never on
+ * every recomposition or keystroke — this prevents cursor-jump and flash on typing.
  */
 @Composable
 fun SoraCodeEditor(
@@ -43,13 +45,17 @@ fun SoraCodeEditor(
     settings:        EditorSettings = EditorSettings(),
     modifier:        Modifier       = Modifier
 ) {
-    val context        = LocalContext.current
-    val onChangeState  = rememberUpdatedState(onContentChange)
+    val context       = LocalContext.current
+    val onChangeState = rememberUpdatedState(onContentChange)
 
     // Track the last loaded file so we only reload content on file changes.
     var lastFileKey by remember { mutableStateOf<String?>(null) }
-    // Track language-affecting settings so we recreate the language when they change.
+    // Track the last language key so we only recreate the language when needed.
     var lastLangKey by remember { mutableStateOf<String?>(null) }
+    // Track the last applied settings to skip redundant sora-editor property writes.
+    // Sora-editor setters call invalidate() even when the value hasn't changed,
+    // causing a visible flash on every keystroke if we apply them unconditionally.
+    var lastSettings by remember { mutableStateOf<EditorSettings?>(null) }
 
     remember(context) { TextMateManager.init(context) }
 
@@ -62,7 +68,7 @@ fun SoraCodeEditor(
                 // ── Theme ──────────────────────────────────────────────────────
                 TextMateManager.applyTheme(this)
 
-                // ── Typography (initial values from settings) ──────────────────
+                // ── Typography ─────────────────────────────────────────────────
                 typefaceText = Typeface.MONOSPACE
                 setTextSize(settings.fontSize.toFloat())
                 tabWidth = settings.tabSize
@@ -72,10 +78,11 @@ fun SoraCodeEditor(
                 isLineNumberEnabled = settings.lineNumbers
                 nonPrintablePaintingFlags = 0
 
-                // ── Symbol pairs (bracket auto-close) ─────────────────────────
-                // bracketPairs controls whether typing `{` inserts a matching `}`.
-                // This is independent of syntax highlighting and auto-indent.
-                props.symbolPairAutoCompletion = settings.bracketPairs
+                // ── Auto-indent ────────────────────────────────────────────────
+                // props.autoIndent controls whether the editor applies grammar-driven
+                // indentation on Enter. This is the correct toggle — mapping to
+                // TextMateLanguage.autoCompleteEnabled only controls the popup.
+                props.autoIndent = settings.autoIndent
 
                 // ── Scrollbars ─────────────────────────────────────────────────
                 isVerticalScrollBarEnabled   = false
@@ -83,16 +90,7 @@ fun SoraCodeEditor(
                 overScrollMode               = View.OVER_SCROLL_NEVER
 
                 // ── Language ───────────────────────────────────────────────────
-                // autoIndent → autoCompleteEnabled: controls the grammar-driven
-                // indent engine and the completion popup inside TextMateLanguage.
-                // tabWidth must be set BEFORE createLanguage so the language
-                // picks it up as the indent unit for new blocks.
-                setEditorLanguage(
-                    TextMateManager.createLanguage(
-                        lang                = language,
-                        autoCompleteEnabled = settings.autoIndent
-                    )
-                )
+                setEditorLanguage(TextMateManager.createLanguage(language))
 
                 // ── Content change → ViewModel ─────────────────────────────────
                 subscribeEvent(ContentChangeEvent::class.java) { _, _ ->
@@ -102,17 +100,23 @@ fun SoraCodeEditor(
         },
         update = { editor ->
 
-            // ── Live settings — safe to apply on every update ──────────────────
-            editor.setTextSize(settings.fontSize.toFloat())
-            editor.tabWidth             = settings.tabSize
-            editor.isWordwrap           = settings.wordWrap
-            editor.isLineNumberEnabled  = settings.lineNumbers
+            // ── Settings — only write properties whose value actually changed ──
+            // Skipping unchanged writes prevents sora-editor from invalidating
+            // (and re-drawing) the editor view on every keystroke.
+            val prev = lastSettings
+            if (prev == null || prev.fontSize != settings.fontSize)
+                editor.setTextSize(settings.fontSize.toFloat())
+            if (prev == null || prev.tabSize != settings.tabSize)
+                editor.tabWidth = settings.tabSize
+            if (prev == null || prev.wordWrap != settings.wordWrap)
+                editor.isWordwrap = settings.wordWrap
+            if (prev == null || prev.lineNumbers != settings.lineNumbers)
+                editor.isLineNumberEnabled = settings.lineNumbers
+            if (prev == null || prev.autoIndent != settings.autoIndent)
+                editor.props.autoIndent = settings.autoIndent
+            lastSettings = settings
 
-            // bracketPairs: symbol-pair auto-close is a props flag, no language
-            // recreation needed — takes effect immediately on the next keystroke.
-            editor.props.symbolPairAutoCompletion = settings.bracketPairs
-
-            // ── File change: reload content, theme, and language ───────────────
+            // ── File change: reload content and theme ──────────────────────────
             val fileChanged = fileKey != lastFileKey
             if (fileChanged) {
                 lastFileKey = fileKey
@@ -121,18 +125,13 @@ fun SoraCodeEditor(
                 TextMateManager.applyTheme(editor)
             }
 
-            // ── Language change: recreate when autoIndent, tabSize, or file changes.
-            // tabSize is included so the new language is constructed after tabWidth
-            // is already updated above — guaranteeing it uses the correct indent unit.
-            val langKey = "$fileKey|${settings.autoIndent}|${settings.tabSize}|${language.name}"
+            // ── Language change: recreate only when file or language type changes.
+            // tabSize and autoIndent no longer require language recreation — they
+            // are applied directly via editor.tabWidth and editor.props.autoIndent.
+            val langKey = "$fileKey|${language.name}"
             if (langKey != lastLangKey) {
                 lastLangKey = langKey
-                editor.setEditorLanguage(
-                    TextMateManager.createLanguage(
-                        lang                = language,
-                        autoCompleteEnabled = settings.autoIndent
-                    )
-                )
+                editor.setEditorLanguage(TextMateManager.createLanguage(language))
             }
         },
         onRelease = { editor -> editor.release() },
