@@ -32,7 +32,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowBackIosNew
-import androidx.compose.material.icons.rounded.Save
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -170,8 +169,7 @@ fun EditorScreen(
                 project  = uiState.project,
                 openFile = uiState.openFile,
                 isDirty  = uiState.isDirty,
-                onBack   = onBack,
-                onSave   = viewModel::saveCurrentFile
+                onBack   = onBack
             )
 
             // Editor surface — shrinks naturally when the results panel is visible below it
@@ -286,8 +284,7 @@ private fun EditorTopBar(
     project: Project?,
     openFile: FileItem?,
     isDirty: Boolean,
-    onBack: () -> Unit,
-    onSave: () -> Unit
+    onBack: () -> Unit
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -366,21 +363,6 @@ private fun EditorTopBar(
             }
         }
 
-        // Save button — only visible when there are unsaved changes
-        AnimatedVisibility(
-            visible = isDirty,
-            enter   = fadeIn(spring(stiffness = Spring.StiffnessMediumLow)),
-            exit    = fadeOut(spring(stiffness = Spring.StiffnessMediumLow))
-        ) {
-            IconButton(onClick = onSave) {
-                Icon(
-                    imageVector        = Icons.Rounded.Save,
-                    contentDescription = "Save",
-                    tint               = AxiomViolet,
-                    modifier           = Modifier.size(20.dp)
-                )
-            }
-        }
     }
 
     // Top bar divider

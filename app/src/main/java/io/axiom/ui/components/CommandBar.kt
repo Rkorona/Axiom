@@ -238,7 +238,7 @@ fun CommandBar(
                         modifier = Modifier.size(32.dp)
                     ) {
                         Icon(
-                            imageVector        = Icons.Rounded.Code,
+                            imageVector        = Icons.Rounded.Terminal,
                             contentDescription = "Switch to symbol bar",
                             tint               = modeAccentColor.copy(alpha = 0.85f),
                             modifier           = Modifier.size(17.dp)
