@@ -45,13 +45,11 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch {
             combine(
                 AppSettingsRepository.fontSize,
-                AppSettingsRepository.tabSize,
                 AppSettingsRepository.wordWrap,
                 AppSettingsRepository.lineNumbers
-            ) { fontSize, tabSize, wordWrap, lineNumbers ->
+            ) { fontSize, wordWrap, lineNumbers ->
                 EditorSettings(
                     fontSize    = fontSize,
-                    tabSize     = tabSize,
                     wordWrap    = wordWrap,
                     lineNumbers = lineNumbers
                 )

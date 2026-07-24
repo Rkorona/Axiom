@@ -41,8 +41,6 @@ fun defaultSettings(): List<SettingsEntry> = listOf(
         SettingValue.Toggle(true),                                       SettingsCategory.APPEARANCE),
 
     // ── EDITOR ─────────────────────────────────────────────────────────────────
-    SettingsEntry("tabSize",     "tabSize",    "// spaces per tab stop",
-        SettingValue.Stepper(4, 2, 8, 2),   SettingsCategory.EDITOR),
     SettingsEntry("wordWrap",    "wordWrap",   "// wrap long lines",
         SettingValue.Toggle(false),          SettingsCategory.EDITOR),
     SettingsEntry("lineNumbers", "lineNumbers","// gutter line numbers",

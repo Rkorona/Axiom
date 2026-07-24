@@ -20,19 +20,12 @@ import io.github.rosemoe.sora.widget.CodeEditor
 /**
  * Compose wrapper around sora-editor's [CodeEditor] with TextMate syntax highlighting.
  *
+ * Indentation is hardcoded to 2 spaces (`tabWidth = 2`).
+ *
  * Settings are applied **only when their value changes** to prevent sora-editor from
  * calling `invalidate()` on every keystroke (which caused the editor to flash).
  *
- * tabSize behaviour:
- * - `editor.tabWidth` is updated immediately so new grammar-driven indentation uses
- *   the correct number of spaces.
- * - When tabSize changes while a file is open, the current file content is
- *   re-indented in place: every N leading spaces (where N = previous tabSize) becomes
- *   M leading spaces (where M = new tabSize). This converts existing code to the new
- *   indent width so the setting feels immediate and consistent.
- *
- * Auto-indent is always enabled (editor.props.autoIndent = true); the UI toggle for
- * it has been removed.
+ * Auto-indent is always enabled (`editor.props.autoIndent = true`).
  *
  * File switching:
  * Content and language are only reloaded when [fileKey] changes, never on every
@@ -70,7 +63,7 @@ fun SoraCodeEditor(
                 // ── Typography ─────────────────────────────────────────────────
                 typefaceText = Typeface.MONOSPACE
                 setTextSize(settings.fontSize.toFloat())
-                tabWidth = settings.tabSize
+                tabWidth = 2
 
                 // ── Layout behaviour ───────────────────────────────────────────
                 isWordwrap          = settings.wordWrap
@@ -98,24 +91,9 @@ fun SoraCodeEditor(
 
             val prev = lastSettings
 
-            // ── tabSize: apply width, then re-indent existing content ──────────
-            // Only runs when the user actually changed the setting.
-            if (prev == null || prev.tabSize != settings.tabSize) {
-                editor.tabWidth = settings.tabSize
-                // Re-indent the open file so existing code converts immediately.
-                // Skip on initial attach (prev == null) — content is already set
-                // with the correct tabSize from the factory block.
-                if (prev != null && prev.tabSize != settings.tabSize) {
-                    val current = editor.text.toString()
-                    val converted = reIndentContent(current, prev.tabSize, settings.tabSize)
-                    if (converted != current) {
-                        editor.setText(converted)
-                        if (editor.lineCount > 0) editor.setSelection(0, 0)
-                    }
-                }
-            }
-
-            // ── Other settings — only write when changed ───────────────────────
+            // Only write properties whose value actually changed.
+            // Sora-editor setters call invalidate() even for no-op writes,
+            // causing a visible flash on every keystroke if applied unconditionally.
             if (prev == null || prev.fontSize != settings.fontSize)
                 editor.setTextSize(settings.fontSize.toFloat())
             if (prev == null || prev.wordWrap != settings.wordWrap)
@@ -144,37 +122,4 @@ fun SoraCodeEditor(
         onRelease = { editor -> editor.release() },
         modifier  = modifier
     )
-}
-
-/**
- * Converts the leading indentation of every line in [content] from [oldTabSize]-space
- * units to [newTabSize]-space units.
- *
- * For each line, the number of leading spaces is decomposed as:
- *   levels   = leadingSpaces / oldTabSize   (integer division)
- *   remainder = leadingSpaces % oldTabSize  (preserved as-is to avoid corruption)
- *
- * The new leading spaces = levels * newTabSize + remainder.
- *
- * Only space characters are treated as indentation. Lines that start with a tab
- * or have no leading spaces are left unchanged.
- */
-private fun reIndentContent(content: String, oldTabSize: Int, newTabSize: Int): String {
-    if (oldTabSize <= 0 || newTabSize <= 0 || oldTabSize == newTabSize) return content
-    val sb = StringBuilder(content.length)
-    val lines = content.split('\n')
-    lines.forEachIndexed { i, line ->
-        val leadingSpaces = line.length - line.trimStart(' ').length
-        if (leadingSpaces > 0) {
-            val levels    = leadingSpaces / oldTabSize
-            val remainder = leadingSpaces % oldTabSize
-            val newIndent = levels * newTabSize + remainder
-            repeat(newIndent) { sb.append(' ') }
-            sb.append(line, leadingSpaces, line.length)
-        } else {
-            sb.append(line)
-        }
-        if (i < lines.size - 1) sb.append('\n')
-    }
-    return sb.toString()
 }

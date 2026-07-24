@@ -29,8 +29,6 @@ class SettingsViewModel : ViewModel() {
                         value = AppSettingsRepository.fontSize.value))
                     "animatedBackground" -> entry.copy(value = SettingValue.Toggle(
                         AppSettingsRepository.animatedBackground.value))
-                    "tabSize"            -> entry.copy(value = (entry.value as SettingValue.Stepper).copy(
-                        value = AppSettingsRepository.tabSize.value))
                     "wordWrap"           -> entry.copy(value = SettingValue.Toggle(
                         AppSettingsRepository.wordWrap.value))
                     "lineNumbers"        -> entry.copy(value = SettingValue.Toggle(
@@ -113,8 +111,6 @@ class SettingsViewModel : ViewModel() {
                 ?.let { AppSettingsRepository.setFontSize(it.value) }
             "animatedBackground" -> (value as? SettingValue.Toggle)
                 ?.let { AppSettingsRepository.setAnimatedBackground(it.enabled) }
-            "tabSize"            -> (value as? SettingValue.Stepper)
-                ?.let { AppSettingsRepository.setTabSize(it.value) }
             "wordWrap"           -> (value as? SettingValue.Toggle)
                 ?.let { AppSettingsRepository.setWordWrap(it.enabled) }
             "lineNumbers"        -> (value as? SettingValue.Toggle)

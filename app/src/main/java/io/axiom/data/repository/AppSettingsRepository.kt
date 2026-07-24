@@ -25,11 +25,9 @@ object AppSettingsRepository {
     val animatedBackground: StateFlow<Boolean> = _animatedBackground.asStateFlow()
 
     // ── Editor ─────────────────────────────────────────────────────────────────
-    private val _tabSize     = MutableStateFlow(4)
     private val _wordWrap    = MutableStateFlow(false)
     private val _lineNumbers = MutableStateFlow(true)
 
-    val tabSize:     StateFlow<Int>     = _tabSize.asStateFlow()
     val wordWrap:    StateFlow<Boolean> = _wordWrap.asStateFlow()
     val lineNumbers: StateFlow<Boolean> = _lineNumbers.asStateFlow()
 
@@ -45,7 +43,6 @@ object AppSettingsRepository {
     fun setAccent(key: String)             { _accentKey.value          = key }
     fun setFontSize(sp: Int)               { _fontSize.value           = sp }
     fun setAnimatedBackground(on: Boolean) { _animatedBackground.value = on }
-    fun setTabSize(n: Int)                 { _tabSize.value            = n }
     fun setWordWrap(on: Boolean)           { _wordWrap.value           = on }
     fun setLineNumbers(on: Boolean)        { _lineNumbers.value        = on }
     fun setAutoFetch(on: Boolean)          { _autoFetch.value          = on }
